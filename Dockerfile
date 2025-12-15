@@ -3,8 +3,7 @@ FROM python:3.14-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src
+    PYTHONUNBUFFERED=1
 
 # Set working directory
 WORKDIR /app
@@ -21,8 +20,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
+# Copy source code and project files
+COPY pyproject.toml .
 COPY src/ ./src/
+
+# Install the package itself (makes subtitle_translator importable)
+RUN pip install --no-cache-dir -e .
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser && \

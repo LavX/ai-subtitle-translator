@@ -13,6 +13,56 @@ class SubtitleLine(BaseModel):
     line: str = Field(..., description="The subtitle text content")
 
 
+class ReasoningConfig(BaseModel):
+    """Configuration for model reasoning/thinking capabilities."""
+    
+    enabled: Optional[bool] = Field(
+        default=None,
+        description="Enable reasoning (default medium effort). Not all models support this."
+    )
+    effort: Optional[str] = Field(
+        default=None,
+        description="Reasoning effort level: 'xhigh', 'high', 'medium', 'low', 'minimal', 'none'"
+    )
+    max_tokens: Optional[int] = Field(
+        default=None,
+        alias="maxTokens",
+        ge=100,
+        le=32000,
+        description="Max tokens for reasoning (alternative to effort)"
+    )
+    
+    model_config = {"populate_by_name": True}
+
+
+class ProviderConfig(BaseModel):
+    """Configuration for OpenRouter provider routing."""
+    
+    order: Optional[List[str]] = Field(
+        default=None,
+        description="List of provider slugs to try in order (e.g., ['exacto', 'deepinfra'])"
+    )
+    allow_fallbacks: Optional[bool] = Field(
+        default=True,
+        alias="allowFallbacks",
+        description="Whether to allow fallbacks to other providers"
+    )
+    sort: Optional[str] = Field(
+        default=None,
+        description="Sort providers by: 'price', 'throughput', or 'latency'"
+    )
+    only: Optional[List[str]] = Field(
+        default=None,
+        description="List of provider slugs to allow exclusively"
+    )
+    ignore: Optional[List[str]] = Field(
+        default=None,
+        description="List of provider slugs to skip"
+    )
+    
+    model_config = {"populate_by_name": True}
+
+
 class TranslationConfig(BaseModel):
     """Per-request configuration that can override defaults."""
     
@@ -37,6 +87,19 @@ class TranslationConfig(BaseModel):
         ge=1,
         le=10,
         description="Max concurrent workers (only via PUT /config)"
+    )
+    reasoning: Optional[ReasoningConfig] = Field(
+        default=None,
+        description="Reasoning/thinking configuration (only supported by some models)"
+    )
+    use_thinking_variant: Optional[bool] = Field(
+        default=None,
+        alias="useThinkingVariant",
+        description="Append :thinking to model ID for extended reasoning (DeepSeek, Qwen)"
+    )
+    provider: Optional[ProviderConfig] = Field(
+        default=None,
+        description="OpenRouter provider routing configuration"
     )
     
     model_config = {"populate_by_name": True}

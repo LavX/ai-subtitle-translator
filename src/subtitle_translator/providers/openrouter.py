@@ -23,67 +23,148 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Recommended models for subtitle translation
+# Reasoning support verified from OpenRouter model pages (Dec 2025)
 RECOMMENDED_MODELS = [
     {
         "id": "google/gemini-2.5-flash-preview-09-2025",
         "name": "Gemini 2.5 Flash Preview",
-        "description": "Fast and efficient for subtitle translation with excellent quality",
+        "description": "Fast and efficient for subtitle translation with built-in thinking capabilities",
         "context_length": 1048576,
+        "supports_reasoning": True,
+        "reasoning_type": "max_tokens",  # Configurable via max_tokens for reasoning
     },
     {
         "id": "google/gemini-2.5-flash-lite-preview-09-2025",
         "name": "Gemini 2.5 Flash Lite Preview",
-        "description": "Lightweight version, very fast and cost-effective",
+        "description": "Lightweight version, thinking disabled by default but can be enabled",
         "context_length": 1048576,
+        "supports_reasoning": True,
+        "reasoning_type": "max_tokens",  # Can enable via Reasoning API parameter
     },
     {
         "id": "anthropic/claude-sonnet-4.5",
         "name": "Claude Sonnet 4.5",
         "description": "Excellent quality translations with nuanced understanding",
-        "context_length": 200000,
+        "context_length": 1000000,
+        "supports_reasoning": True,
+        "reasoning_type": "max_tokens",  # All Anthropic Claude 3.7+ models support reasoning
     },
     {
         "id": "anthropic/claude-haiku-4.5",
         "name": "Claude Haiku 4.5",
-        "description": "Fast and affordable with good quality",
+        "description": "Fast model with extended thinking capabilities",
         "context_length": 200000,
+        "supports_reasoning": True,
+        "reasoning_type": "max_tokens",  # Extended thinking with controllable depth
     },
     {
         "id": "openai/gpt-5-nano",
         "name": "GPT-5 Nano",
-        "description": "Compact and efficient OpenAI model",
-        "context_length": 128000,
+        "description": "Compact and efficient, limited reasoning depth",
+        "context_length": 400000,
+        "supports_reasoning": True,
+        "reasoning_type": "effort",  # GPT-5 series supports effort levels
     },
     {
         "id": "openai/gpt-oss-120b",
         "name": "GPT OSS 120B",
-        "description": "Large open-source style model from OpenAI",
-        "context_length": 128000,
+        "description": "Open-weight MoE model with configurable reasoning depth",
+        "context_length": 131072,
+        "supports_reasoning": True,
+        "reasoning_type": "max_tokens",  # Supports configurable reasoning depth
     },
     {
         "id": "x-ai/grok-4.1-fast",
         "name": "Grok 4.1 Fast",
-        "description": "Fast xAI model with good translation capabilities",
-        "context_length": 131072,
+        "description": "Best agentic tool calling model with 2M context",
+        "context_length": 2000000,
+        "supports_reasoning": True,
+        "reasoning_type": "enabled",  # Uses reasoning.enabled parameter
     },
     {
         "id": "meta-llama/llama-4-maverick",
         "name": "Llama 4 Maverick",
-        "description": "Meta's latest Llama model, excellent multilingual support",
-        "context_length": 128000,
+        "description": "Multimodal MoE model, excellent multilingual support",
+        "context_length": 1048576,
+        "supports_reasoning": False,  # No reasoning mentioned
     },
     {
-        "id": "moonshotai/kimi-k2-0905",
-        "name": "Kimi K2",
-        "description": "Moonshot AI model with strong translation capabilities",
-        "context_length": 128000,
+        "id": "moonshotai/kimi-k2-0905:exacto",
+        "name": "Kimi K2 (Exacto)",
+        "description": "Large MoE model optimized for agentic coding - Exacto endpoint",
+        "context_length": 262144,
+        "supports_reasoning": False,  # No reasoning in base variant
     },
     {
         "id": "minimax/minimax-m2",
         "name": "MiniMax M2",
-        "description": "Efficient model from MiniMax",
-        "context_length": 128000,
+        "description": "Compact model with reasoning, recommends preserving reasoning_details",
+        "context_length": 196608,
+        "supports_reasoning": True,
+        "reasoning_type": "max_tokens",  # Uses reasoning_details
     },
+    {
+        "id": "deepseek/deepseek-v3.2-speciale",
+        "name": "DeepSeek V3.2 Speciale",
+        "description": "High-compute variant optimized for maximum reasoning and agentic performance",
+        "context_length": 163840,
+        "supports_reasoning": True,
+        "reasoning_type": "max_tokens",  # Uses reasoning parameter with reasoning_details
+    },
+    {
+        "id": "z-ai/glm-4.6",
+        "name": "GLM 4.6",
+        "description": "Advanced reasoning model with 200K context and tool use during inference",
+        "context_length": 202752,
+        "supports_reasoning": True,
+        "reasoning_type": "max_tokens",  # Uses reasoning parameter with reasoning_details
+    },
+]
+
+# Anthropic models that require explicit cache_control
+ANTHROPIC_MODELS = [
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-haiku-4.5",
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3.5-haiku",
+    "anthropic/claude-3-opus",
+]
+
+# Models that support the :thinking variant
+THINKING_VARIANT_MODELS = [
+    "deepseek/deepseek-r1",
+    "deepseek/deepseek-chat",
+    "qwen/qwen3-vl-8b-thinking",
+]
+
+# Models that support reasoning with enabled flag (like Grok)
+ENABLED_REASONING_MODELS = [
+    "x-ai/grok-4.1-fast",
+    "x-ai/grok-4.1",
+]
+
+# Models that support reasoning with effort levels (OpenAI o-series, GPT-5 series)
+EFFORT_REASONING_MODELS = [
+    "openai/o3-mini",
+    "openai/o1",
+    "openai/o1-mini",
+    "openai/o4-mini",
+    "openai/gpt-5",
+    "openai/gpt-5-mini",
+    "openai/gpt-5-nano",
+]
+
+# Models that support reasoning with max_tokens
+MAX_TOKENS_REASONING_MODELS = [
+    "google/gemini-2.5-flash-preview-09-2025",
+    "google/gemini-2.5-flash-lite-preview-09-2025",
+    "google/gemini-2.5-pro-preview",
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-haiku-4.5",
+    "openai/gpt-oss-120b",
+    "minimax/minimax-m2",
+    "deepseek/deepseek-v3.2-speciale",
+    "z-ai/glm-4.6",
 ]
 
 
@@ -151,6 +232,166 @@ class OpenRouterProvider(TranslationProvider):
 
         return models
 
+    def _get_reasoning_type(self, model_id: str) -> Optional[str]:
+        """
+        Determine the reasoning type supported by a model.
+        
+        Args:
+            model_id: The model identifier (without :thinking suffix)
+            
+        Returns:
+            Reasoning type: 'thinking_variant', 'effort', 'max_tokens', 'enabled', or None
+        """
+        base_model = model_id.replace(":thinking", "")
+        
+        if base_model in THINKING_VARIANT_MODELS:
+            return "thinking_variant"
+        if base_model in ENABLED_REASONING_MODELS:
+            return "enabled"
+        if base_model in EFFORT_REASONING_MODELS:
+            return "effort"
+        if base_model in MAX_TOKENS_REASONING_MODELS:
+            return "max_tokens"
+        
+        # Check RECOMMENDED_MODELS for reasoning type
+        for model_info in RECOMMENDED_MODELS:
+            if model_info["id"] == base_model:
+                if model_info.get("supports_reasoning"):
+                    return model_info.get("reasoning_type")
+                return None
+                
+        return None
+
+    def _build_reasoning_payload(
+        self,
+        model_id: str,
+        config_override: Optional["TranslationConfig"],
+    ) -> tuple[str, dict[str, Any]]:
+        """
+        Build reasoning-related payload parameters.
+        
+        Args:
+            model_id: The base model identifier
+            config_override: Optional config with reasoning settings
+            
+        Returns:
+            Tuple of (final_model_id, reasoning_params_dict)
+        """
+        reasoning_params: dict[str, Any] = {}
+        final_model_id = model_id
+        
+        if not config_override:
+            return final_model_id, reasoning_params
+            
+        reasoning_config = config_override.reasoning
+        use_thinking = config_override.use_thinking_variant
+        
+        # Check if model supports reasoning
+        reasoning_type = self._get_reasoning_type(model_id)
+        
+        if reasoning_type is None:
+            # Model doesn't support reasoning, skip
+            if reasoning_config or use_thinking:
+                logger.warning(
+                    f"Model {model_id} does not support reasoning/thinking. "
+                    "Reasoning settings will be ignored."
+                )
+            return final_model_id, reasoning_params
+        
+        # Handle :thinking variant
+        if use_thinking and reasoning_type == "thinking_variant":
+            if not model_id.endswith(":thinking"):
+                final_model_id = f"{model_id}:thinking"
+                logger.info(f"Using thinking variant: {final_model_id}")
+            return final_model_id, reasoning_params
+        
+        # Handle reasoning config
+        if reasoning_config:
+            if reasoning_type == "enabled":
+                # For models like Grok that use reasoning.enabled parameter
+                if reasoning_config.enabled:
+                    reasoning_params["reasoning"] = {"enabled": True}
+                    logger.info("Using reasoning enabled: true")
+                elif reasoning_config.enabled is False:
+                    reasoning_params["reasoning"] = {"enabled": False}
+                    logger.info("Using reasoning enabled: false")
+                    
+            elif reasoning_type == "effort":
+                # Build effort-based reasoning params (OpenAI o-series)
+                if reasoning_config.effort:
+                    valid_efforts = ["xhigh", "high", "medium", "low", "minimal", "none"]
+                    if reasoning_config.effort.lower() in valid_efforts:
+                        reasoning_params["reasoning"] = {"effort": reasoning_config.effort.lower()}
+                        logger.info(f"Using reasoning effort: {reasoning_config.effort}")
+                    else:
+                        logger.warning(f"Invalid reasoning effort: {reasoning_config.effort}")
+                elif reasoning_config.enabled:
+                    reasoning_params["reasoning"] = {"effort": "medium"}
+                    logger.info("Using default reasoning effort: medium")
+                    
+            elif reasoning_type == "max_tokens":
+                # Build max_tokens-based reasoning params (Gemini, Claude, MiniMax)
+                if reasoning_config.max_tokens:
+                    reasoning_params["reasoning"] = {"max_tokens": reasoning_config.max_tokens}
+                    logger.info(f"Using reasoning max_tokens: {reasoning_config.max_tokens}")
+                elif reasoning_config.enabled:
+                    # Default to 2000 tokens for reasoning
+                    reasoning_params["reasoning"] = {"max_tokens": 2000}
+                    logger.info("Using default reasoning max_tokens: 2000")
+                    
+            elif reasoning_type == "thinking_variant":
+                # For thinking variant models (DeepSeek, Qwen), use :thinking suffix
+                if reasoning_config.enabled and not model_id.endswith(":thinking"):
+                    final_model_id = f"{model_id}:thinking"
+                    logger.info(f"Using thinking variant: {final_model_id}")
+        
+        return final_model_id, reasoning_params
+
+    def _build_provider_payload(
+        self,
+        config_override: Optional["TranslationConfig"],
+    ) -> dict[str, Any]:
+        """
+        Build provider routing configuration for OpenRouter.
+        
+        Args:
+            config_override: Optional config with provider settings
+            
+        Returns:
+            Provider configuration dict for the payload
+        """
+        provider_params: dict[str, Any] = {}
+        
+        if not config_override or not config_override.provider:
+            # Default: prioritize throughput for fastest response
+            return {"provider": {"sort": "throughput"}}
+        
+        provider_config = config_override.provider
+        
+        if provider_config.order:
+            provider_params["order"] = provider_config.order
+        
+        if provider_config.allow_fallbacks is not None:
+            provider_params["allow_fallbacks"] = provider_config.allow_fallbacks
+            
+        if provider_config.sort:
+            provider_params["sort"] = provider_config.sort
+        elif not provider_config.order:
+            # Default to throughput sorting if no order specified
+            provider_params["sort"] = "throughput"
+            
+        if provider_config.only:
+            provider_params["only"] = provider_config.only
+            
+        if provider_config.ignore:
+            provider_params["ignore"] = provider_config.ignore
+        
+        if provider_params:
+            logger.debug(f"Provider routing params: {provider_params}")
+            return {"provider": provider_params}
+        
+        return {}
+
     async def translate_batch(
         self,
         batch: TranslationBatch,
@@ -195,6 +436,9 @@ class OpenRouterProvider(TranslationProvider):
                 retryable=False,
             )
 
+        # Build reasoning configuration
+        model_to_use, reasoning_params = self._build_reasoning_payload(model_to_use, config_override)
+
         # Build messages
         system_prompt = self.build_system_prompt(
             batch.target_language,
@@ -203,19 +447,57 @@ class OpenRouterProvider(TranslationProvider):
         )
         user_content = self.format_input_for_translation(batch.lines)
 
-        # Build request payload
-        payload = {
-            "model": model_to_use,
-            "messages": [
+        # Build provider routing configuration
+        provider_params = self._build_provider_payload(config_override)
+
+        # Build messages with cache_control for Anthropic models
+        is_anthropic = any(model_to_use.startswith(prefix) for prefix in ["anthropic/"])
+        
+        if is_anthropic:
+            # Anthropic requires explicit cache_control breakpoints
+            # Cache the system prompt since it's consistent across requests
+            messages = [
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": system_prompt,
+                            "cache_control": {"type": "ephemeral"}
+                        }
+                    ]
+                },
+                {"role": "user", "content": user_content},
+            ]
+        else:
+            # Other providers use automatic caching
+            messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
-            ],
+            ]
+
+        # Build request payload
+        payload: dict[str, Any] = {
+            "model": model_to_use,
+            "messages": messages,
             "temperature": temp_to_use,
             "max_tokens": self.settings.openrouter_max_tokens,
             "response_format": {"type": "json_object"},
+            # Include usage stats to track cache savings
+            "usage": {"include": True},
         }
+        
+        # Add reasoning params if configured
+        if reasoning_params:
+            payload.update(reasoning_params)
+            
+        # Add provider routing params
+        if provider_params:
+            payload.update(provider_params)
 
         logger.debug(f"Sending translation request for {len(batch.lines)} lines using {model_to_use}")
+        if reasoning_params:
+            logger.debug(f"Reasoning params: {reasoning_params}")
 
         try:
             # Create request-specific client if API key differs from default

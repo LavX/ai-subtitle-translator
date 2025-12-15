@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # OpenRouter Configuration
     openrouter_api_key: str = ""
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
-    openrouter_default_model: str = "google/gemini-2.5-flash-preview-05-20"
+    openrouter_default_model: str = "moonshotai/kimi-k2-0905:exacto"
     openrouter_temperature: float = 0.3
     openrouter_max_tokens: int = 8000
 
