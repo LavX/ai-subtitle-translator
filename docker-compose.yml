@@ -1,0 +1,43 @@
+# AI Subtitle Translator by LavX
+# https://github.com/LavX/ai-subtitle-translator
+version: '3.8'
+
+services:
+  ai-subtitle-translator:
+    build: .
+    container_name: ai-subtitle-translator
+    ports:
+      - "8765:8765"
+    environment:
+      # OpenRouter Configuration
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_DEFAULT_MODEL=${OPENROUTER_DEFAULT_MODEL:-google/gemini-2.5-flash-preview-09-2025}
+      - OPENROUTER_TEMPERATURE=${OPENROUTER_TEMPERATURE:-0.3}
+      - OPENROUTER_MAX_TOKENS=${OPENROUTER_MAX_TOKENS:-8000}
+      # Server Configuration
+      - HOST=0.0.0.0
+      - PORT=8765
+      # Translation Configuration
+      - BATCH_SIZE=${BATCH_SIZE:-100}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_DELAY=${RETRY_DELAY:-1.0}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-120.0}
+      # App identification for OpenRouter analytics
+      - APP_NAME=${APP_NAME:-ai-subtitle-translator}
+      - APP_URL=${APP_URL:-https://lavx.hu}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: ai-subtitle-translator-network
