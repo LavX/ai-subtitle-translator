@@ -1,6 +1,7 @@
 """Pydantic request/response models for the API."""
 
-from typing import Optional
+from datetime import datetime
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -126,3 +127,45 @@ class TranslationProgress(BaseModel):
     completed_lines: int = Field(..., description="Number of lines translated")
     percent_complete: float = Field(..., description="Percentage of completion (0-100)")
     status: str = Field(..., description="Current status: 'processing', 'completed', 'failed'")
+
+
+# Job Queue Models
+
+class JobSubmitResponse(BaseModel):
+    """Response model for job submission."""
+
+    jobId: str = Field(..., description="Unique job identifier (UUID)")
+    status: str = Field(default="queued", description="Initial job status")
+    position: Optional[int] = Field(default=None, description="Position in queue (1-based)")
+
+
+class JobStatusResponse(BaseModel):
+    """Response model for job status."""
+
+    jobId: str = Field(..., description="Unique job identifier (UUID)")
+    jobType: Optional[str] = Field(default=None, description="Type of job (translate_content, translate_file)")
+    status: str = Field(..., description="Job status: queued, processing, completed, failed, cancelled")
+    progress: int = Field(default=0, ge=0, le=100, description="Progress percentage (0-100)")
+    message: Optional[str] = Field(default=None, description="Status message")
+    createdAt: datetime = Field(..., description="Job creation timestamp")
+    startedAt: Optional[datetime] = Field(default=None, description="Processing start timestamp")
+    completedAt: Optional[datetime] = Field(default=None, description="Completion timestamp")
+    result: Optional[Any] = Field(default=None, description="Translation result (only when completed)")
+    error: Optional[str] = Field(default=None, description="Error message (only when failed)")
+
+
+class JobListResponse(BaseModel):
+    """Response model for listing jobs."""
+
+    jobs: List[JobStatusResponse] = Field(..., description="List of jobs")
+    total: int = Field(..., description="Total number of jobs")
+    processing: int = Field(..., description="Number of jobs currently processing")
+    queued: int = Field(..., description="Number of jobs in queue")
+
+
+class JobDeleteResponse(BaseModel):
+    """Response model for job deletion/cancellation."""
+
+    jobId: str = Field(..., description="The job ID")
+    status: str = Field(..., description="New job status after operation")
+    message: str = Field(..., description="Operation result message")

@@ -6,9 +6,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from subtitle_translator.api.routes import api_router, health_router
+from subtitle_translator.api.routes import api_router, health_router, jobs_router
 from subtitle_translator.config import get_settings
 from subtitle_translator.core.translator import close_translator
+from subtitle_translator.queue.job_manager import job_manager
+from subtitle_translator.queue.worker import job_worker_handler
 
 # Configure logging
 logging.basicConfig(
@@ -35,10 +37,19 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("OpenRouter API key is configured")
     
+    # Start job queue workers
+    logger.info(f"Starting job queue with {settings.job_queue_max_concurrent} workers")
+    job_manager.max_concurrent = settings.job_queue_max_concurrent
+    job_manager.max_jobs = settings.job_queue_max_jobs
+    job_manager.job_ttl = settings.job_queue_ttl
+    job_manager.set_worker_handler(job_worker_handler)
+    await job_manager.start_workers()
+    
     yield
     
     # Shutdown
     logger.info("Shutting down AI Subtitle Translator service")
+    await job_manager.stop_workers()
     await close_translator()
 
 
@@ -77,6 +88,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(health_router)
     app.include_router(api_router)
+    app.include_router(jobs_router)
     
     return app
 

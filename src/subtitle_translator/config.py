@@ -1,5 +1,6 @@
 """Configuration management using pydantic-settings."""
 
+from datetime import timedelta
 from functools import lru_cache
 from typing import Optional
 
@@ -34,6 +35,11 @@ class Settings(BaseSettings):
     retry_delay: float = 1.0
     request_timeout: float = 120.0
 
+    # Job Queue Configuration
+    job_queue_max_concurrent: int = 2  # Max concurrent translation jobs
+    job_queue_max_jobs: int = 100  # Max jobs in memory
+    job_queue_ttl_hours: int = 1  # TTL for completed/failed jobs
+
     # App identification for OpenRouter analytics
     app_name: str = "ai-subtitle-translator"
     app_url: Optional[str] = "https://lavx.hu"
@@ -67,6 +73,11 @@ class Settings(BaseSettings):
         # Handle full language names or codes
         code = language_code.lower().split("-")[0].split("_")[0]
         return code in self.rtl_languages
+
+    @property
+    def job_queue_ttl(self) -> timedelta:
+        """Get job TTL as timedelta."""
+        return timedelta(hours=self.job_queue_ttl_hours)
 
 
 @lru_cache
