@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import AsyncGenerator, Callable, Optional
+from typing import AsyncGenerator, Callable, Optional, TYPE_CHECKING
 
 from subtitle_translator.config import Settings, get_settings
 from subtitle_translator.providers.base import (
@@ -13,6 +13,9 @@ from subtitle_translator.providers.base import (
     TranslationProviderError,
     TranslationResult,
 )
+
+if TYPE_CHECKING:
+    from subtitle_translator.api.models import TranslationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +123,7 @@ class BatchProcessor:
         batch_index: int,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        config_override: Optional["TranslationConfig"] = None,
     ) -> BatchResult:
         """
         Process a single batch with retry logic.
@@ -129,6 +133,7 @@ class BatchProcessor:
             batch_index: Index of this batch
             model: Optional model override
             temperature: Optional temperature override
+            config_override: Optional per-request configuration override
 
         Returns:
             BatchResult with translations or error
@@ -139,7 +144,7 @@ class BatchProcessor:
         while retries <= self.settings.max_retries:
             try:
                 result = await self.provider.translate_batch(
-                    batch, model=model, temperature=temperature
+                    batch, model=model, temperature=temperature, config_override=config_override
                 )
                 
                 return BatchResult(
@@ -207,6 +212,7 @@ class BatchProcessor:
         temperature: Optional[float] = None,
         batch_size: Optional[int] = None,
         progress_callback: Optional[Callable[[BatchProgress], None]] = None,
+        config_override: Optional["TranslationConfig"] = None,
     ) -> BatchProcessingResult:
         """
         Process all batches sequentially.
@@ -221,12 +227,18 @@ class BatchProcessor:
             temperature: Optional temperature override
             batch_size: Optional batch size override
             progress_callback: Optional callback for progress updates
+            config_override: Optional per-request configuration override
 
         Returns:
             BatchProcessingResult with all translations
         """
         batches = self.create_batches(lines, batch_size)
-        model_to_use = model or self.settings.openrouter_default_model
+        
+        # Determine model to use (config override takes precedence)
+        if config_override and config_override.model:
+            model_to_use = config_override.model
+        else:
+            model_to_use = model or self.settings.openrouter_default_model
         
         progress = BatchProgress(
             total_batches=len(batches),
@@ -248,7 +260,7 @@ class BatchProcessor:
             logger.info(f"Processing batch {i + 1}/{len(batches)} ({len(batch_lines)} lines)")
 
             result = await self.process_batch(
-                batch, batch_index=i, model=model, temperature=temperature
+                batch, batch_index=i, model=model, temperature=temperature, config_override=config_override
             )
             batch_results.append(result)
 
@@ -283,6 +295,7 @@ class BatchProcessor:
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         batch_size: Optional[int] = None,
+        config_override: Optional["TranslationConfig"] = None,
     ) -> AsyncGenerator[tuple[BatchResult, BatchProgress], None]:
         """
         Process batches and yield results as they complete.
@@ -298,6 +311,7 @@ class BatchProcessor:
             model: Optional model override
             temperature: Optional temperature override
             batch_size: Optional batch size override
+            config_override: Optional per-request configuration override
 
         Yields:
             Tuples of (BatchResult, BatchProgress) for each completed batch
@@ -319,7 +333,7 @@ class BatchProcessor:
             )
 
             result = await self.process_batch(
-                batch, batch_index=i, model=model, temperature=temperature
+                batch, batch_index=i, model=model, temperature=temperature, config_override=config_override
             )
 
             if result.success:

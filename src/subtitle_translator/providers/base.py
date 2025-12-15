@@ -2,7 +2,10 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from subtitle_translator.api.models import TranslationConfig
 
 
 @dataclass
@@ -83,6 +86,7 @@ class TranslationProvider(ABC):
         batch: TranslationBatch,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        config_override: Optional["TranslationConfig"] = None,
     ) -> TranslationResult:
         """
         Translate a batch of subtitle lines.
@@ -91,6 +95,7 @@ class TranslationProvider(ABC):
             batch: The batch of subtitle lines to translate
             model: Optional model override
             temperature: Optional temperature override
+            config_override: Optional per-request configuration override
 
         Returns:
             TranslationResult containing translated lines and metadata

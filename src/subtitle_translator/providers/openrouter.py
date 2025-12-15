@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 import httpx
 
@@ -16,6 +16,9 @@ from subtitle_translator.providers.base import (
     TranslationProviderError,
     TranslationResult,
 )
+
+if TYPE_CHECKING:
+    from subtitle_translator.api.models import TranslationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +156,7 @@ class OpenRouterProvider(TranslationProvider):
         batch: TranslationBatch,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        config_override: Optional["TranslationConfig"] = None,
     ) -> TranslationResult:
         """
         Translate a batch of subtitle lines using OpenRouter.
@@ -161,6 +165,7 @@ class OpenRouterProvider(TranslationProvider):
             batch: The batch of subtitle lines to translate
             model: Optional model override
             temperature: Optional temperature override
+            config_override: Optional per-request configuration override
 
         Returns:
             TranslationResult containing translated lines and metadata
@@ -168,8 +173,27 @@ class OpenRouterProvider(TranslationProvider):
         Raises:
             TranslationProviderError: On translation failure
         """
-        model_to_use = model or self.settings.openrouter_default_model
-        temp_to_use = temperature if temperature is not None else self.settings.openrouter_temperature
+        # Apply config override if provided (highest priority)
+        if config_override:
+            api_key = config_override.api_key or self.settings.openrouter_api_key
+            model_to_use = config_override.model or model or self.settings.openrouter_default_model
+            temp_to_use = (
+                config_override.temperature
+                if config_override.temperature is not None
+                else (temperature if temperature is not None else self.settings.openrouter_temperature)
+            )
+        else:
+            api_key = self.settings.openrouter_api_key
+            model_to_use = model or self.settings.openrouter_default_model
+            temp_to_use = temperature if temperature is not None else self.settings.openrouter_temperature
+
+        # Validate API key
+        if not api_key:
+            raise TranslationProviderError(
+                "OpenRouter API key not configured. Set OPENROUTER_API_KEY environment variable or pass apiKey in request config.",
+                provider=self.provider_name,
+                retryable=False,
+            )
 
         # Build messages
         system_prompt = self.build_system_prompt(
@@ -194,8 +218,19 @@ class OpenRouterProvider(TranslationProvider):
         logger.debug(f"Sending translation request for {len(batch.lines)} lines using {model_to_use}")
 
         try:
-            response = await self.client.post("/chat/completions", json=payload)
-            return await self._process_response(response, model_to_use)
+            # Create request-specific client if API key differs from default
+            if config_override and config_override.api_key and config_override.api_key != self.settings.openrouter_api_key:
+                headers = self.settings.get_openrouter_headers(api_key_override=config_override.api_key)
+                async with httpx.AsyncClient(
+                    base_url=self.settings.openrouter_api_base,
+                    headers=headers,
+                    timeout=httpx.Timeout(self.settings.request_timeout),
+                ) as client:
+                    response = await client.post("/chat/completions", json=payload)
+                    return await self._process_response(response, model_to_use)
+            else:
+                response = await self.client.post("/chat/completions", json=payload)
+                return await self._process_response(response, model_to_use)
         except httpx.TimeoutException as e:
             raise TranslationProviderError(
                 f"Request timed out after {self.settings.request_timeout}s",

@@ -13,6 +13,35 @@ class SubtitleLine(BaseModel):
     line: str = Field(..., description="The subtitle text content")
 
 
+class TranslationConfig(BaseModel):
+    """Per-request configuration that can override defaults."""
+    
+    api_key: Optional[str] = Field(
+        default=None,
+        alias="apiKey",
+        description="OpenRouter API key (overrides environment variable)"
+    )
+    model: Optional[str] = Field(
+        default=None,
+        description="Model to use for translation"
+    )
+    temperature: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Sampling temperature (0.0-2.0)"
+    )
+    max_concurrent_jobs: Optional[int] = Field(
+        default=None,
+        alias="maxConcurrentJobs",
+        ge=1,
+        le=10,
+        description="Max concurrent workers (only via PUT /config)"
+    )
+    
+    model_config = {"populate_by_name": True}
+
+
 class TranslateContentRequest(BaseModel):
     """
     Request model for translating subtitle content.
@@ -37,6 +66,9 @@ class TranslateContentRequest(BaseModel):
     )
     temperature: Optional[float] = Field(
         default=None, ge=0.0, le=2.0, description="Override default temperature (0.0-2.0)"
+    )
+    config: Optional[TranslationConfig] = Field(
+        default=None, description="Per-request configuration overrides"
     )
 
 
@@ -64,6 +96,9 @@ class TranslateFileRequest(BaseModel):
     )
     temperature: Optional[float] = Field(
         default=None, ge=0.0, le=2.0, description="Override default temperature"
+    )
+    config: Optional[TranslationConfig] = Field(
+        default=None, description="Per-request configuration overrides"
     )
 
 
@@ -169,3 +204,57 @@ class JobDeleteResponse(BaseModel):
     jobId: str = Field(..., description="The job ID")
     status: str = Field(..., description="New job status after operation")
     message: str = Field(..., description="Operation result message")
+
+
+class ConfigResponse(BaseModel):
+    """Response model for configuration endpoint."""
+
+    model: str = Field(..., description="Default translation model")
+    temperature: float = Field(..., description="Default temperature")
+    batchSize: int = Field(..., description="Batch size for translation")
+    maxConcurrentJobs: int = Field(..., description="Max concurrent translation jobs")
+    maxJobs: int = Field(..., description="Max jobs in memory")
+    apiKeyConfigured: bool = Field(..., description="Whether API key is configured")
+    queueStatus: dict = Field(..., description="Current queue status")
+
+
+class ConfigUpdateRequest(BaseModel):
+    """Request model for updating runtime configuration."""
+    
+    apiKey: Optional[str] = Field(
+        default=None,
+        description="OpenRouter API key"
+    )
+    model: Optional[str] = Field(
+        default=None,
+        description="Default model for translation"
+    )
+    temperature: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Default temperature"
+    )
+    maxConcurrentJobs: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=10,
+        description="Max concurrent workers"
+    )
+
+
+class ConfigUpdateResponse(BaseModel):
+    """Response model for configuration update."""
+
+    status: str = Field(..., description="Update status")
+    message: str = Field(default="Configuration updated", description="Status message")
+
+
+class ServiceStatusResponse(BaseModel):
+    """Response model for service status endpoint."""
+
+    service: str = Field(..., description="Service name")
+    version: str = Field(..., description="Service version")
+    healthy: bool = Field(..., description="Whether service is healthy")
+    config: dict = Field(..., description="Current configuration summary")
+    queue: dict = Field(..., description="Queue status")

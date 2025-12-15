@@ -1,8 +1,8 @@
 """Configuration management using pydantic-settings."""
 
+import threading
 from datetime import timedelta
-from functools import lru_cache
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -56,17 +56,30 @@ class Settings(BaseSettings):
         "ku",  # Kurdish (Sorani)
     ]
 
-    @property
-    def openrouter_headers(self) -> dict[str, str]:
-        """Get headers for OpenRouter API requests."""
+    def get_openrouter_headers(self, api_key_override: Optional[str] = None) -> dict[str, str]:
+        """
+        Get headers for OpenRouter API requests.
+        
+        Args:
+            api_key_override: Optional API key to use instead of the configured one
+            
+        Returns:
+            Headers dictionary for OpenRouter API requests
+        """
+        api_key = api_key_override or self.openrouter_api_key
         headers = {
-            "Authorization": f"Bearer {self.openrouter_api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "X-Title": self.app_name,
         }
         if self.app_url:
             headers["HTTP-Referer"] = self.app_url
         return headers
+
+    @property
+    def openrouter_headers(self) -> dict[str, str]:
+        """Get headers for OpenRouter API requests (legacy property)."""
+        return self.get_openrouter_headers()
 
     def is_rtl_language(self, language_code: str) -> bool:
         """Check if a language code represents an RTL language."""
@@ -80,7 +93,90 @@ class Settings(BaseSettings):
         return timedelta(hours=self.job_queue_ttl_hours)
 
 
-@lru_cache
+# Global settings instance with lock for thread safety
+_settings: Optional[Settings] = None
+_settings_lock = threading.Lock()
+_runtime_overrides: Dict[str, Any] = {}
+
+
 def get_settings() -> Settings:
-    """Get cached settings instance."""
-    return Settings()
+    """
+    Get settings instance with runtime overrides applied.
+    
+    This function returns a settings instance that combines:
+    1. Environment variables / .env file values (base)
+    2. Runtime overrides set via update_runtime_config
+    
+    Returns:
+        Settings instance with runtime overrides applied
+    """
+    global _settings
+    with _settings_lock:
+        if _settings is None:
+            _settings = Settings()
+        
+        # Apply runtime overrides
+        if _runtime_overrides:
+            # Create a copy of current settings with overrides
+            settings_dict = _settings.model_dump()
+            settings_dict.update(_runtime_overrides)
+            return Settings(**settings_dict)
+        
+        return _settings
+
+
+def update_runtime_config(key: str, value: Any) -> None:
+    """
+    Update configuration at runtime without restarting.
+    
+    This allows dynamic configuration changes through the API.
+    The changes are stored in memory and will be lost on restart.
+    
+    Args:
+        key: Configuration key to update (must be a valid Settings field)
+        value: New value for the configuration
+        
+    Raises:
+        ValueError: If key is not a valid Settings field
+    """
+    global _runtime_overrides
+    
+    # Validate that key is a valid Settings field
+    valid_keys = set(Settings.model_fields.keys())
+    if key not in valid_keys:
+        raise ValueError(f"Invalid configuration key: {key}. Valid keys: {valid_keys}")
+    
+    with _settings_lock:
+        _runtime_overrides[key] = value
+
+
+def get_runtime_overrides() -> Dict[str, Any]:
+    """
+    Get current runtime configuration overrides.
+    
+    Returns:
+        Dictionary of runtime overrides (keys are masked for sensitive values)
+    """
+    with _settings_lock:
+        result = {}
+        for key, value in _runtime_overrides.items():
+            if "key" in key.lower() or "secret" in key.lower() or "password" in key.lower():
+                result[key] = "***" if value else None
+            else:
+                result[key] = value
+        return result
+
+
+def clear_runtime_overrides() -> None:
+    """Clear all runtime configuration overrides."""
+    global _runtime_overrides
+    with _settings_lock:
+        _runtime_overrides = {}
+
+
+def reset_settings() -> None:
+    """Reset settings instance to force reload from environment."""
+    global _settings, _runtime_overrides
+    with _settings_lock:
+        _settings = None
+        _runtime_overrides = {}

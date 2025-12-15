@@ -387,6 +387,39 @@ class JobManager:
         
         return stats
     
+    async def set_max_concurrent(self, new_max: int) -> None:
+        """
+        Update max concurrent workers at runtime.
+        
+        This allows dynamically scaling the number of worker tasks.
+        If increasing, new workers are started immediately.
+        If decreasing, workers are allowed to finish naturally.
+        
+        Args:
+            new_max: New maximum number of concurrent workers (1-10)
+            
+        Raises:
+            ValueError: If new_max is not between 1 and 10
+        """
+        if new_max < 1 or new_max > 10:
+            raise ValueError("max_concurrent must be between 1 and 10")
+        
+        old_max = self.max_concurrent
+        self.max_concurrent = new_max
+        
+        logger.info(f"Updating max concurrent workers: {old_max} -> {new_max}")
+        
+        # Start additional workers if needed
+        if new_max > old_max and self._workers_started:
+            for i in range(old_max, new_max):
+                logger.info(f"Starting additional worker {i}")
+                task = asyncio.create_task(self._worker(i))
+                self._workers.append(task)
+        
+        # Note: We don't stop existing workers when decreasing.
+        # They will naturally stop when the queue is empty or
+        # will be cancelled when stop_workers() is called.
+    
     async def _worker(self, worker_id: int) -> None:
         """
         Background worker that processes jobs from the queue.

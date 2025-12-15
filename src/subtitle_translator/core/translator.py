@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
 from subtitle_translator.config import Settings, get_settings
@@ -10,6 +10,9 @@ from subtitle_translator.core.batch_processor import BatchProcessor, BatchProces
 from subtitle_translator.core.srt_parser import SRTParser, SubtitleEntry
 from subtitle_translator.providers.base import TranslationProvider
 from subtitle_translator.providers.openrouter import OpenRouterProvider
+
+if TYPE_CHECKING:
+    from subtitle_translator.api.models import TranslationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -71,16 +74,21 @@ class SubtitleTranslator:
     async def translate_content(
         self,
         request: TranslateContentRequest,
+        config_override: Optional["TranslationConfig"] = None,
     ) -> ContentTranslationResult:
         """
         Translate subtitle content from a Lingarr-compatible request.
 
         Args:
             request: Translation request with lines to translate
+            config_override: Optional per-request configuration override
 
         Returns:
             ContentTranslationResult with translated lines
         """
+        # Use config from request if not provided explicitly
+        effective_config = config_override or request.config
+        
         if not request.lines:
             return ContentTranslationResult(
                 lines=[],
@@ -107,6 +115,7 @@ class SubtitleTranslator:
                 context_media_type=request.mediaType,
                 model=request.model,
                 temperature=request.temperature,
+                config_override=effective_config,
             )
 
             # Check if translation was successful
@@ -163,6 +172,7 @@ class SubtitleTranslator:
         title: Optional[str] = None,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        config_override: Optional["TranslationConfig"] = None,
     ) -> FileTranslationResult:
         """
         Translate an entire SRT file.
@@ -174,11 +184,16 @@ class SubtitleTranslator:
             title: Optional media title for context
             model: Optional model override
             temperature: Optional temperature override
+            config_override: Optional per-request configuration override
 
         Returns:
             FileTranslationResult with translated SRT content
         """
-        model_to_use = model or self.settings.openrouter_default_model
+        # Determine model to use (config override takes precedence)
+        if config_override and config_override.model:
+            model_to_use = config_override.model
+        else:
+            model_to_use = model or self.settings.openrouter_default_model
 
         # Validate and parse SRT
         is_valid, error = self._srt_parser.validate_srt(content)
@@ -214,6 +229,7 @@ class SubtitleTranslator:
                 context_title=title,
                 model=model,
                 temperature=temperature,
+                config_override=config_override,
             )
 
             if not result.success:

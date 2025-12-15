@@ -1,9 +1,9 @@
 """Worker functions for processing translation jobs."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
+from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest, TranslationConfig
 from subtitle_translator.core.batch_processor import BatchProgress, BatchProcessor
 from subtitle_translator.core.translator import SubtitleTranslator, get_translator
 from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
@@ -37,6 +37,9 @@ async def process_content_translation_job(
             job_manager.set_job_completed(job_id, {"lines": [], "model_used": "", "tokens_used": 0})
             return
         
+        # Extract config override from request
+        config_override = _extract_config_override(request.config, job.request_data)
+        
         # Convert request lines to internal format
         lines = [
             {"index": str(line.position), "content": line.line}
@@ -62,6 +65,7 @@ async def process_content_translation_job(
             model=request.model,
             temperature=request.temperature,
             progress_callback=progress_callback,
+            config_override=config_override,
         )
         
         if not result.success:
@@ -140,6 +144,9 @@ async def process_file_translation_job(
         model = request_data.get("model")
         temperature = request_data.get("temperature")
         
+        # Extract config override from request data
+        config_override = _extract_config_override_from_dict(request_data.get("config"))
+        
         if not content or not content.strip():
             job_manager.set_job_failed(job_id, "SRT content is required")
             return
@@ -185,6 +192,7 @@ async def process_file_translation_job(
             model=model,
             temperature=temperature,
             progress_callback=progress_callback,
+            config_override=config_override,
         )
         
         if not result.success:
@@ -294,6 +302,56 @@ def _add_rtl_markers(text: str) -> str:
             marked_lines.append(line)
     
     return "\n".join(marked_lines)
+
+
+def _extract_config_override(
+    config: Optional[TranslationConfig],
+    request_data: Dict[str, Any],
+) -> Optional[TranslationConfig]:
+    """
+    Extract TranslationConfig from request, handling both parsed model and raw dict.
+    
+    Args:
+        config: Parsed TranslationConfig if available
+        request_data: Raw request data dictionary
+        
+    Returns:
+        TranslationConfig if present, None otherwise
+    """
+    if config is not None:
+        return config
+    
+    # Try to extract from raw request data
+    return _extract_config_override_from_dict(request_data.get("config"))
+
+
+def _extract_config_override_from_dict(
+    config_dict: Optional[Dict[str, Any]],
+) -> Optional[TranslationConfig]:
+    """
+    Extract TranslationConfig from a dictionary.
+    
+    Args:
+        config_dict: Raw config dictionary from request
+        
+    Returns:
+        TranslationConfig if valid dict provided, None otherwise
+    """
+    if config_dict is None:
+        return None
+    
+    if not isinstance(config_dict, dict):
+        return None
+    
+    # Check if any fields are present
+    if not any(key in config_dict for key in ["apiKey", "api_key", "model", "temperature", "maxConcurrentJobs", "max_concurrent_jobs"]):
+        return None
+    
+    try:
+        return TranslationConfig(**config_dict)
+    except Exception:
+        # If validation fails, return None
+        return None
 
 
 async def job_worker_handler(

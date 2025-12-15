@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from subtitle_translator.api.routes import api_router, health_router, jobs_router
+from subtitle_translator.api.routes import api_router, config_router, health_router, jobs_router
 from subtitle_translator.config import get_settings
 from subtitle_translator.core.translator import close_translator
 from subtitle_translator.queue.job_manager import job_manager
@@ -89,6 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(api_router)
     app.include_router(jobs_router)
+    app.include_router(config_router)
     
     return app
 
