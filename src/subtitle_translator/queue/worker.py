@@ -37,8 +37,19 @@ async def process_content_translation_job(
             job_manager.set_job_completed(job_id, {"lines": [], "model_used": "", "tokens_used": 0})
             return
         
+        # Log incoming request data for debugging
+        raw_config = job.request_data.get("config")
+        logger.info(f"Job {job_id}: Raw config from request_data: {raw_config}")
+        
         # Extract config override from request
         config_override = _extract_config_override(request.config, job.request_data)
+        
+        # Log API key tracking (masked)
+        if config_override and config_override.api_key:
+            masked_key = config_override.api_key[:10] + "..." if len(config_override.api_key) > 10 else "***"
+            logger.info(f"Job {job_id}: Using API key from config: {masked_key}")
+        else:
+            logger.info(f"Job {job_id}: No API key in config_override, will use env default")
         
         # Convert request lines to internal format
         lines = [
@@ -146,6 +157,13 @@ async def process_file_translation_job(
         
         # Extract config override from request data
         config_override = _extract_config_override_from_dict(request_data.get("config"))
+        
+        # Debug log for API key tracking (masked)
+        if config_override and config_override.api_key:
+            masked_key = config_override.api_key[:10] + "..." if len(config_override.api_key) > 10 else "***"
+            logger.debug(f"Job {job_id}: Using API key from config: {masked_key}")
+        else:
+            logger.warning(f"Job {job_id}: No API key in config_override, will use env default")
         
         if not content or not content.strip():
             job_manager.set_job_failed(job_id, "SRT content is required")
@@ -344,13 +362,14 @@ def _extract_config_override_from_dict(
         return None
     
     # Check if any fields are present
-    if not any(key in config_dict for key in ["apiKey", "api_key", "model", "temperature", "maxConcurrentJobs", "max_concurrent_jobs"]):
+    if not any(key in config_dict for key in ["apiKey", "api_key", "model", "temperature", "maxConcurrentJobs", "max_concurrent_jobs", "reasoning", "provider"]):
         return None
     
     try:
         return TranslationConfig(**config_dict)
-    except Exception:
-        # If validation fails, return None
+    except Exception as e:
+        # Log validation failure for debugging
+        logger.warning(f"Failed to create TranslationConfig from dict: {e}")
         return None
 
 

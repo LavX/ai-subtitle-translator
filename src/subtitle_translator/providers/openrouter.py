@@ -66,8 +66,8 @@ RECOMMENDED_MODELS = [
         "reasoning_type": "effort",  # GPT-5 series supports effort levels
     },
     {
-        "id": "openai/gpt-oss-120b",
-        "name": "GPT OSS 120B",
+        "id": "openai/gpt-oss-120b:exacto",
+        "name": "GPT OSS 120B (Exacto)",
         "description": "Open-weight MoE model with configurable reasoning depth",
         "context_length": 131072,
         "supports_reasoning": True,
@@ -423,10 +423,16 @@ class OpenRouterProvider(TranslationProvider):
                 if config_override.temperature is not None
                 else (temperature if temperature is not None else self.settings.openrouter_temperature)
             )
+            # Debug logging for API key tracking
+            if config_override.api_key:
+                logger.debug(f"Using API key from config_override: {config_override.api_key[:15]}...")
+            else:
+                logger.warning(f"config_override exists but api_key is None/empty. config_override fields: api_key={config_override.api_key is not None}, model={config_override.model}")
         else:
             api_key = self.settings.openrouter_api_key
             model_to_use = model or self.settings.openrouter_default_model
             temp_to_use = temperature if temperature is not None else self.settings.openrouter_temperature
+            logger.debug("No config_override, using settings")
 
         # Validate API key
         if not api_key:
@@ -501,8 +507,10 @@ class OpenRouterProvider(TranslationProvider):
 
         try:
             # Create request-specific client if API key differs from default
-            if config_override and config_override.api_key and config_override.api_key != self.settings.openrouter_api_key:
+            # Always use config_override API key if available
+            if config_override and config_override.api_key:
                 headers = self.settings.get_openrouter_headers(api_key_override=config_override.api_key)
+                logger.info(f"Making request with per-request API key: {config_override.api_key[:15]}... Auth header set: {'Authorization' in headers}")
                 async with httpx.AsyncClient(
                     base_url=self.settings.openrouter_api_base,
                     headers=headers,
@@ -511,6 +519,7 @@ class OpenRouterProvider(TranslationProvider):
                     response = await client.post("/chat/completions", json=payload)
                     return await self._process_response(response, model_to_use)
             else:
+                logger.info(f"Making request with default client (env API key configured: {bool(self.settings.openrouter_api_key)})")
                 response = await self.client.post("/chat/completions", json=payload)
                 return await self._process_response(response, model_to_use)
         except httpx.TimeoutException as e:
