@@ -101,6 +101,13 @@ class TranslationConfig(BaseModel):
         default=None,
         description="OpenRouter provider routing configuration"
     )
+    parallel_batches: Optional[int] = Field(
+        default=None,
+        alias="parallelBatches",
+        ge=1,
+        le=10,
+        description="Number of batches to process in parallel per job (default: 4)"
+    )
     
     model_config = {"populate_by_name": True}
 
@@ -275,6 +282,7 @@ class ConfigResponse(BaseModel):
     model: str = Field(..., description="Default translation model")
     temperature: float = Field(..., description="Default temperature")
     batchSize: int = Field(..., description="Batch size for translation")
+    parallelBatchesPerJob: int = Field(..., description="Number of batches processed in parallel per job")
     maxConcurrentJobs: int = Field(..., description="Max concurrent translation jobs")
     maxJobs: int = Field(..., description="Max jobs in memory")
     apiKeyConfigured: bool = Field(..., description="Whether API key is configured")
@@ -303,6 +311,12 @@ class ConfigUpdateRequest(BaseModel):
         ge=1,
         le=10,
         description="Max concurrent workers"
+    )
+    parallelBatchesPerJob: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=10,
+        description="Number of batches to process in parallel per job"
     )
 
 

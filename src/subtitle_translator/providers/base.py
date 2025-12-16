@@ -106,16 +106,6 @@ class TranslationProvider(ABC):
         pass
 
     @abstractmethod
-    async def get_available_models(self) -> list[dict]:
-        """
-        Get list of available models from the provider.
-
-        Returns:
-            List of model information dictionaries
-        """
-        pass
-
-    @abstractmethod
     async def health_check(self) -> bool:
         """
         Check if the provider is available and configured correctly.
@@ -130,9 +120,20 @@ class TranslationProvider(ABC):
         """Clean up resources (close HTTP connections, etc.)."""
         pass
 
+    @abstractmethod
+    async def get_available_models(self) -> list[dict]:
+        """
+        Get list of available models from the provider.
+
+        Returns:
+            List of model information dictionaries
+        """
+        pass
+
     def build_system_prompt(
         self,
         target_language: str,
+        source_language: str,
         context_title: Optional[str] = None,
         context_media_type: Optional[str] = None,
     ) -> str:
@@ -141,6 +142,7 @@ class TranslationProvider(ABC):
 
         Args:
             target_language: Target language for translation
+            source_language: Source language for translation
             context_title: Optional media title for context
             context_media_type: Optional media type (Episode/Movie)
 
@@ -153,19 +155,63 @@ class TranslationProvider(ABC):
         if context_media_type:
             context_info += f"\nMedia type: {context_media_type}"
 
-        return f"""You are a professional subtitle translator specializing in translating subtitles to {target_language}.
-{context_info}
+        language_note = f"Follow natural {target_language} grammar, expressions, and use proper diacritics/accents for the language."
 
-Your task is to translate the provided subtitle lines while following these rules:
-1. Return ONLY a valid JSON array with the exact format: [{{"index": "0", "content": "translated text"}}, ...]
-2. Each object must have "index" (string) and "content" (string) keys
-3. Preserve the original meaning and tone of the dialogue
-4. Keep translations natural and colloquial for spoken dialogue
-5. Maintain approximately 40-50 characters per line when possible for readability
-6. Do NOT translate proper nouns (names of people, places, brands) unless they have an official translation
-7. Preserve any timing codes, formatting tags (like <i>, <b>), or special markers
-8. If the original contains profanity or slang, translate appropriately for the target language
-9. Do NOT add explanations, notes, or anything outside the JSON array"""
+        return f"""You are an expert subtitle translator specializing in {source_language} to {target_language} translation.
+
+{context_info}{language_note}
+
+CRITICAL INSTRUCTIONS - READ CAREFULLY:
+
+STEP 1: EXACT FORMAT REQUIREMENT
+Return ONLY this exact JSON format - nothing else, no exceptions:
+[{{
+  "index": "0",
+  "content": "TRANSLATED TEXT WITH DIACRITICS"
+}},{{
+  "index": "1",
+  "content": "NEXT TRANSLATED LINE"
+}}]
+
+STEP 2: 100% TRANSLATION REQUIREMENT
+- Translate EVERY SINGLE LINE from {source_language} to {target_language}
+- DO NOT skip any lines - no matter how simple, only if it's reasonable to do so
+- DO NOT leave any {source_language} text- no matter how simple, only if it's reasonable to do so
+- EVERY "content" field MUST contain {target_language} text- no matter how simple, only if it's reasonable to do so
+
+STEP 3: PRESERVATION REQUIREMENTS
+- Keep ALL HTML tags exactly: <i>, <b>, <font color="#FFFFFF">, <font color="#FF0000">
+- Keep ALL line breaks (\n) in the same positions
+- Keep ALL punctuation exactly as positioned
+- Keep ALL capitalization (capital letters start sentences)
+- Keep ALL numbers, dates, times
+
+STEP 4: TRANSLATION QUALITY REQUIREMENTS
+- Use natural, conversational {target_language} expressions
+- For {target_language}, use everyday spoken language that real people actually say
+- If the line is casual/slang, make the translation casual/slang in {target_language}
+- If the line is formal/polite, make the translation formal/polite in {target_language}
+- For profanity: use equivalent intensity {target_language} profanity, not censorship
+
+STEP 5: VERIFICATION CHECKLIST
+Before returning, verify every single line:
+[ ] Every "content" contains ONLY {target_language} characters/words
+[ ] Not a single {source_language} word remains in any "content"
+[ ] All HTML tags preserved exactly
+[ ] All line breaks preserved exactly
+[ ] All diacritics/accents proper for {target_language}
+[ ] Natural flow that sounds like native speakers
+[ ] Same emotional tone maintained
+[ ] Same level of formality maintained
+
+VIOLATION CONSEQUENCES:
+- If any line contains {source_language}: FAIL
+- If any {target_language} diacritics/accents missing: FAIL
+- If different number of lines than input: FAIL
+- If HTML tags missing/changed: FAIL
+
+FINAL CHECK: Read through all "content" fields one by one.
+Does every single one contain ONLY natural {target_language}? YES or FAIL."""
 
     def format_input_for_translation(self, lines: list[dict[str, str]]) -> str:
         """

@@ -37,9 +37,23 @@ async def process_content_translation_job(
             job_manager.set_job_completed(job_id, {"lines": [], "model_used": "", "tokens_used": 0})
             return
         
-        # Log incoming request data for debugging
+        # Log request metadata (without actual text content)
+        logger.info(f"Job {job_id}: Processing translation request - "
+                   f"source={request.sourceLanguage}, target={request.targetLanguage}, "
+                   f"lines={len(request.lines)}, title='{request.title or 'N/A'}', "
+                   f"mediaType='{request.mediaType or 'N/A'}', model='{request.model or 'default'}', "
+                   f"temperature={request.temperature}")
+        
+        # Log incoming request config (without sensitive data)
         raw_config = job.request_data.get("config")
-        logger.info(f"Job {job_id}: Raw config from request_data: {raw_config}")
+        if raw_config:
+            safe_config = {}
+            for key, value in raw_config.items():
+                if 'key' in key.lower() or 'secret' in key.lower() or 'password' in key.lower():
+                    safe_config[key] = '***' if value else None
+                else:
+                    safe_config[key] = value
+            logger.info(f"Job {job_id}: Request config: {safe_config}")
         
         # Extract config override from request
         config_override = _extract_config_override(request.config, job.request_data)
@@ -50,6 +64,13 @@ async def process_content_translation_job(
             logger.info(f"Job {job_id}: Using API key from config: {masked_key}")
         else:
             logger.info(f"Job {job_id}: No API key in config_override, will use env default")
+        
+        # Log reasoning and provider settings if configured
+        if config_override and (config_override.reasoning or config_override.use_thinking_variant):
+            logger.info(f"Job {job_id}: Reasoning config - enabled={bool(config_override.reasoning)}, "
+                       f"use_thinking_variant={bool(config_override.use_thinking_variant)}")
+        if config_override and config_override.provider:
+            logger.info(f"Job {job_id}: Provider config configured")
         
         # Convert request lines to internal format
         lines = [
@@ -155,8 +176,26 @@ async def process_file_translation_job(
         model = request_data.get("model")
         temperature = request_data.get("temperature")
         
+        # Log file translation request metadata (without actual content)
+        content_length = len(content) if content else 0
+        logger.info(f"Job {job_id}: Processing file translation - "
+                   f"source={source_language}, target={target_language}, "
+                   f"content_length={content_length}, title='{title or 'N/A'}', "
+                   f"model='{model or 'default'}', temperature={temperature or 'default'}")
+        
         # Extract config override from request data
         config_override = _extract_config_override_from_dict(request_data.get("config"))
+        
+        # Log request config for file translation
+        if request_data.get("config"):
+            raw_config = request_data.get("config")
+            safe_config = {}
+            for key, value in raw_config.items():
+                if 'key' in key.lower() or 'secret' in key.lower() or 'password' in key.lower():
+                    safe_config[key] = '***' if value else None
+                else:
+                    safe_config[key] = value
+            logger.info(f"Job {job_id}: File translation config: {safe_config}")
         
         # Debug log for API key tracking (masked)
         if config_override and config_override.api_key:

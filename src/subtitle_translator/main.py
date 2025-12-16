@@ -1,6 +1,7 @@
 """FastAPI application entry point for AI Subtitle Translator service by LavX."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,11 +13,20 @@ from subtitle_translator.core.translator import close_translator
 from subtitle_translator.queue.job_manager import job_manager
 from subtitle_translator.queue.worker import job_worker_handler
 
-# Configure logging
+# Configure logging - use LOG_LEVEL env var (default: INFO)
+log_level_str = os.environ.get("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_str, logging.INFO)
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+
+# Set debug logger level explicitly for the OpenRouter provider
+if log_level == logging.DEBUG:
+    logging.getLogger("subtitle_translator.providers.openrouter.debug").setLevel(logging.DEBUG)
+    logging.getLogger("subtitle_translator.core.batch_processor.debug").setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
 
 

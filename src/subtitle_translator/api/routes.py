@@ -144,6 +144,25 @@ async def translate_content(
     """
     settings = get_settings()
     
+    # Log incoming request metadata (without actual content)
+    logger.info(f"API request: translate_content - "
+               f"sourceLanguage={request.sourceLanguage}, "
+               f"targetLanguage={request.targetLanguage}, "
+               f"lines={len(request.lines)}, "
+               f"title='{request.title or 'N/A'}', "
+               f"mediaType='{request.mediaType or 'N/A'}', "
+               f"model='{request.model or 'default'}', "
+               f"temperature={request.temperature or 'default'}")
+    
+    if request.config:
+        safe_config = {}
+        for key, value in request.config.model_dump(exclude_none=True).items():
+            if 'key' in key.lower() or 'secret' in key.lower() or 'password' in key.lower():
+                safe_config[key] = '***' if value else None
+            else:
+                safe_config[key] = value
+        logger.info(f"API request config: {safe_config}")
+    
     # Check if API key is available (either from env or request config)
     has_api_key = bool(settings.openrouter_api_key)
     if request.config and request.config.api_key:
@@ -351,12 +370,20 @@ async def submit_translate_content_job(
         )
     
     try:
+        # Log job submission metadata (without content)
+        lines_count = len(request.lines) if request.lines else 0
+        logger.info(f"Submitting content translation job - "
+                   f"source={request.sourceLanguage}, target={request.targetLanguage}, "
+                   f"lines={lines_count}, "
+                   f"model={request.model or 'default'}, temperature={request.temperature or 'default'}")
+        
         job_id = await job_manager.submit_job(
             request_data=request.model_dump(),
             job_type=JobType.TRANSLATE_CONTENT,
         )
         
         position = job_manager.get_queue_position(job_id)
+        logger.info(f"Job {job_id}: Queued at position {position or 'N/A'}")
         
         return JobSubmitResponse(
             jobId=job_id,
@@ -679,6 +706,7 @@ async def get_config() -> ConfigResponse:
         model=settings.openrouter_default_model,
         temperature=settings.openrouter_temperature,
         batchSize=settings.batch_size,
+        parallelBatchesPerJob=settings.parallel_batches_per_job,
         maxConcurrentJobs=job_manager.max_concurrent,
         maxJobs=job_manager.max_jobs,
         apiKeyConfigured=bool(settings.openrouter_api_key),
@@ -730,6 +758,10 @@ async def update_config(request: ConfigUpdateRequest) -> ConfigUpdateResponse:
         if request.maxConcurrentJobs is not None:
             await job_manager.set_max_concurrent(request.maxConcurrentJobs)
             updated_fields.append("maxConcurrentJobs")
+        
+        if request.parallelBatchesPerJob is not None:
+            update_runtime_config("parallel_batches_per_job", request.parallelBatchesPerJob)
+            updated_fields.append("parallelBatchesPerJob")
         
         if not updated_fields:
             return ConfigUpdateResponse(

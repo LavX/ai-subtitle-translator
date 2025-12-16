@@ -25,19 +25,20 @@ class Settings(BaseSettings):
     # OpenRouter Configuration
     openrouter_api_key: str = ""
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
-    openrouter_default_model: str = "moonshotai/kimi-k2-0905:exacto"
+    openrouter_default_model: str = "amazon/nova-2-lite-v1:free"
     openrouter_temperature: float = 0.3
     openrouter_max_tokens: int = 8000
 
     # Translation Configuration
     batch_size: int = 100
+    parallel_batches_per_job: int = 4  # Number of batches to process in parallel per job
     max_retries: int = 3
     retry_delay: float = 1.0
     request_timeout: float = 120.0
 
     # Job Queue Configuration
-    job_queue_max_concurrent: int = 2  # Max concurrent translation jobs
-    job_queue_max_jobs: int = 100  # Max jobs in memory
+    job_queue_max_concurrent: int = 15  # Max concurrent translation jobs (increased for battle royale)
+    job_queue_max_jobs: int = 500  # Max jobs in memory (increased for high-throughput testing)
     job_queue_ttl_hours: int = 1  # TTL for completed/failed jobs
 
     # App identification for OpenRouter analytics

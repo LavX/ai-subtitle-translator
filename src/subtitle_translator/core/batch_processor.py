@@ -1,12 +1,14 @@
 """Batch processing logic for subtitle translation."""
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass, field
-from typing import AsyncGenerator, Callable, Optional, TYPE_CHECKING
+from typing import AsyncGenerator, Callable, List, Optional, TYPE_CHECKING
 
 from subtitle_translator.config import Settings, get_settings
 from subtitle_translator.providers.base import (
+    InvalidResponseError,
     RateLimitError,
     TranslationBatch,
     TranslationProvider,
@@ -18,6 +20,9 @@ if TYPE_CHECKING:
     from subtitle_translator.api.models import TranslationConfig
 
 logger = logging.getLogger(__name__)
+
+# Debug logger for detailed request/response logging
+debug_logger = logging.getLogger(f"{__name__}.debug")
 
 
 @dataclass
@@ -201,6 +206,53 @@ class BatchProcessor:
             retries=retries,
         )
 
+    async def _process_batch_group(
+        self,
+        batch_group: List[tuple[int, list[dict[str, str]]]],
+        source_language: str,
+        target_language: str,
+        context_title: Optional[str],
+        context_media_type: Optional[str],
+        model: Optional[str],
+        temperature: Optional[float],
+        config_override: Optional["TranslationConfig"],
+    ) -> List[BatchResult]:
+        """
+        Process a group of batches in parallel.
+
+        Args:
+            batch_group: List of (batch_index, batch_lines) tuples
+            source_language: Source language code
+            target_language: Target language code
+            context_title: Optional media title for context
+            context_media_type: Optional media type (Episode/Movie)
+            model: Optional model override
+            temperature: Optional temperature override
+            config_override: Optional per-request configuration override
+
+        Returns:
+            List of BatchResults in the same order as input
+        """
+        tasks = []
+        for batch_index, batch_lines in batch_group:
+            batch = TranslationBatch(
+                lines=batch_lines,
+                source_language=source_language,
+                target_language=target_language,
+                context_title=context_title,
+                context_media_type=context_media_type,
+            )
+            task = self.process_batch(
+                batch,
+                batch_index=batch_index,
+                model=model,
+                temperature=temperature,
+                config_override=config_override,
+            )
+            tasks.append(task)
+        
+        return await asyncio.gather(*tasks)
+
     async def process_all_batches(
         self,
         lines: list[dict[str, str]],
@@ -215,7 +267,10 @@ class BatchProcessor:
         config_override: Optional["TranslationConfig"] = None,
     ) -> BatchProcessingResult:
         """
-        Process all batches sequentially.
+        Process all batches with parallel processing support.
+
+        Batches are processed in parallel groups based on the parallel_batches_per_job
+        setting or per-request config override.
 
         Args:
             lines: List of subtitle lines to translate
@@ -240,6 +295,12 @@ class BatchProcessor:
         else:
             model_to_use = model or self.settings.openrouter_default_model
         
+        # Determine parallel batch count (config override takes precedence)
+        if config_override and config_override.parallel_batches:
+            parallel_count = config_override.parallel_batches
+        else:
+            parallel_count = self.settings.parallel_batches_per_job
+        
         progress = BatchProgress(
             total_batches=len(batches),
             total_lines=len(lines),
@@ -248,34 +309,52 @@ class BatchProcessor:
         batch_results: list[BatchResult] = []
         all_translations: list[dict[str, str]] = []
 
-        for i, batch_lines in enumerate(batches):
-            batch = TranslationBatch(
-                lines=batch_lines,
+        # Create indexed batches for tracking
+        indexed_batches = list(enumerate(batches))
+        
+        logger.info(f"Processing {len(batches)} batches with {parallel_count} parallel batches per group - "
+                   f"source={source_language}, target={target_language}, "
+                   f"model={model_to_use}, temperature={temperature or 'default'}")
+
+        # Process batches in parallel groups
+        for group_start in range(0, len(indexed_batches), parallel_count):
+            batch_group = indexed_batches[group_start:group_start + parallel_count]
+            
+            group_indices = [idx for idx, _ in batch_group]
+            logger.info(f"Processing parallel batch group: batches {group_indices} "
+                       f"({len(batch_group)} batches in parallel)")
+            
+            # Process batch group in parallel
+            group_results = await self._process_batch_group(
+                batch_group,
                 source_language=source_language,
                 target_language=target_language,
                 context_title=context_title,
                 context_media_type=context_media_type,
+                model=model,
+                temperature=temperature,
+                config_override=config_override,
             )
-
-            logger.info(f"Processing batch {i + 1}/{len(batches)} ({len(batch_lines)} lines)")
-
-            result = await self.process_batch(
-                batch, batch_index=i, model=model, temperature=temperature, config_override=config_override
-            )
-            batch_results.append(result)
-
-            if result.success:
-                all_translations.extend(result.translations)
-                progress.completed_lines += len(batch_lines)
-                progress.total_tokens += result.tokens_used
-            else:
-                progress.failed_batches += 1
-                logger.error(f"Batch {i + 1} failed: {result.error}")
-
-            progress.completed_batches += 1
-
+            
+            # Process results from this group
+            for (batch_index, batch_lines), result in zip(batch_group, group_results):
+                batch_results.append(result)
+                
+                if result.success:
+                    all_translations.extend(result.translations)
+                    progress.completed_lines += len(batch_lines)
+                    progress.total_tokens += result.tokens_used
+                else:
+                    progress.failed_batches += 1
+                    logger.error(f"Batch {batch_index + 1} failed: {result.error}")
+                
+                progress.completed_batches += 1
+            
             if progress_callback:
                 progress_callback(progress)
+
+        # Sort batch_results by batch_index to maintain order
+        batch_results.sort(key=lambda r: r.batch_index)
 
         return BatchProcessingResult(
             all_translations=all_translations,
