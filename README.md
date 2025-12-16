@@ -145,7 +145,7 @@ All configuration is done via environment variables:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `OPENROUTER_API_KEY` | Your OpenRouter API key **(required)** | - |
-| `OPENROUTER_DEFAULT_MODEL` | Default AI model for translation | `google/gemini-2.5-flash-preview-09-2025` |
+| `OPENROUTER_DEFAULT_MODEL` | Default AI model for translation | `amazon/nova-2-lite-v1:free` |
 | `OPENROUTER_TEMPERATURE` | Temperature for AI responses (0.0-2.0) | `0.3` |
 | `OPENROUTER_MAX_TOKENS` | Maximum tokens per response | `8000` |
 | `HOST` | Server host | `0.0.0.0` |
@@ -157,17 +157,56 @@ All configuration is done via environment variables:
 
 ## 🤖 Supported AI Models
 
-The service supports any model available on [OpenRouter](https://openrouter.ai/models). Recommended models:
+The service supports any model available on [OpenRouter](https://openrouter.ai/models). Models have been extensively tested through a **Battle Royale** elimination process (5→10→20→30→40→50 lines at 80% translation threshold).
 
-| Model | Best For | Speed | Quality |
-|-------|----------|-------|---------|
-| `google/gemini-2.5-flash-preview-09-2025` | General use (default) | ⚡⚡⚡ | ⭐⭐⭐⭐ |
-| `google/gemini-2.5-flash-lite-preview-09-2025` | Cost-effective | ⚡⚡⚡⚡ | ⭐⭐⭐ |
-| `anthropic/claude-sonnet-4.5` | Highest quality | ⚡⚡ | ⭐⭐⭐⭐⭐ |
-| `anthropic/claude-haiku-4.5` | Fast & affordable | ⚡⚡⚡ | ⭐⭐⭐⭐ |
-| `meta-llama/llama-4-maverick` | Multilingual | ⚡⚡ | ⭐⭐⭐⭐ |
-| `openai/gpt-5-nano` | Compact & efficient | ⚡⚡⚡ | ⭐⭐⭐⭐ |
-| `x-ai/grok-4.1-fast` | Fast xAI model | ⚡⚡⚡ | ⭐⭐⭐⭐ |
+### 🏆 Battle Royale Champions (Survived ALL 6 Rounds)
+
+These models consistently delivered high-quality translations across all test rounds:
+
+#### Speed Champions ⚡
+| Model | Avg Speed | Success Rate | Notes |
+|-------|-----------|--------------|-------|
+| `meta-llama/llama-4-maverick` | 3s | 92% | 🥇 Fastest overall (1-4s) |
+| `google/gemini-2.5-flash-lite-preview-09-2025` | 3.2s | 90% | 🥈 Very fast, reasoning support |
+| `moonshotai/kimi-k2-0905:exacto` | 4s | 92% | 🥉 Balanced speed & quality |
+
+#### Quality Champions ⭐
+| Model | Avg Speed | Success Rate | Notes |
+|-------|-----------|--------------|-------|
+| `google/gemini-2.5-flash-preview-09-2025` | 8.5s | 92% | Default model, reasoning support |
+| `anthropic/claude-haiku-4.5` | 13s | 93% | Highest quality, premium |
+| `anthropic/claude-sonnet-4.5` | 18s | 92% | Premium, nuanced translations |
+
+### 🆓 Excellent FREE Models (Zero Cost!)
+
+These free models survived ALL Battle Royale rounds:
+
+| Model | Avg Speed | Success Rate | Notes |
+|-------|-----------|--------------|-------|
+| `amazon/nova-2-lite-v1:free` | 17s | 95% | 🏆 Best free model! |
+| `nex-agi/deepseek-v3.1-nex-n1:free` | 35s | 90% | Reliable backup, slower |
+
+### ⚠️ Models to Avoid
+
+These models failed Battle Royale Round 1 (0% translation or timeout):
+
+| Model | Reason |
+|-------|--------|
+| `tngtech/deepseek-r1t-chimera:free` | 0% translation output |
+| `cognitivecomputations/dolphin-mistral-24b-venice-edition:free` | 0% translation output |
+| `nvidia/nemotron-3-nano-30b-a3b:free` | 0% translation output |
+| `allenai/olmo-3-32b-think:free` | Timeout |
+| `openai/gpt-oss-120b:exacto` | Timeout |
+| `x-ai/grok-4.1-fast` | Poor translation quality |
+
+### Model Selection Guide
+
+```
+Need SPEED?      → meta-llama/llama-4-maverick
+Need QUALITY?    → anthropic/claude-haiku-4.5
+Need FREE?       → amazon/nova-2-lite-v1:free (default)
+Balanced?        → google/gemini-2.5-flash-preview-09-2025
+```
 
 ## 🔗 Integration
 
