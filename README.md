@@ -301,6 +301,27 @@ ai-subtitle-translator/
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+---
+
+## 🌐 About the Maintainer
+
+This translator is maintained by **LavX**. Explore more of my projects and services:
+
+### 🚀 Services
+- **[LavX Managed Systems](https://lavx.hu)** – Enterprise AI solutions, RAG systems, and LLMOps.
+- **[LavX News](https://news.lavx.hu)** – Latest insights on AI, Open Source, and emerging tech.
+- **[LMS Tools](https://tools.lavx.hu)** – 140+ free, privacy-focused online tools for developers and researchers.
+
+### 🛠️ Open Source Projects
+- **[AI Subtitle Translator](https://github.com/LavX/ai-subtitle-translator)** – LLM-powered subtitle translator using OpenRouter API.
+- **[OpenSubtitles Scraper](https://github.com/LavX/opensubtitles-scraper)** – Web scraper for OpenSubtitles.org (no VIP required).
+- **[Bazarr (LavX Fork)](https://github.com/LavX/bazarr)** – Automated subtitle management with OpenSubtitles.org scraper & AI translation.
+- **[JFrog to Nexus OSS](https://github.com/LavX/jfrogtonexusoss)** – Automated migration tool for repository managers.
+- **[WeatherFlow](https://github.com/LavX/weatherflow)** – Multi-platform weather data forwarding (WU to Windy/Idokep).
+- **[Like4Like Suite](https://github.com/LavX/Like4Like-Suite)** – Social media automation and engagement toolkit.
+
+---
+
 ## 🙏 Credits
 
 Created by **[LavX](https://github.com/LavX)**
