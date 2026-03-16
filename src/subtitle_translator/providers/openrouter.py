@@ -994,6 +994,12 @@ class OpenRouterProvider(TranslationProvider):
                 except Exception:
                     pass
 
+            # Handle malformed JSON with duplicate keys (single object with repeated index/content pairs)
+            # Some models return {"index":"0","content":"...","index":"1","content":"..."} instead of an array
+            pair_pattern = re.findall(r'"index"\s*:\s*"(\d+)"\s*,\s*"content"\s*:\s*"((?:[^"\\]|\\.)*)"', content)
+            if pair_pattern:
+                return [{"index": idx, "content": txt.replace("\\n", "\n")} for idx, txt in pair_pattern]
+
             raise InvalidResponseError(
                 f"Failed to parse JSON: {str(e)}",
                 provider=self.provider_name,
