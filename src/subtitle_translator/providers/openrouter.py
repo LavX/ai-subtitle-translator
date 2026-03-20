@@ -935,9 +935,31 @@ class OpenRouterProvider(TranslationProvider):
             InvalidResponseError: If JSON parsing fails
         """
         try:
-            # Try to parse as is
-            parsed = json.loads(content)
-            
+            # Parse JSON, detecting duplicate keys that json.loads() would silently deduplicate.
+            # Some models return {"index":"0","content":"...","index":"1","content":"..."} which is
+            # valid JSON but json.loads() keeps only the last value per key, losing translations.
+            def _handle_duplicate_keys(pairs: list[tuple[str, str]]) -> dict | list[dict]:
+                keys = [k for k, _ in pairs]
+                if len(keys) == len(set(keys)):
+                    return dict(pairs)
+                # Duplicate keys detected — split into list of dicts
+                logger.warning(
+                    f"Detected duplicate JSON keys in LLM response, "
+                    f"recovering {len(pairs) // 2} translations via object_pairs_hook"
+                )
+                result, current, seen = [], {}, set()
+                for k, v in pairs:
+                    if k in seen:
+                        result.append(current)
+                        current, seen = {}, set()
+                    current[k] = v
+                    seen.add(k)
+                if current:
+                    result.append(current)
+                return result
+
+            parsed = json.loads(content, object_pairs_hook=_handle_duplicate_keys)
+
             # Handle case where response is wrapped in an object
             if isinstance(parsed, dict):
                 # Look for common wrapper keys
