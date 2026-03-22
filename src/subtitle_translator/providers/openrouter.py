@@ -31,6 +31,11 @@ debug_logger = logging.getLogger(f"{__name__}.debug")
 # === BATTLE ROYALE TESTED MODELS - Dec 2025 ===
 # Champions that survived ALL 6 ROUNDS (5→10→20→30→40→50 lines at 80% threshold)
 
+# Batch size override rules (from adaptive-batch-sizing spec):
+# - context_length <= 16384: add "max_batch_size": 10
+# - context_length <= 65536: add "max_batch_size": 30
+# - larger context models: no override needed (heuristic handles it)
+
 # EXCELLENT: TOP TIER - All champions from Battle Royale
 EXCELLENT_MODELS = [
     # 🏆 SPEED CHAMPIONS
@@ -215,6 +220,7 @@ POOR_MODELS = [
         "supports_reasoning": False,
         "recommended_for": ["lightweight_testing"],
         "success_rate": 10,  # Based on expected performance
+        "max_batch_size": 10,
     },
 ]
 
@@ -370,6 +376,14 @@ class OpenRouterProvider(TranslationProvider):
             return (priority_score, -success_rate)
         
         return sorted(models, key=sort_key)
+
+    def get_model_metadata(self, model_id: str) -> Optional[dict]:
+        if not hasattr(self, "_model_metadata_cache"):
+            self._model_metadata_cache: dict[str, dict] = {}
+            for model_list in [EXCELLENT_MODELS, EXCELLENT_FREE_MODELS, GOOD_MODELS, POOR_MODELS]:
+                for model in model_list:
+                    self._model_metadata_cache[model["id"]] = model
+        return self._model_metadata_cache.get(model_id)
 
     def get_best_model_for_language(self, target_language: str) -> Optional[str]:
         """
