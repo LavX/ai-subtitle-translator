@@ -103,6 +103,7 @@ class BatchProcessor:
         self,
         lines: list[dict[str, str]],
         batch_size: Optional[int] = None,
+        model: Optional[str] = None,
     ) -> list[list[dict[str, str]]]:
         """
         Split lines into batches.
@@ -110,16 +111,29 @@ class BatchProcessor:
         Args:
             lines: List of {"index": "X", "content": "text"} dictionaries
             batch_size: Optional batch size override
+            model: Optional model ID for adaptive batch sizing
 
         Returns:
             List of batches, each being a list of line dictionaries
         """
-        size = batch_size or self.settings.batch_size
+        if batch_size:
+            size = batch_size
+        elif model:
+            from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+            metadata = self.provider.get_model_metadata(model)
+            resolver = get_batch_size_resolver()
+            size = resolver.resolve(
+                model,
+                context_length=metadata.get("context_length") if metadata else None,
+                max_batch_size=metadata.get("max_batch_size") if metadata else None,
+            )
+        else:
+            size = self.settings.batch_size
+
         batches = []
-        
         for i in range(0, len(lines), size):
             batches.append(lines[i : i + size])
-        
+
         return batches
 
     async def process_batch(
@@ -129,6 +143,7 @@ class BatchProcessor:
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         config_override: Optional["TranslationConfig"] = None,
+        _is_adaptive_retry: bool = False,
     ) -> BatchResult:
         """
         Process a single batch with retry logic.
@@ -139,19 +154,43 @@ class BatchProcessor:
             model: Optional model override
             temperature: Optional temperature override
             config_override: Optional per-request configuration override
+            _is_adaptive_retry: Internal flag to prevent infinite recursion
 
         Returns:
             BatchResult with translations or error
         """
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver, MIN_BATCH_SIZE
+
         retries = 0
         last_error: Optional[str] = None
+        is_timeout = False
+        can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
 
         while retries <= self.settings.max_retries:
             try:
                 result = await self.provider.translate_batch(
                     batch, model=model, temperature=temperature, config_override=config_override
                 )
-                
+
+                # Count mismatch check
+                if len(result.translations) < len(batch.lines):
+                    logger.warning(
+                        f"Batch {batch_index}: got {len(result.translations)}/{len(batch.lines)} translations"
+                    )
+                    if can_adaptive:
+                        return await self._retry_with_smaller_batches(
+                            batch, batch_index, model, temperature, config_override
+                        )
+                    # In sub-batch retry or at floor - treat as failure
+                    return BatchResult(
+                        batch_index=batch_index, success=False,
+                        error=f"Partial translations: expected {len(batch.lines)}, got {len(result.translations)}",
+                        retries=retries,
+                    )
+
+                model_id = model or self.settings.openrouter_default_model
+                get_batch_size_resolver().record_success(model_id, len(batch.lines))
+
                 return BatchResult(
                     batch_index=batch_index,
                     success=True,
@@ -159,9 +198,24 @@ class BatchProcessor:
                     tokens_used=result.total_tokens or 0,
                     retries=retries,
                 )
-                
+
+            except InvalidResponseError as e:
+                if can_adaptive:
+                    return await self._retry_with_smaller_batches(
+                        batch, batch_index, model, temperature, config_override
+                    )
+                # At floor or already in adaptive retry - use normal retry
+                if retries < self.settings.max_retries:
+                    retries += 1
+                    last_error = e.message
+                    await asyncio.sleep(self.settings.retry_delay * (2 ** (retries - 1)))
+                else:
+                    return BatchResult(
+                        batch_index=batch_index, success=False,
+                        error=e.message, retries=retries,
+                    )
+
             except RateLimitError as e:
-                # Special handling for rate limits
                 delay = e.retry_after or (self.settings.retry_delay * (2 ** retries))
                 logger.warning(
                     f"Rate limit hit on batch {batch_index}, waiting {delay}s (retry {retries + 1})"
@@ -169,8 +223,9 @@ class BatchProcessor:
                 await asyncio.sleep(delay)
                 retries += 1
                 last_error = str(e)
-                
+
             except TranslationProviderError as e:
+                is_timeout = "timeout" in e.message.lower()
                 if e.retryable and retries < self.settings.max_retries:
                     delay = self.settings.retry_delay * (2 ** retries)
                     logger.warning(
@@ -182,13 +237,9 @@ class BatchProcessor:
                     last_error = e.message
                 else:
                     logger.error(f"Non-retryable error on batch {batch_index}: {e.message}")
-                    return BatchResult(
-                        batch_index=batch_index,
-                        success=False,
-                        error=e.message,
-                        retries=retries,
-                    )
-                    
+                    last_error = e.message
+                    break
+
             except Exception as e:
                 logger.error(f"Unexpected error on batch {batch_index}: {str(e)}")
                 return BatchResult(
@@ -199,11 +250,70 @@ class BatchProcessor:
                 )
 
         # Max retries exceeded
+        if is_timeout and can_adaptive:
+            return await self._retry_with_smaller_batches(
+                batch, batch_index, model, temperature, config_override
+            )
+
         return BatchResult(
             batch_index=batch_index,
             success=False,
             error=f"Max retries exceeded. Last error: {last_error}",
             retries=retries,
+        )
+
+    async def _retry_with_smaller_batches(
+        self,
+        batch: TranslationBatch,
+        batch_index: int,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        config_override: Optional["TranslationConfig"] = None,
+    ) -> BatchResult:
+        """Retry a failed batch by splitting it into smaller sub-batches."""
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        model_id = model or self.settings.openrouter_default_model
+        resolver = get_batch_size_resolver()
+        new_size = resolver.record_failure(model_id, len(batch.lines))
+
+        logger.warning(
+            f"Batch {batch_index}: adaptive retry with size {new_size} (was {len(batch.lines)})"
+        )
+
+        sub_batches = [batch.lines[i:i + new_size] for i in range(0, len(batch.lines), new_size)]
+
+        all_translations: list[dict[str, str]] = []
+        total_tokens = 0
+        total_retries = 0
+
+        for sub_batch_lines in sub_batches:
+            sub_batch = TranslationBatch(
+                lines=sub_batch_lines,
+                source_language=batch.source_language,
+                target_language=batch.target_language,
+                context_title=batch.context_title,
+                context_media_type=batch.context_media_type,
+            )
+            sub_result = await self.process_batch(
+                sub_batch, batch_index, model, temperature, config_override,
+                _is_adaptive_retry=True,
+            )
+            if not sub_result.success:
+                return BatchResult(
+                    batch_index=batch_index, success=False,
+                    translations=all_translations,
+                    error=f"Adaptive retry failed at size {new_size}: {sub_result.error}",
+                    retries=total_retries,
+                )
+            all_translations.extend(sub_result.translations)
+            total_tokens += sub_result.tokens_used
+            total_retries += sub_result.retries
+
+        return BatchResult(
+            batch_index=batch_index, success=True,
+            translations=all_translations, tokens_used=total_tokens,
+            retries=total_retries,
         )
 
     async def _process_batch_group(
@@ -287,14 +397,14 @@ class BatchProcessor:
         Returns:
             BatchProcessingResult with all translations
         """
-        batches = self.create_batches(lines, batch_size)
-        
         # Determine model to use (config override takes precedence)
         if config_override and config_override.model:
             model_to_use = config_override.model
         else:
             model_to_use = model or self.settings.openrouter_default_model
-        
+
+        batches = self.create_batches(lines, batch_size, model=model_to_use)
+
         # Determine parallel batch count (config override takes precedence)
         if config_override and config_override.parallel_batches:
             parallel_count = config_override.parallel_batches
@@ -395,8 +505,8 @@ class BatchProcessor:
         Yields:
             Tuples of (BatchResult, BatchProgress) for each completed batch
         """
-        batches = self.create_batches(lines, batch_size)
-        
+        batches = self.create_batches(lines, batch_size, model=model)
+
         progress = BatchProgress(
             total_batches=len(batches),
             total_lines=len(lines),

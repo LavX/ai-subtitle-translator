@@ -130,6 +130,18 @@ class TranslationProvider(ABC):
         """
         pass
 
+    def get_model_metadata(self, model_id: str) -> Optional[dict]:
+        """
+        Get metadata for a specific model by ID.
+
+        Args:
+            model_id: The model identifier
+
+        Returns:
+            Model metadata dict or None if not found
+        """
+        return None
+
     def build_system_prompt(
         self,
         target_language: str,
