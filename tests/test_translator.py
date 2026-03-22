@@ -191,6 +191,7 @@ class TestBatchProcessor:
         """Create a mock provider."""
         provider = AsyncMock()
         provider.provider_name = "mock"
+        provider.get_model_metadata = MagicMock(return_value=None)
         return provider
 
     @pytest.fixture
@@ -308,6 +309,7 @@ class TestSubtitleTranslator:
         )
         provider.get_available_models = AsyncMock(return_value=[])
         provider.health_check = AsyncMock(return_value=True)
+        provider.get_model_metadata = MagicMock(return_value=None)
         provider.close = AsyncMock()
         return provider
 
