@@ -41,7 +41,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/ai-subtitle-translator
+  IMAGE_NAME: lavx/ai-subtitle-translator
 
 jobs:
   test:
