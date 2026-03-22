@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SubtitleLine(BaseModel):
@@ -130,7 +130,7 @@ class TranslateContentRequest(BaseModel):
     mediaType: Optional[str] = Field(
         default=None, description="Type of media: 'Episode' or 'Movie'"
     )
-    lines: list[SubtitleLine] = Field(..., description="List of subtitle lines to translate")
+    lines: list[SubtitleLine] = Field(..., max_length=50_000, description="List of subtitle lines to translate")
     model: Optional[str] = Field(
         default=None, description="Override default LLM model for translation"
     )
@@ -145,17 +145,19 @@ class TranslateContentRequest(BaseModel):
 class TranslateContentResponse(BaseModel):
     """Response model for translated subtitle content."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     lines: list[SubtitleLine] = Field(..., description="Translated subtitle lines")
-    model_used: str = Field(..., description="The LLM model used for translation")
+    model_used: str = Field(..., alias="modelUsed", description="The LLM model used for translation")
     tokens_used: Optional[int] = Field(
-        default=None, description="Total tokens consumed (if available)"
+        default=None, alias="tokensUsed", description="Total tokens consumed (if available)"
     )
 
 
 class TranslateFileRequest(BaseModel):
     """Request model for translating an entire SRT file."""
 
-    content: str = Field(..., description="Complete SRT file content as string")
+    content: str = Field(..., max_length=10_000_000, description="Complete SRT file content as string")
     sourceLanguage: str = Field(..., description="Source language code")
     targetLanguage: str = Field(..., description="Target language code")
     title: Optional[str] = Field(
@@ -175,43 +177,51 @@ class TranslateFileRequest(BaseModel):
 class TranslateFileResponse(BaseModel):
     """Response model for translated SRT file."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     content: str = Field(..., description="Translated SRT file content")
-    model_used: str = Field(..., description="The LLM model used for translation")
+    model_used: str = Field(..., alias="modelUsed", description="The LLM model used for translation")
     tokens_used: Optional[int] = Field(
-        default=None, description="Total tokens consumed (if available)"
+        default=None, alias="tokensUsed", description="Total tokens consumed (if available)"
     )
-    subtitle_count: int = Field(..., description="Number of subtitles translated")
+    subtitle_count: int = Field(..., alias="subtitleCount", description="Number of subtitles translated")
 
 
 class ModelInfo(BaseModel):
     """Information about an available LLM model."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str = Field(..., description="Model identifier for API calls")
     name: str = Field(..., description="Human-readable model name")
     description: Optional[str] = Field(default=None, description="Model description")
     context_length: Optional[int] = Field(
-        default=None, description="Maximum context length in tokens"
+        default=None, alias="contextLength", description="Maximum context length in tokens"
     )
     pricing: Optional[dict] = Field(
         default=None, description="Pricing information (prompt/completion per token)"
     )
-    is_default: bool = Field(default=False, description="Whether this is the default model")
+    is_default: bool = Field(default=False, alias="isDefault", description="Whether this is the default model")
 
 
 class ModelsResponse(BaseModel):
     """Response model for listing available models."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     models: list[ModelInfo] = Field(..., description="List of available/recommended models")
-    default_model: str = Field(..., description="The default model ID")
+    default_model: str = Field(..., alias="defaultModel", description="The default model ID")
 
 
 class HealthResponse(BaseModel):
     """Response model for health check endpoint."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     status: str = Field(..., description="Service status ('healthy' or 'unhealthy')")
     version: str = Field(..., description="Service version")
     openrouter_configured: bool = Field(
-        ..., description="Whether OpenRouter API key is configured"
+        ..., alias="openrouterConfigured", description="Whether OpenRouter API key is configured"
     )
 
 
@@ -226,11 +236,13 @@ class ErrorResponse(BaseModel):
 class TranslationProgress(BaseModel):
     """Progress information for ongoing translation."""
 
-    total_batches: int = Field(..., description="Total number of batches to process")
-    completed_batches: int = Field(..., description="Number of completed batches")
-    total_lines: int = Field(..., description="Total number of lines to translate")
-    completed_lines: int = Field(..., description="Number of lines translated")
-    percent_complete: float = Field(..., description="Percentage of completion (0-100)")
+    model_config = ConfigDict(populate_by_name=True)
+
+    total_batches: int = Field(..., alias="totalBatches", description="Total number of batches to process")
+    completed_batches: int = Field(..., alias="completedBatches", description="Number of completed batches")
+    total_lines: int = Field(..., alias="totalLines", description="Total number of lines to translate")
+    completed_lines: int = Field(..., alias="completedLines", description="Number of lines translated")
+    percent_complete: float = Field(..., alias="percentComplete", description="Percentage of completion (0-100)")
     status: str = Field(..., description="Current status: 'processing', 'completed', 'failed'")
 
 

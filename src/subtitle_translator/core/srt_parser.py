@@ -153,31 +153,8 @@ class SRTParser:
         return translated_entries
 
     def _add_rtl_markers(self, text: str) -> str:
-        """
-        Add Right-to-Left directional markers to text.
-
-        Args:
-            text: Text content
-
-        Returns:
-            Text with RTL markers added
-        """
-        # Unicode RIGHT-TO-LEFT MARK (RLM) and RIGHT-TO-LEFT EMBEDDING (RLE)
-        RLM = "\u200F"
-        RLE = "\u202B"
-        PDF = "\u202C"  # POP DIRECTIONAL FORMATTING
-        
-        lines = text.split("\n")
-        marked_lines = []
-        
-        for line in lines:
-            if line.strip():
-                # Wrap each line with RLE...PDF for proper rendering
-                marked_lines.append(f"{RLE}{line}{PDF}")
-            else:
-                marked_lines.append(line)
-        
-        return "\n".join(marked_lines)
+        """Add Right-to-Left directional markers to text."""
+        return add_rtl_markers(text)
 
     def validate_srt(self, content: str) -> tuple[bool, Optional[str]]:
         """
@@ -213,22 +190,6 @@ class SRTParser:
             return len(list(srt.parse(content)))
         except Exception:
             return 0
-
-    def merge_multiline_subtitles(self, entries: list[SubtitleEntry]) -> list[SubtitleEntry]:
-        """
-        Merge subtitles that span multiple lines into single entries.
-
-        This is useful for preserving context during translation.
-
-        Args:
-            entries: List of SubtitleEntry objects
-
-        Returns:
-            List of SubtitleEntry objects (unchanged in this implementation)
-        """
-        # SRT already handles multiline content within a single entry
-        # This method is here for potential future enhancements
-        return entries
 
     def split_long_subtitles(
         self,
@@ -287,6 +248,31 @@ class SRTParser:
             )
 
         return processed
+
+
+def add_rtl_markers(text: str) -> str:
+    """
+    Add Right-to-Left directional markers to text.
+
+    Args:
+        text: Text content
+
+    Returns:
+        Text with RTL markers added
+    """
+    RLE = "\u202B"  # RIGHT-TO-LEFT EMBEDDING
+    PDF = "\u202C"  # POP DIRECTIONAL FORMATTING
+
+    lines = text.split("\n")
+    marked_lines = []
+
+    for line in lines:
+        if line.strip():
+            marked_lines.append(f"{RLE}{line}{PDF}")
+        else:
+            marked_lines.append(line)
+
+    return "\n".join(marked_lines)
 
 
 def get_srt_parser() -> SRTParser:

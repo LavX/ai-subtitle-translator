@@ -42,7 +42,7 @@ class TestHealthEndpoint:
             data = response.json()
             assert data["status"] == "healthy"
             assert data["version"] == "1.0.0"
-            assert data["openrouter_configured"] is True
+            assert data["openrouterConfigured"] is True
 
     def test_health_check_no_api_key(self, client):
         """Test health check when API key is not configured."""
@@ -60,7 +60,7 @@ class TestHealthEndpoint:
                 
                 assert response.status_code == 200
                 data = response.json()
-                assert data["openrouter_configured"] is False
+                assert data["openrouterConfigured"] is False
 
 
 class TestModelsEndpoint:
@@ -96,7 +96,7 @@ class TestModelsEndpoint:
             data = response.json()
             assert "models" in data
             assert len(data["models"]) == 2
-            assert data["default_model"] == "google/gemini-2.5-flash-preview-09-2025"
+            assert data["defaultModel"] == "google/gemini-2.5-flash-preview-09-2025"
 
 
 class TestTranslateContentEndpoint:
@@ -136,7 +136,7 @@ class TestTranslateContentEndpoint:
             data = response.json()
             assert len(data["lines"]) == 2
             assert data["lines"][0]["line"] == "Hola"
-            assert data["model_used"] == "google/gemini-2.5-flash-preview-09-2025"
+            assert data["modelUsed"] == "google/gemini-2.5-flash-preview-09-2025"
 
     def test_translate_content_empty_lines(self, client, mock_settings):
         """Test translation with empty lines."""
@@ -252,7 +252,7 @@ Hola mundo
             assert response.status_code == 200
             data = response.json()
             assert "Hola mundo" in data["content"]
-            assert data["subtitle_count"] == 2
+            assert data["subtitleCount"] == 2
 
     def test_translate_file_empty_content(self, client, mock_settings):
         """Test translation with empty content."""
