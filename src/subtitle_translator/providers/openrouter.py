@@ -356,24 +356,6 @@ class OpenRouterProvider(TranslationProvider):
             model_info["priority"] = "good"
             models.append(model_info)
 
-        # Sort by priority (excellent first, then good), then by success rate within each category
-        def sort_key(model):
-            priority_score = 0 if model.get("priority") == "excellent" else 1
-            
-            # Excellent free models get highest priority (negative scores)
-            if model.get("id") in ["allenai/olmo-3-32b-think:free", "tngtech/deepseek-r1t-chimera:free"]:
-                priority_score = -2  # Excellent free models first
-            elif model.get("id") in ["anthropic/claude-haiku-4.5", "moonshotai/kimi-k2-0905:exacto"]:
-                priority_score = -1  # Existing excellent models second
-            
-            success_rate = model.get("success_rate", 0)
-            
-            # If default model, put it first regardless of priority
-            if model.get("is_default", False):
-                return (-100, -success_rate)
-            return (priority_score, -success_rate)
-        
-        # Add excellent free models to the top of recommendations
         def sort_key(model):
             priority_score = 0 if model.get("priority") == "excellent" else 1
             if model.get("id") in [m["id"] for m in EXCELLENT_FREE_MODELS]:
@@ -631,7 +613,7 @@ class OpenRouterProvider(TranslationProvider):
             )
             # Debug logging for API key tracking
             if config_override.api_key:
-                logger.debug(f"Using API key from config_override: {config_override.api_key[:15]}...")
+                logger.debug(f"Using API key from config_override: ...{config_override.api_key[-4:]}")
             else:
                 logger.warning(f"config_override exists but api_key is None/empty. config_override fields: api_key={config_override.api_key is not None}, model={config_override.model}")
         else:
@@ -730,7 +712,7 @@ class OpenRouterProvider(TranslationProvider):
             # Always use config_override API key if available
             if config_override and config_override.api_key:
                 headers = self.settings.get_openrouter_headers(api_key_override=config_override.api_key)
-                logger.info(f"Making request with per-request API key: {config_override.api_key[:15]}... Auth header set: {'Authorization' in headers}")
+                logger.info(f"Making request with per-request API key: ...{config_override.api_key[-4:]} Auth header set: {'Authorization' in headers}")
                 async with httpx.AsyncClient(
                     base_url=self.settings.openrouter_api_base,
                     headers=headers,

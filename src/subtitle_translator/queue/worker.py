@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest, TranslationConfig
 from subtitle_translator.core.batch_processor import BatchProgress, BatchProcessor
-from subtitle_translator.core.translator import SubtitleTranslator, get_translator
+from subtitle_translator.core.translator import SubtitleTranslator, get_translator, map_translations_to_lines
 from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
 
 logger = logging.getLogger(__name__)
@@ -57,10 +57,17 @@ async def process_content_translation_job(
         
         # Extract config override from request
         config_override = _extract_config_override(request.config, job.request_data)
-        
+
+        # Restore API key from job-level storage (stripped from request_data for security)
+        if job.api_key_override:
+            if config_override is None:
+                config_override = TranslationConfig(api_key=job.api_key_override)
+            elif not config_override.api_key:
+                config_override.api_key = job.api_key_override
+
         # Log API key tracking (masked)
         if config_override and config_override.api_key:
-            masked_key = config_override.api_key[:10] + "..." if len(config_override.api_key) > 10 else "***"
+            masked_key = f"...{config_override.api_key[-4:]}"
             logger.info(f"Job {job_id}: Using API key from config: {masked_key}")
         else:
             logger.info(f"Job {job_id}: No API key in config_override, will use env default")
@@ -106,7 +113,7 @@ async def process_content_translation_job(
             
             # Check if we have partial results
             if result.all_translations:
-                translated_lines = _map_translations_to_lines(
+                translated_lines = map_translations_to_lines(
                     request.lines,
                     result.all_translations,
                     request.targetLanguage,
@@ -127,7 +134,7 @@ async def process_content_translation_job(
             return
         
         # Map translations back to SubtitleLine format
-        translated_lines = _map_translations_to_lines(
+        translated_lines = map_translations_to_lines(
             request.lines,
             result.all_translations,
             request.targetLanguage,
@@ -185,7 +192,14 @@ async def process_file_translation_job(
         
         # Extract config override from request data
         config_override = _extract_config_override_from_dict(request_data.get("config"))
-        
+
+        # Restore API key from job-level storage (stripped from request_data for security)
+        if job.api_key_override:
+            if config_override is None:
+                config_override = TranslationConfig(api_key=job.api_key_override)
+            elif not config_override.api_key:
+                config_override.api_key = job.api_key_override
+
         # Log request config for file translation
         if request_data.get("config"):
             raw_config = request_data.get("config")
@@ -196,10 +210,10 @@ async def process_file_translation_job(
                 else:
                     safe_config[key] = value
             logger.info(f"Job {job_id}: File translation config: {safe_config}")
-        
+
         # Debug log for API key tracking (masked)
         if config_override and config_override.api_key:
-            masked_key = config_override.api_key[:10] + "..." if len(config_override.api_key) > 10 else "***"
+            masked_key = f"...{config_override.api_key[-4:]}"
             logger.debug(f"Job {job_id}: Using API key from config: {masked_key}")
         else:
             logger.warning(f"Job {job_id}: No API key in config_override, will use env default")
@@ -208,14 +222,12 @@ async def process_file_translation_job(
             job_manager.set_job_failed(job_id, "SRT content is required")
             return
         
-        # Validate and parse SRT
-        is_valid, error = translator._srt_parser.validate_srt(content)
-        if not is_valid:
-            job_manager.set_job_failed(job_id, f"Invalid SRT content: {error}")
+        # Parse and validate SRT content
+        try:
+            entries = translator._srt_parser.parse(content)
+        except Exception as parse_error:
+            job_manager.set_job_failed(job_id, f"Invalid SRT content: {parse_error}")
             return
-        
-        # Parse SRT content
-        entries = translator._srt_parser.parse(content)
         if not entries:
             job_manager.set_job_completed(
                 job_id,
@@ -308,57 +320,7 @@ async def process_file_translation_job(
         job_manager.set_job_failed(job_id, str(e))
 
 
-def _map_translations_to_lines(
-    original_lines: List[SubtitleLine],
-    translations: List[Dict[str, str]],
-    target_language: str,
-    settings: Any,
-) -> List[SubtitleLine]:
-    """
-    Map translated content back to SubtitleLine format.
-    
-    Args:
-        original_lines: Original subtitle lines
-        translations: Translated content
-        target_language: Target language for RTL handling
-        settings: Settings instance
-        
-    Returns:
-        List of SubtitleLine with translated content
-    """
-    # Build translation map
-    translation_map = {t["index"]: t["content"] for t in translations}
-    
-    # Check if RTL markers needed
-    is_rtl = settings.is_rtl_language(target_language)
-    
-    result = []
-    for line in original_lines:
-        translated_text = translation_map.get(str(line.position), line.line)
-        
-        if is_rtl:
-            translated_text = _add_rtl_markers(translated_text)
-        
-        result.append(SubtitleLine(position=line.position, line=translated_text))
-    
-    return result
 
-
-def _add_rtl_markers(text: str) -> str:
-    """Add RTL markers to text for proper display."""
-    RLE = "\u202B"  # RIGHT-TO-LEFT EMBEDDING
-    PDF = "\u202C"  # POP DIRECTIONAL FORMATTING
-    
-    lines = text.split("\n")
-    marked_lines = []
-    
-    for line in lines:
-        if line.strip():
-            marked_lines.append(f"{RLE}{line}{PDF}")
-        else:
-            marked_lines.append(line)
-    
-    return "\n".join(marked_lines)
 
 
 def _extract_config_override(

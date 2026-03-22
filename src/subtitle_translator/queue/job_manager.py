@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -40,6 +40,7 @@ class Job(BaseModel):
     progress: int = 0
     message: str = ""
     request_data: Dict[str, Any]
+    api_key_override: Optional[str] = None
     result: Optional[Any] = None
     error: Optional[str] = None
     created_at: datetime
@@ -152,13 +153,15 @@ class JobManager:
         self,
         request_data: Dict[str, Any],
         job_type: JobType,
+        api_key_override: Optional[str] = None,
     ) -> str:
         """
         Submit a new job to the queue.
-        
+
         Args:
             request_data: The request data for the translation job
             job_type: Type of translation job
+            api_key_override: API key to use for this job (kept separate from request_data)
             
         Returns:
             The job ID
@@ -182,7 +185,8 @@ class JobManager:
             job_type=job_type,
             status=JobStatus.QUEUED,
             request_data=request_data,
-            created_at=datetime.utcnow(),
+            api_key_override=api_key_override,
+            created_at=datetime.now(timezone.utc),
         )
         
         self.jobs[job_id] = job
@@ -229,7 +233,7 @@ class JobManager:
         if job_id in self.jobs:
             job = self.jobs[job_id]
             job.status = JobStatus.PROCESSING
-            job.started_at = datetime.utcnow()
+            job.started_at = datetime.now(timezone.utc)
             job.message = "Processing translation..."
     
     def set_job_completed(
@@ -249,7 +253,7 @@ class JobManager:
             job.status = JobStatus.COMPLETED
             job.progress = 100
             job.result = result
-            job.completed_at = datetime.utcnow()
+            job.completed_at = datetime.now(timezone.utc)
             job.message = "Translation completed"
             logger.info(f"Job {job_id} completed successfully")
     
@@ -269,7 +273,7 @@ class JobManager:
             job = self.jobs[job_id]
             job.status = JobStatus.FAILED
             job.error = error
-            job.completed_at = datetime.utcnow()
+            job.completed_at = datetime.now(timezone.utc)
             job.message = f"Translation failed: {error}"
             logger.error(f"Job {job_id} failed: {error}")
     
@@ -289,7 +293,7 @@ class JobManager:
         
         if job.status == JobStatus.QUEUED:
             job.status = JobStatus.CANCELLED
-            job.completed_at = datetime.utcnow()
+            job.completed_at = datetime.now(timezone.utc)
             job.message = "Job cancelled by user"
             logger.info(f"Job {job_id} cancelled")
             return True
@@ -416,9 +420,8 @@ class JobManager:
                 task = asyncio.create_task(self._worker(i))
                 self._workers.append(task)
         
-        # Note: We don't stop existing workers when decreasing.
-        # They will naturally stop when the queue is empty or
-        # will be cancelled when stop_workers() is called.
+        # Remove finished worker tasks from the list
+        self._workers = [w for w in self._workers if not w.done()]
     
     async def _worker(self, worker_id: int) -> None:
         """
@@ -428,12 +431,16 @@ class JobManager:
             worker_id: Worker identifier for logging
         """
         logger.info(f"Worker {worker_id} started")
-        
+
         while True:
             try:
+                if worker_id >= self.max_concurrent:
+                    logger.info(f"Worker {worker_id} exiting: exceeds max_concurrent ({self.max_concurrent})")
+                    break
+
                 # Get next job from queue
                 job_id, job_type = await self.queue.get()
-                
+
                 # Check if job still exists and is queued
                 job = self.jobs.get(job_id)
                 if job is None:
@@ -482,7 +489,7 @@ class JobManager:
     
     async def _cleanup_expired_jobs(self) -> None:
         """Remove expired completed/failed jobs."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired_ids = []
         
         for job_id, job in self.jobs.items():

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     job_queue_max_jobs: int = 500  # Max jobs in memory (increased for high-throughput testing)
     job_queue_ttl_hours: int = 1  # TTL for completed/failed jobs
 
+    # Admin API key for protecting config endpoints (optional)
+    admin_api_key: str = ""
+
     # App identification for OpenRouter analytics
     app_name: str = "ai-subtitle-translator"
     app_url: Optional[str] = "https://lavx.hu"
@@ -98,31 +101,32 @@ class Settings(BaseSettings):
 _settings: Optional[Settings] = None
 _settings_lock = threading.Lock()
 _runtime_overrides: Dict[str, Any] = {}
+_overridden_settings: Optional[Settings] = None
 
 
 def get_settings() -> Settings:
     """
     Get settings instance with runtime overrides applied.
-    
+
     This function returns a settings instance that combines:
     1. Environment variables / .env file values (base)
     2. Runtime overrides set via update_runtime_config
-    
+
     Returns:
         Settings instance with runtime overrides applied
     """
-    global _settings
+    global _settings, _overridden_settings
     with _settings_lock:
         if _settings is None:
             _settings = Settings()
-        
-        # Apply runtime overrides
+
         if _runtime_overrides:
-            # Create a copy of current settings with overrides
-            settings_dict = _settings.model_dump()
-            settings_dict.update(_runtime_overrides)
-            return Settings(**settings_dict)
-        
+            if _overridden_settings is None:
+                settings_dict = _settings.model_dump()
+                settings_dict.update(_runtime_overrides)
+                _overridden_settings = Settings(**settings_dict)
+            return _overridden_settings
+
         return _settings
 
 
@@ -140,15 +144,16 @@ def update_runtime_config(key: str, value: Any) -> None:
     Raises:
         ValueError: If key is not a valid Settings field
     """
-    global _runtime_overrides
-    
+    global _runtime_overrides, _overridden_settings
+
     # Validate that key is a valid Settings field
     valid_keys = set(Settings.model_fields.keys())
     if key not in valid_keys:
         raise ValueError(f"Invalid configuration key: {key}. Valid keys: {valid_keys}")
-    
+
     with _settings_lock:
         _runtime_overrides[key] = value
+        _overridden_settings = None
 
 
 def get_runtime_overrides() -> Dict[str, Any]:

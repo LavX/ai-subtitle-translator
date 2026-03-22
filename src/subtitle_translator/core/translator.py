@@ -1,5 +1,6 @@
 """Main translation orchestration module."""
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Optional, TYPE_CHECKING
@@ -7,7 +8,7 @@ from typing import Optional, TYPE_CHECKING
 from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
 from subtitle_translator.config import Settings, get_settings
 from subtitle_translator.core.batch_processor import BatchProcessor, BatchProcessingResult
-from subtitle_translator.core.srt_parser import SRTParser, SubtitleEntry
+from subtitle_translator.core.srt_parser import SRTParser, SubtitleEntry, add_rtl_markers
 from subtitle_translator.providers.base import TranslationProvider
 from subtitle_translator.providers.openrouter import OpenRouterProvider
 
@@ -195,18 +196,8 @@ class SubtitleTranslator:
         else:
             model_to_use = model or self.settings.openrouter_default_model
 
-        # Validate and parse SRT
-        is_valid, error = self._srt_parser.validate_srt(content)
-        if not is_valid:
-            return FileTranslationResult(
-                content="",
-                model_used=model_to_use,
-                success=False,
-                error=f"Invalid SRT content: {error}",
-            )
-
         try:
-            # Parse SRT content
+            # Parse and validate SRT content
             entries = self._srt_parser.parse(content)
             if not entries:
                 return FileTranslationResult(
@@ -296,53 +287,14 @@ class SubtitleTranslator:
         translations: list[dict[str, str]],
         target_language: str,
     ) -> list[SubtitleLine]:
-        """
-        Map translated content back to SubtitleLine format.
-
-        Args:
-            original_lines: Original subtitle lines
-            translations: Translated content
-            target_language: Target language for RTL handling
-
-        Returns:
-            List of SubtitleLine with translated content
-        """
-        # Build translation map
-        translation_map = {t["index"]: t["content"] for t in translations}
-        
-        # Check if RTL markers needed
-        is_rtl = self.settings.is_rtl_language(target_language)
-
-        result = []
-        for line in original_lines:
-            translated_text = translation_map.get(
-                str(line.position), line.line
-            )
-            
-            if is_rtl:
-                translated_text = self._add_rtl_markers(translated_text)
-
-            result.append(
-                SubtitleLine(position=line.position, line=translated_text)
-            )
-
-        return result
+        """Map translated content back to SubtitleLine format."""
+        return map_translations_to_lines(
+            original_lines, translations, target_language, self.settings
+        )
 
     def _add_rtl_markers(self, text: str) -> str:
         """Add RTL markers to text for proper display."""
-        RLE = "\u202B"  # RIGHT-TO-LEFT EMBEDDING
-        PDF = "\u202C"  # POP DIRECTIONAL FORMATTING
-        
-        lines = text.split("\n")
-        marked_lines = []
-        
-        for line in lines:
-            if line.strip():
-                marked_lines.append(f"{RLE}{line}{PDF}")
-            else:
-                marked_lines.append(line)
-        
-        return "\n".join(marked_lines)
+        return add_rtl_markers(text)
 
     async def get_available_models(self) -> list[dict]:
         """Get list of available translation models."""
@@ -353,15 +305,55 @@ class SubtitleTranslator:
         return await self.provider.health_check()
 
 
+def map_translations_to_lines(
+    original_lines: list[SubtitleLine],
+    translations: list[dict[str, str]],
+    target_language: str,
+    settings: "Settings",
+) -> list[SubtitleLine]:
+    """
+    Map translated content back to SubtitleLine format.
+
+    Args:
+        original_lines: Original subtitle lines
+        translations: Translated content
+        target_language: Target language for RTL handling
+        settings: Settings instance
+
+    Returns:
+        List of SubtitleLine with translated content
+    """
+    translation_map = {t["index"]: t["content"] for t in translations}
+    is_rtl = settings.is_rtl_language(target_language)
+
+    result = []
+    for line in original_lines:
+        translated_text = translation_map.get(
+            str(line.position), line.line
+        )
+
+        if is_rtl:
+            translated_text = add_rtl_markers(translated_text)
+
+        result.append(
+            SubtitleLine(position=line.position, line=translated_text)
+        )
+
+    return result
+
+
 # Global translator instance for dependency injection
 _translator_instance: Optional[SubtitleTranslator] = None
+_translator_lock: asyncio.Lock = asyncio.Lock()
 
 
 async def get_translator() -> SubtitleTranslator:
     """Get or create the global translator instance."""
     global _translator_instance
     if _translator_instance is None:
-        _translator_instance = SubtitleTranslator()
+        async with _translator_lock:
+            if _translator_instance is None:
+                _translator_instance = SubtitleTranslator()
     return _translator_instance
 
 

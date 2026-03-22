@@ -3,7 +3,7 @@
 import logging
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from subtitle_translator.api.models import (
     ConfigResponse,
@@ -377,9 +377,14 @@ async def submit_translate_content_job(
                    f"lines={lines_count}, "
                    f"model={request.model or 'default'}, temperature={request.temperature or 'default'}")
         
+        request_data = request.model_dump()
+        api_key_override = None
+        if request_data.get("config") and request_data["config"].get("api_key"):
+            api_key_override = request_data["config"].pop("api_key")
         job_id = await job_manager.submit_job(
-            request_data=request.model_dump(),
+            request_data=request_data,
             job_type=JobType.TRANSLATE_CONTENT,
+            api_key_override=api_key_override,
         )
         
         position = job_manager.get_queue_position(job_id)
@@ -458,9 +463,14 @@ async def submit_translate_file_job(
         )
     
     try:
+        request_data = request.model_dump()
+        api_key_override = None
+        if request_data.get("config") and request_data["config"].get("api_key"):
+            api_key_override = request_data["config"].pop("api_key")
         job_id = await job_manager.submit_job(
-            request_data=request.model_dump(),
+            request_data=request_data,
             job_type=JobType.TRANSLATE_FILE,
+            api_key_override=api_key_override,
         )
         
         position = job_manager.get_queue_position(job_id)
@@ -659,19 +669,27 @@ async def cancel_or_delete_job(job_id: str) -> JobDeleteResponse:
     summary="Service Status",
     description="Get overall service status including queue state and configuration.",
 )
-async def get_service_status() -> ServiceStatusResponse:
+async def get_service_status(translator: TranslatorDep) -> ServiceStatusResponse:
     """
     Get overall service status.
-    
+
     Returns service health, current configuration summary, and queue statistics.
     """
     settings = get_settings()
     jobs = list(job_manager.jobs.values())
-    
+
+    is_healthy = True
+    if settings.openrouter_api_key:
+        try:
+            is_healthy = await translator.health_check()
+        except Exception as e:
+            logger.warning(f"Status health check failed: {e}")
+            is_healthy = False
+
     return ServiceStatusResponse(
         service="ai-subtitle-translator",
         version="1.0.0",
-        healthy=True,
+        healthy=is_healthy,
         config={
             "model": settings.openrouter_default_model,
             "apiKeyConfigured": bool(settings.openrouter_api_key),
@@ -727,7 +745,10 @@ async def get_config() -> ConfigResponse:
         400: {"model": ErrorResponse, "description": "Invalid configuration value"},
     },
 )
-async def update_config(request: ConfigUpdateRequest) -> ConfigUpdateResponse:
+async def update_config(
+    request: ConfigUpdateRequest,
+    x_admin_key: Annotated[Optional[str], Header()] = None,
+) -> ConfigUpdateResponse:
     """
     Update runtime configuration.
     
@@ -740,8 +761,16 @@ async def update_config(request: ConfigUpdateRequest) -> ConfigUpdateResponse:
     - temperature: Default sampling temperature (0.0-2.0)
     - maxConcurrentJobs: Maximum concurrent translation workers (1-10)
     """
+    settings = get_settings()
+    if settings.admin_api_key:
+        if not x_admin_key or x_admin_key != settings.admin_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": "forbidden", "message": "Invalid or missing X-Admin-Key header"},
+            )
+
     updated_fields = []
-    
+
     try:
         if request.apiKey is not None:
             update_runtime_config("openrouter_api_key", request.apiKey)

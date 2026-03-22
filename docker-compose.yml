@@ -1,6 +1,5 @@
 # AI Subtitle Translator by LavX
 # https://github.com/LavX/ai-subtitle-translator
-version: '3.8'
 
 services:
   ai-subtitle-translator:
