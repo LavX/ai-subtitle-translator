@@ -1,16 +1,16 @@
 """Worker functions for processing translation jobs."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest, TranslationConfig
-from subtitle_translator.core.batch_processor import BatchProgress, BatchProcessor
+from subtitle_translator.api.models import TranslateContentRequest, TranslationConfig
+from subtitle_translator.core.batch_processor import BatchProcessor, BatchProgress
 from subtitle_translator.core.translator import (
     SubtitleTranslator,
     get_translator,
     map_translations_to_lines,
 )
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.queue.job_manager import JobManager, JobType
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ async def process_content_translation_job(
 
         if not result.success:
             failed_batches = [r for r in result.batch_results if not r.success]
-            successful_batches = [r for r in result.batch_results if r.success]
+            [r for r in result.batch_results if r.success]
             error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
 
             # Report as partial if we have some results, otherwise fail
@@ -368,9 +368,9 @@ async def process_file_translation_job(
 
 
 def _extract_config_override(
-    config: Optional[TranslationConfig],
-    request_data: Dict[str, Any],
-) -> Optional[TranslationConfig]:
+    config: TranslationConfig | None,
+    request_data: dict[str, Any],
+) -> TranslationConfig | None:
     """
     Extract TranslationConfig from request, handling both parsed model and raw dict.
 
@@ -389,8 +389,8 @@ def _extract_config_override(
 
 
 def _extract_config_override_from_dict(
-    config_dict: Optional[Dict[str, Any]],
-) -> Optional[TranslationConfig]:
+    config_dict: dict[str, Any] | None,
+) -> TranslationConfig | None:
     """
     Extract TranslationConfig from a dictionary.
 

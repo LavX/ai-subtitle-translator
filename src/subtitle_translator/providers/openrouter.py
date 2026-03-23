@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 import httpx
 
@@ -311,7 +311,7 @@ MAX_TOKENS_REASONING_MODELS = [
 class OpenRouterProvider(TranslationProvider):
     """Translation provider using OpenRouter API."""
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Settings | None = None):
         """
         Initialize OpenRouter provider.
 
@@ -319,7 +319,7 @@ class OpenRouterProvider(TranslationProvider):
             settings: Optional settings instance. Uses global settings if not provided.
         """
         self.settings = settings or get_settings()
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._model_params_cache: dict[str, list[str]] = {}
         self._model_params_fetched: bool = False
 
@@ -396,7 +396,7 @@ class OpenRouterProvider(TranslationProvider):
 
         return sorted(models, key=sort_key)
 
-    def get_model_metadata(self, model_id: str) -> Optional[dict]:
+    def get_model_metadata(self, model_id: str) -> dict | None:
         if not hasattr(self, "_model_metadata_cache"):
             self._model_metadata_cache: dict[str, dict] = {}
             for model_list in [EXCELLENT_MODELS, EXCELLENT_FREE_MODELS, GOOD_MODELS, POOR_MODELS]:
@@ -404,7 +404,7 @@ class OpenRouterProvider(TranslationProvider):
                     self._model_metadata_cache[model["id"]] = model
         return self._model_metadata_cache.get(model_id)
 
-    def get_best_model_for_language(self, target_language: str) -> Optional[str]:
+    def get_best_model_for_language(self, target_language: str) -> str | None:
         """
         Get the best model for the specified target language.
 
@@ -482,7 +482,7 @@ class OpenRouterProvider(TranslationProvider):
             logger.warning(f"Failed to fetch model params from OpenRouter API: {e}")
         self._model_params_fetched = True
 
-    async def _get_reasoning_type(self, model_id: str) -> Optional[str]:
+    async def _get_reasoning_type(self, model_id: str) -> str | None:
         """
         Determine the reasoning type supported by a model.
 
@@ -591,9 +591,7 @@ class OpenRouterProvider(TranslationProvider):
                         "low",
                         "minimal",
                     ]:
-                        reasoning_params["reasoning"] = {
-                            "effort": reasoning_config.effort.lower()
-                        }
+                        reasoning_params["reasoning"] = {"effort": reasoning_config.effort.lower()}
                         logger.info(f"Using reasoning effort: {reasoning_config.effort}")
                     else:
                         logger.warning(f"Invalid reasoning effort: {reasoning_config.effort}")
@@ -679,8 +677,8 @@ class OpenRouterProvider(TranslationProvider):
     async def translate_batch(
         self,
         batch: TranslationBatch,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
     ) -> TranslationResult:
         """
@@ -802,7 +800,7 @@ class OpenRouterProvider(TranslationProvider):
             payload.update(provider_params)
 
         # Debug logging: Log incoming batch data
-        debug_logger.debug(f"=== INCOMING BATCH DATA ===")
+        debug_logger.debug("=== INCOMING BATCH DATA ===")
         debug_logger.debug(f"Source language: {batch.source_language}")
         debug_logger.debug(f"Target language: {batch.target_language}")
         debug_logger.debug(f"Lines count: {len(batch.lines)}")
@@ -815,7 +813,7 @@ class OpenRouterProvider(TranslationProvider):
             logger.debug(f"Reasoning params: {reasoning_params}")
 
         # Debug logging: Log the complete payload being sent to OpenRouter
-        debug_logger.debug(f"=== SENDING TO OPENROUTER ===")
+        debug_logger.debug("=== SENDING TO OPENROUTER ===")
         debug_logger.debug(f"Model: {model_to_use}")
         debug_logger.debug(f"Temperature: {temp_to_use}")
         debug_logger.debug(f"Payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
@@ -954,7 +952,7 @@ class OpenRouterProvider(TranslationProvider):
             )
 
         # Debug logging: Log the raw response content
-        debug_logger.debug(f"=== RECEIVED FROM OPENROUTER ===")
+        debug_logger.debug("=== RECEIVED FROM OPENROUTER ===")
         debug_logger.debug(f"Model used: {model_used}")
         debug_logger.debug(
             f"Token usage - prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
@@ -965,7 +963,7 @@ class OpenRouterProvider(TranslationProvider):
         translations = self._parse_translations(content)
 
         # Debug logging: Log parsed translations
-        debug_logger.debug(f"=== PARSED TRANSLATIONS ===")
+        debug_logger.debug("=== PARSED TRANSLATIONS ===")
         debug_logger.debug(f"Translations count: {len(translations)}")
         debug_logger.debug(
             f"Translations: {json.dumps(translations, ensure_ascii=False, indent=2)}"

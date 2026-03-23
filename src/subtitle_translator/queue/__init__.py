@@ -7,7 +7,10 @@ from subtitle_translator.queue.job_manager import (
     JobType,
     job_manager,
 )
-from subtitle_translator.queue.worker import process_content_translation_job, process_file_translation_job
+from subtitle_translator.queue.worker import (
+    process_content_translation_job,
+    process_file_translation_job,
+)
 
 __all__ = [
     "Job",

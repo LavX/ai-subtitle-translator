@@ -1,7 +1,6 @@
 """Adaptive batch sizing for different model capabilities."""
 
 import logging
-from typing import Optional
 
 from subtitle_translator.config import get_settings
 
@@ -21,8 +20,8 @@ class BatchSizeResolver:
     def resolve(
         self,
         model_id: str,
-        context_length: Optional[int] = None,
-        max_batch_size: Optional[int] = None,
+        context_length: int | None = None,
+        max_batch_size: int | None = None,
     ) -> int:
         global_max = self._settings.batch_size
 
@@ -58,7 +57,7 @@ class BatchSizeResolver:
         self._learned_sizes.clear()
 
 
-_resolver_instance: Optional[BatchSizeResolver] = None
+_resolver_instance: BatchSizeResolver | None = None
 
 
 def get_batch_size_resolver() -> BatchSizeResolver:

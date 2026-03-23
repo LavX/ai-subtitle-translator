@@ -1,6 +1,6 @@
 """Tests for job queue API routes and _build_job_status_response helper."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from subtitle_translator.api.routes import _build_job_status_response
 from subtitle_translator.main import app
-from subtitle_translator.queue.job_manager import Job, JobManager, JobStatus, JobType, job_manager
+from subtitle_translator.queue.job_manager import Job, JobStatus, JobType, job_manager
 
 
 @pytest.fixture
@@ -78,7 +78,7 @@ class TestBuildJobStatusResponse:
             job_type=JobType.TRANSLATE_CONTENT,
             status=JobStatus.QUEUED,
             request_data={},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             job_name="my-job",
             file_name="subs.srt",
             source_language="en",
@@ -102,13 +102,13 @@ class TestBuildJobStatusResponse:
         assert resp.totalLines == 50
 
     def test_processing_job_elapsed_computed(self):
-        started = datetime.now(timezone.utc) - timedelta(seconds=30)
+        started = datetime.now(UTC) - timedelta(seconds=30)
         job = Job(
             id="test-2",
             job_type=JobType.TRANSLATE_FILE,
             status=JobStatus.PROCESSING,
             request_data={},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             started_at=started,
             total_batches=10,
             completed_batches=5,
@@ -126,8 +126,8 @@ class TestBuildJobStatusResponse:
         assert resp.totalCost == pytest.approx(0.05)
 
     def test_completed_job_elapsed_fixed(self):
-        started = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-        completed = datetime(2026, 1, 1, 0, 0, 45, tzinfo=timezone.utc)
+        started = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        completed = datetime(2026, 1, 1, 0, 0, 45, tzinfo=UTC)
         job = Job(
             id="test-3",
             job_type=JobType.TRANSLATE_CONTENT,
@@ -148,7 +148,7 @@ class TestBuildJobStatusResponse:
             job_type=JobType.TRANSLATE_CONTENT,
             status=JobStatus.FAILED,
             request_data={},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             error="Translation failed",
         )
         resp = _build_job_status_response(job)
@@ -161,7 +161,7 @@ class TestBuildJobStatusResponse:
             job_type=JobType.TRANSLATE_CONTENT,
             status=JobStatus.PROCESSING,
             request_data={},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             tokens_used=0,
             total_cost=0.0,
         )
@@ -175,7 +175,7 @@ class TestBuildJobStatusResponse:
             job_type=JobType.TRANSLATE_CONTENT,
             status=JobStatus.QUEUED,
             request_data={},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             total_batches=None,
             completed_batches=0,
             completed_lines=0,
@@ -191,7 +191,7 @@ class TestBuildJobStatusResponse:
             job_type=JobType.TRANSLATE_CONTENT,
             status=JobStatus.QUEUED,
             request_data={},
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         resp = _build_job_status_response(job)
         assert resp.jobName is None
@@ -476,7 +476,7 @@ class TestGetJobStatus:
         job_id = resp.json()["jobId"]
 
         # Simulate processing with metrics
-        job = job_manager.get_job(job_id)
+        job_manager.get_job(job_id)
         job_manager.set_job_processing(job_id)
         job_manager.update_progress(
             job_id,
@@ -539,7 +539,7 @@ class TestListJobs:
             "/api/v1/jobs/translate/content",
             json=_make_content_request(),
         )
-        resp2 = client.post(
+        client.post(
             "/api/v1/jobs/translate/content",
             json=_make_content_request(),
         )

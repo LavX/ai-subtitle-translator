@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from subtitle_translator.api.models import TranslationConfig
@@ -14,11 +14,11 @@ class TranslationResult:
 
     translations: list[dict[str, str]]  # List of {"index": "0", "content": "translated text"}
     model_used: str
-    prompt_tokens: Optional[int] = None
-    completion_tokens: Optional[int] = None
-    total_tokens: Optional[int] = None
-    cost: Optional[float] = None
-    raw_response: Optional[dict] = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+    cost: float | None = None
+    raw_response: dict | None = None
 
 
 @dataclass
@@ -28,8 +28,8 @@ class TranslationBatch:
     lines: list[dict[str, str]]  # List of {"index": "0", "content": "original text"}
     source_language: str
     target_language: str
-    context_title: Optional[str] = None
-    context_media_type: Optional[str] = None
+    context_title: str | None = None
+    context_media_type: str | None = None
 
 
 class TranslationProviderError(Exception):
@@ -40,7 +40,7 @@ class TranslationProviderError(Exception):
         message: str,
         provider: str = "unknown",
         retryable: bool = False,
-        status_code: Optional[int] = None,
+        status_code: int | None = None,
     ):
         super().__init__(message)
         self.message = message
@@ -52,7 +52,7 @@ class TranslationProviderError(Exception):
 class RateLimitError(TranslationProviderError):
     """Raised when rate limit is exceeded."""
 
-    def __init__(self, message: str, provider: str = "unknown", retry_after: Optional[float] = None):
+    def __init__(self, message: str, provider: str = "unknown", retry_after: float | None = None):
         super().__init__(message, provider, retryable=True, status_code=429)
         self.retry_after = retry_after
 
@@ -67,7 +67,7 @@ class AuthenticationError(TranslationProviderError):
 class InvalidResponseError(TranslationProviderError):
     """Raised when the provider returns an invalid response."""
 
-    def __init__(self, message: str, provider: str = "unknown", raw_response: Optional[str] = None):
+    def __init__(self, message: str, provider: str = "unknown", raw_response: str | None = None):
         super().__init__(message, provider, retryable=True)
         self.raw_response = raw_response
 
@@ -85,8 +85,8 @@ class TranslationProvider(ABC):
     async def translate_batch(
         self,
         batch: TranslationBatch,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
     ) -> TranslationResult:
         """
@@ -131,7 +131,7 @@ class TranslationProvider(ABC):
         """
         pass
 
-    def get_model_metadata(self, model_id: str) -> Optional[dict]:
+    def get_model_metadata(self, model_id: str) -> dict | None:
         """
         Get metadata for a specific model by ID.
 
@@ -147,8 +147,8 @@ class TranslationProvider(ABC):
         self,
         target_language: str,
         source_language: str,
-        context_title: Optional[str] = None,
-        context_media_type: Optional[str] = None,
+        context_title: str | None = None,
+        context_media_type: str | None = None,
     ) -> str:
         """
         Build the system prompt for translation.

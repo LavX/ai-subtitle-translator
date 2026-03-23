@@ -1,11 +1,11 @@
 """Tests for the job manager."""
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from subtitle_translator.queue.job_manager import Job, JobManager, JobStatus, JobType
+from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
 
 
 @pytest.fixture
@@ -100,7 +100,7 @@ class TestJobSubmission:
 
     @pytest.mark.asyncio
     async def test_submit_job_adds_to_queue(self, manager):
-        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
+        await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         assert not manager.queue.empty()
 
 
@@ -349,7 +349,7 @@ class TestStats:
     @pytest.mark.asyncio
     async def test_stats_mixed(self, manager):
         id1 = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
-        id2 = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
+        await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(id1)
         manager.set_job_failed(id1, "err")
         stats = manager.get_stats()
@@ -403,7 +403,7 @@ class TestCleanup:
         manager.set_job_completed(job_id, {})
         # Manually set completed_at to be past TTL
         job = manager.get_job(job_id)
-        job.completed_at = datetime.now(timezone.utc) - timedelta(hours=2)
+        job.completed_at = datetime.now(UTC) - timedelta(hours=2)
         await manager._cleanup_expired_jobs()
         assert manager.get_job(job_id) is None
 

@@ -3,16 +3,16 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     """Status of a translation job."""
 
     QUEUED = "queued"
@@ -23,7 +23,7 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class JobType(str, Enum):
+class JobType(StrEnum):
     """Type of translation job."""
 
     TRANSLATE_CONTENT = "translate_content"
@@ -40,30 +40,30 @@ class Job(BaseModel):
     status: JobStatus = JobStatus.QUEUED
     progress: int = 0
     message: str = ""
-    request_data: Dict[str, Any]
-    api_key_override: Optional[str] = None
-    result: Optional[Any] = None
-    error: Optional[str] = None
+    request_data: dict[str, Any]
+    api_key_override: str | None = None
+    result: Any | None = None
+    error: str | None = None
     created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     # Input metadata
-    job_name: Optional[str] = None
-    file_name: Optional[str] = None
-    source_language: Optional[str] = None
-    target_language: Optional[str] = None
-    title: Optional[str] = None
-    media_type: Optional[str] = None
-    model: Optional[str] = None
-    total_lines: Optional[int] = None
+    job_name: str | None = None
+    file_name: str | None = None
+    source_language: str | None = None
+    target_language: str | None = None
+    title: str | None = None
+    media_type: str | None = None
+    model: str | None = None
+    total_lines: int | None = None
     # Processing metrics
-    total_batches: Optional[int] = None
+    total_batches: int | None = None
     completed_batches: int = 0
     completed_lines: int = 0
     tokens_used: int = 0
     total_cost: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert job to dictionary for API response."""
         return {
             "jobId": self.id,
@@ -101,15 +101,15 @@ class JobManager:
             max_jobs: Maximum number of jobs to keep in memory
             job_ttl_hours: Time-to-live for completed/failed jobs in hours
         """
-        self.jobs: Dict[str, Job] = {}
+        self.jobs: dict[str, Job] = {}
         self.queue: asyncio.Queue = asyncio.Queue()
         self.max_concurrent = max_concurrent
         self.max_jobs = max_jobs
         self.job_ttl = timedelta(hours=job_ttl_hours)
         self._workers_started = False
-        self._workers: List[asyncio.Task] = []
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._worker_handler: Optional[Any] = None
+        self._workers: list[asyncio.Task] = []
+        self._cleanup_task: asyncio.Task | None = None
+        self._worker_handler: Any | None = None
 
     def set_worker_handler(self, handler: Any) -> None:
         """
@@ -167,10 +167,10 @@ class JobManager:
 
     async def submit_job(
         self,
-        request_data: Dict[str, Any],
+        request_data: dict[str, Any],
         job_type: JobType,
-        api_key_override: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        api_key_override: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Submit a new job to the queue.
@@ -204,7 +204,7 @@ class JobManager:
             status=JobStatus.QUEUED,
             request_data=request_data,
             api_key_override=api_key_override,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             job_name=meta.get("job_name"),
             file_name=meta.get("file_name"),
             source_language=meta.get("source_language"),
@@ -222,7 +222,7 @@ class JobManager:
 
         return job_id
 
-    def get_job(self, job_id: str) -> Optional[Job]:
+    def get_job(self, job_id: str) -> Job | None:
         """
         Get a job by ID.
 
@@ -239,11 +239,11 @@ class JobManager:
         job_id: str,
         progress: int,
         message: str = "",
-        total_batches: Optional[int] = None,
-        completed_batches: Optional[int] = None,
-        completed_lines: Optional[int] = None,
-        tokens_used: Optional[int] = None,
-        total_cost: Optional[float] = None,
+        total_batches: int | None = None,
+        completed_batches: int | None = None,
+        completed_lines: int | None = None,
+        tokens_used: int | None = None,
+        total_cost: float | None = None,
     ) -> None:
         """
         Update job progress and metrics.
@@ -279,7 +279,7 @@ class JobManager:
         if job_id in self.jobs:
             job = self.jobs[job_id]
             job.status = JobStatus.PROCESSING
-            job.started_at = datetime.now(timezone.utc)
+            job.started_at = datetime.now(UTC)
             job.message = "Processing translation..."
 
     def set_job_completed(
@@ -299,7 +299,7 @@ class JobManager:
             job.status = JobStatus.COMPLETED
             job.progress = 100
             job.result = result
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = datetime.now(UTC)
             job.message = "Translation completed"
             logger.info(f"Job {job_id} completed successfully")
 
@@ -322,7 +322,7 @@ class JobManager:
             job.status = JobStatus.PARTIAL
             job.result = result
             job.error = error
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = datetime.now(UTC)
             job.message = f"Partial translation: {error}"
             logger.warning(f"Job {job_id} partially completed: {error}")
 
@@ -342,7 +342,7 @@ class JobManager:
             job = self.jobs[job_id]
             job.status = JobStatus.FAILED
             job.error = error
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = datetime.now(UTC)
             job.message = f"Translation failed: {error}"
             logger.error(f"Job {job_id} failed: {error}")
 
@@ -362,7 +362,7 @@ class JobManager:
 
         if job.status == JobStatus.QUEUED:
             job.status = JobStatus.CANCELLED
-            job.completed_at = datetime.now(timezone.utc)
+            job.completed_at = datetime.now(UTC)
             job.message = "Job cancelled by user"
             logger.info(f"Job {job_id} cancelled")
             return True
@@ -395,9 +395,9 @@ class JobManager:
 
     def list_jobs(
         self,
-        status_filter: Optional[JobStatus] = None,
+        status_filter: JobStatus | None = None,
         limit: int = 100,
-    ) -> List[Job]:
+    ) -> list[Job]:
         """
         List jobs with optional filtering.
 
@@ -418,7 +418,7 @@ class JobManager:
 
         return jobs[:limit]
 
-    def get_queue_position(self, job_id: str) -> Optional[int]:
+    def get_queue_position(self, job_id: str) -> int | None:
         """
         Get the position of a job in the queue.
 
@@ -441,7 +441,7 @@ class JobManager:
 
         return None
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """
         Get job queue statistics.
 
@@ -562,7 +562,7 @@ class JobManager:
 
     async def _cleanup_expired_jobs(self) -> None:
         """Remove expired completed/failed jobs."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expired_ids = []
 
         for job_id, job in self.jobs.items():

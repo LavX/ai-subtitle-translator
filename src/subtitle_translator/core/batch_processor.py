@@ -1,10 +1,10 @@
 """Batch processing logic for subtitle translation."""
 
 import asyncio
-import json
 import logging
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
-from typing import AsyncGenerator, Callable, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from subtitle_translator.config import Settings, get_settings
 from subtitle_translator.providers.base import (
@@ -13,7 +13,6 @@ from subtitle_translator.providers.base import (
     TranslationBatch,
     TranslationProvider,
     TranslationProviderError,
-    TranslationResult,
 )
 
 if TYPE_CHECKING:
@@ -63,7 +62,7 @@ class BatchResult:
     translations: list[dict[str, str]] = field(default_factory=list)
     tokens_used: int = 0
     cost: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
     retries: int = 0
 
 
@@ -89,7 +88,7 @@ class BatchProcessor:
     def __init__(
         self,
         provider: TranslationProvider,
-        settings: Optional[Settings] = None,
+        settings: Settings | None = None,
     ):
         """
         Initialize batch processor.
@@ -104,8 +103,8 @@ class BatchProcessor:
     def create_batches(
         self,
         lines: list[dict[str, str]],
-        batch_size: Optional[int] = None,
-        model: Optional[str] = None,
+        batch_size: int | None = None,
+        model: str | None = None,
     ) -> list[list[dict[str, str]]]:
         """
         Split lines into batches.
@@ -143,11 +142,11 @@ class BatchProcessor:
         self,
         batch: TranslationBatch,
         batch_index: int,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
         _is_adaptive_retry: bool = False,
-        _rate_limit_lock: Optional[asyncio.Lock] = None,
+        _rate_limit_lock: asyncio.Lock | None = None,
     ) -> BatchResult:
         """
         Process a single batch with retry logic.
@@ -163,10 +162,10 @@ class BatchProcessor:
         Returns:
             BatchResult with translations or error
         """
-        from subtitle_translator.core.batch_sizing import get_batch_size_resolver, MIN_BATCH_SIZE
+        from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, get_batch_size_resolver
 
         retries = 0
-        last_error: Optional[str] = None
+        last_error: str | None = None
         is_timeout = False
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
         # Rate limits get extra retries (3 more than normal errors)
@@ -298,10 +297,10 @@ class BatchProcessor:
         self,
         batch: TranslationBatch,
         batch_index: int,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
-        _rate_limit_lock: Optional[asyncio.Lock] = None,
+        _rate_limit_lock: asyncio.Lock | None = None,
     ) -> BatchResult:
         """Retry a failed batch by splitting it into smaller sub-batches."""
         from subtitle_translator.core.batch_sizing import get_batch_size_resolver
@@ -366,15 +365,15 @@ class BatchProcessor:
 
     async def _process_batch_group(
         self,
-        batch_group: List[tuple[int, list[dict[str, str]]]],
+        batch_group: list[tuple[int, list[dict[str, str]]]],
         source_language: str,
         target_language: str,
-        context_title: Optional[str],
-        context_media_type: Optional[str],
-        model: Optional[str],
-        temperature: Optional[float],
+        context_title: str | None,
+        context_media_type: str | None,
+        model: str | None,
+        temperature: float | None,
         config_override: Optional["TranslationConfig"],
-    ) -> List[BatchResult]:
+    ) -> list[BatchResult]:
         """
         Process a group of batches in parallel.
 
@@ -416,12 +415,12 @@ class BatchProcessor:
         lines: list[dict[str, str]],
         source_language: str,
         target_language: str,
-        context_title: Optional[str] = None,
-        context_media_type: Optional[str] = None,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        batch_size: Optional[int] = None,
-        progress_callback: Optional[Callable[[BatchProgress], None]] = None,
+        context_title: str | None = None,
+        context_media_type: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        batch_size: int | None = None,
+        progress_callback: Callable[[BatchProgress], None] | None = None,
         config_override: Optional["TranslationConfig"] = None,
     ) -> BatchProcessingResult:
         """
@@ -556,11 +555,11 @@ class BatchProcessor:
         lines: list[dict[str, str]],
         source_language: str,
         target_language: str,
-        context_title: Optional[str] = None,
-        context_media_type: Optional[str] = None,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        batch_size: Optional[int] = None,
+        context_title: str | None = None,
+        context_media_type: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        batch_size: int | None = None,
         config_override: Optional["TranslationConfig"] = None,
     ) -> AsyncGenerator[tuple[BatchResult, BatchProgress], None]:
         """

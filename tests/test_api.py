@@ -1,12 +1,13 @@
 """Tests for API endpoints."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch, MagicMock
 
-from subtitle_translator.main import app
 from subtitle_translator.api.models import SubtitleLine
 from subtitle_translator.core.translator import ContentTranslationResult, FileTranslationResult
+from subtitle_translator.main import app
 
 
 @pytest.fixture
@@ -35,9 +36,9 @@ class TestHealthEndpoint:
             translator = AsyncMock()
             translator.health_check = AsyncMock(return_value=True)
             mock_translator.return_value = translator
-            
+
             response = client.get("/health")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["status"] == "healthy"
@@ -50,14 +51,14 @@ class TestHealthEndpoint:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             mock_get.return_value = settings
-            
+
             with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
                 translator = AsyncMock()
                 translator.health_check = AsyncMock(return_value=False)
                 mock_translator.return_value = translator
-                
+
                 response = client.get("/health")
-                
+
                 assert response.status_code == 200
                 data = response.json()
                 assert data["openrouterConfigured"] is False
@@ -84,14 +85,14 @@ class TestModelsEndpoint:
                 "is_default": False,
             },
         ]
-        
+
         with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.get_available_models = AsyncMock(return_value=mock_models)
             mock_translator.return_value = translator
-            
+
             response = client.get("/api/v1/models")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert "models" in data
@@ -112,12 +113,12 @@ class TestTranslateContentEndpoint:
                 {"position": 2, "line": "World"},
             ],
         }
-        
+
         translated_lines = [
             SubtitleLine(position=1, line="Hola"),
             SubtitleLine(position=2, line="Mundo"),
         ]
-        
+
         with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.translate_content = AsyncMock(
@@ -129,9 +130,9 @@ class TestTranslateContentEndpoint:
                 )
             )
             mock_translator.return_value = translator
-            
+
             response = client.post("/api/v1/translate/content", json=request_data)
-            
+
             assert response.status_code == 200
             data = response.json()
             assert len(data["lines"]) == 2
@@ -145,13 +146,13 @@ class TestTranslateContentEndpoint:
             "targetLanguage": "es",
             "lines": [],
         }
-        
+
         with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             mock_translator.return_value = translator
-            
+
             response = client.post("/api/v1/translate/content", json=request_data)
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["lines"] == []
@@ -162,19 +163,19 @@ class TestTranslateContentEndpoint:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             mock_get.return_value = settings
-            
+
             with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
                 translator = AsyncMock()
                 mock_translator.return_value = translator
-                
+
                 request_data = {
                     "sourceLanguage": "en",
                     "targetLanguage": "es",
                     "lines": [{"position": 1, "line": "Hello"}],
                 }
-                
+
                 response = client.post("/api/v1/translate/content", json=request_data)
-                
+
                 assert response.status_code == 401
 
     def test_translate_content_with_context(self, client, mock_settings):
@@ -187,7 +188,7 @@ class TestTranslateContentEndpoint:
             "arrMediaId": 12345,
             "lines": [{"position": 1, "line": "Say my name"}],
         }
-        
+
         with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.translate_content = AsyncMock(
@@ -199,9 +200,9 @@ class TestTranslateContentEndpoint:
                 )
             )
             mock_translator.return_value = translator
-            
+
             response = client.post("/api/v1/translate/content", json=request_data)
-            
+
             assert response.status_code == 200
 
 
@@ -218,7 +219,7 @@ Hello world
 00:00:05,000 --> 00:00:08,000
 How are you?
 """
-        
+
         translated_srt = """1
 00:00:01,000 --> 00:00:04,000
 Hola mundo
@@ -227,13 +228,13 @@ Hola mundo
 00:00:05,000 --> 00:00:08,000
 ¿Cómo estás?
 """
-        
+
         request_data = {
             "content": srt_content,
             "sourceLanguage": "en",
             "targetLanguage": "es",
         }
-        
+
         with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.translate_file = AsyncMock(
@@ -246,9 +247,9 @@ Hola mundo
                 )
             )
             mock_translator.return_value = translator
-            
+
             response = client.post("/api/v1/translate/file", json=request_data)
-            
+
             assert response.status_code == 200
             data = response.json()
             assert "Hola mundo" in data["content"]
@@ -261,13 +262,13 @@ Hola mundo
             "sourceLanguage": "en",
             "targetLanguage": "es",
         }
-        
+
         with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             mock_translator.return_value = translator
-            
+
             response = client.post("/api/v1/translate/file", json=request_data)
-            
+
             assert response.status_code == 400
 
     def test_translate_file_invalid_srt(self, client, mock_settings):
@@ -277,7 +278,7 @@ Hola mundo
             "sourceLanguage": "en",
             "targetLanguage": "es",
         }
-        
+
         with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.translate_file = AsyncMock(
@@ -289,9 +290,9 @@ Hola mundo
                 )
             )
             mock_translator.return_value = translator
-            
+
             response = client.post("/api/v1/translate/file", json=request_data)
-            
+
             assert response.status_code == 400
 
 
@@ -305,7 +306,7 @@ class TestRequestValidation:
             "targetLanguage": "es",
             "lines": [{"position": 1, "line": "Hello"}],
         }
-        
+
         response = client.post("/api/v1/translate/content", json=request_data)
         assert response.status_code == 422
 
@@ -317,6 +318,6 @@ class TestRequestValidation:
             "lines": [{"position": 1, "line": "Hello"}],
             "temperature": 3.0,  # Invalid: max is 2.0
         }
-        
+
         response = client.post("/api/v1/translate/content", json=request_data)
         assert response.status_code == 422

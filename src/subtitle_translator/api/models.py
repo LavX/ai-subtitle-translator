@@ -1,7 +1,7 @@
 """Pydantic request/response models for the API."""
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,135 +15,118 @@ class SubtitleLine(BaseModel):
 
 class ReasoningConfig(BaseModel):
     """Configuration for model reasoning/thinking capabilities."""
-    
-    enabled: Optional[bool] = Field(
+
+    enabled: bool | None = Field(
         default=None,
-        description="Enable reasoning (default medium effort). Not all models support this."
+        description="Enable reasoning (default medium effort). Not all models support this.",
     )
-    effort: Optional[str] = Field(
+    effort: str | None = Field(
         default=None,
-        description="Reasoning effort level: 'xhigh', 'high', 'medium', 'low', 'minimal', 'none'"
+        description="Reasoning effort level: 'xhigh', 'high', 'medium', 'low', 'minimal', 'none'",
     )
-    max_tokens: Optional[int] = Field(
+    max_tokens: int | None = Field(
         default=None,
         alias="maxTokens",
         ge=100,
         le=32000,
-        description="Max tokens for reasoning (alternative to effort)"
+        description="Max tokens for reasoning (alternative to effort)",
     )
-    
+
     model_config = {"populate_by_name": True}
 
 
 class ProviderConfig(BaseModel):
     """Configuration for OpenRouter provider routing."""
-    
-    order: Optional[List[str]] = Field(
+
+    order: list[str] | None = Field(
         default=None,
-        description="List of provider slugs to try in order (e.g., ['exacto', 'deepinfra'])"
+        description="List of provider slugs to try in order (e.g., ['exacto', 'deepinfra'])",
     )
-    allow_fallbacks: Optional[bool] = Field(
+    allow_fallbacks: bool | None = Field(
         default=True,
         alias="allowFallbacks",
-        description="Whether to allow fallbacks to other providers"
+        description="Whether to allow fallbacks to other providers",
     )
-    sort: Optional[str] = Field(
-        default=None,
-        description="Sort providers by: 'price', 'throughput', or 'latency'"
+    sort: str | None = Field(
+        default=None, description="Sort providers by: 'price', 'throughput', or 'latency'"
     )
-    only: Optional[List[str]] = Field(
-        default=None,
-        description="List of provider slugs to allow exclusively"
+    only: list[str] | None = Field(
+        default=None, description="List of provider slugs to allow exclusively"
     )
-    ignore: Optional[List[str]] = Field(
-        default=None,
-        description="List of provider slugs to skip"
-    )
-    
+    ignore: list[str] | None = Field(default=None, description="List of provider slugs to skip")
+
     model_config = {"populate_by_name": True}
 
 
 class TranslationConfig(BaseModel):
     """Per-request configuration that can override defaults."""
-    
-    api_key: Optional[str] = Field(
+
+    api_key: str | None = Field(
         default=None,
         alias="apiKey",
-        description="OpenRouter API key (overrides environment variable)"
+        description="OpenRouter API key (overrides environment variable)",
     )
-    model: Optional[str] = Field(
-        default=None,
-        description="Model to use for translation"
+    model: str | None = Field(default=None, description="Model to use for translation")
+    temperature: float | None = Field(
+        default=None, ge=0.0, le=2.0, description="Sampling temperature (0.0-2.0)"
     )
-    temperature: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=2.0,
-        description="Sampling temperature (0.0-2.0)"
-    )
-    max_concurrent_jobs: Optional[int] = Field(
+    max_concurrent_jobs: int | None = Field(
         default=None,
         alias="maxConcurrentJobs",
         ge=1,
         le=10,
-        description="Max concurrent workers (only via PUT /config)"
+        description="Max concurrent workers (only via PUT /config)",
     )
-    reasoning: Optional[ReasoningConfig] = Field(
-        default=None,
-        description="Reasoning/thinking configuration (only supported by some models)"
+    reasoning: ReasoningConfig | None = Field(
+        default=None, description="Reasoning/thinking configuration (only supported by some models)"
     )
-    use_thinking_variant: Optional[bool] = Field(
+    use_thinking_variant: bool | None = Field(
         default=None,
         alias="useThinkingVariant",
-        description="Append :thinking to model ID for extended reasoning (DeepSeek, Qwen)"
+        description="Append :thinking to model ID for extended reasoning (DeepSeek, Qwen)",
     )
-    provider: Optional[ProviderConfig] = Field(
-        default=None,
-        description="OpenRouter provider routing configuration"
+    provider: ProviderConfig | None = Field(
+        default=None, description="OpenRouter provider routing configuration"
     )
-    parallel_batches: Optional[int] = Field(
+    parallel_batches: int | None = Field(
         default=None,
         alias="parallelBatches",
         ge=1,
         le=10,
-        description="Number of batches to process in parallel per job (default: 4)"
+        description="Number of batches to process in parallel per job (default: 4)",
     )
-    
+
     model_config = {"populate_by_name": True}
 
 
 class TranslateContentRequest(BaseModel):
     """
     Request model for translating subtitle content.
-    
+
     Compatible with Lingarr API format for seamless Bazarr integration.
     """
 
-    arrMediaId: Optional[int] = Field(
+    arrMediaId: int | None = Field(
         default=None, description="Media ID from Sonarr/Radarr (optional)"
     )
-    title: Optional[str] = Field(
+    title: str | None = Field(
         default=None, description="Title of the media (helps translation context)"
     )
     sourceLanguage: str = Field(..., description="Source language code (e.g., 'en', 'English')")
     targetLanguage: str = Field(..., description="Target language code (e.g., 'es', 'Spanish')")
-    mediaType: Optional[str] = Field(
-        default=None, description="Type of media: 'Episode' or 'Movie'"
+    mediaType: str | None = Field(default=None, description="Type of media: 'Episode' or 'Movie'")
+    lines: list[SubtitleLine] = Field(
+        ..., max_length=50_000, description="List of subtitle lines to translate"
     )
-    lines: list[SubtitleLine] = Field(..., max_length=50_000, description="List of subtitle lines to translate")
-    fileName: Optional[str] = Field(
-        default=None, description="Original file name (informational)"
-    )
-    jobName: Optional[str] = Field(
-        default=None, description="User-provided label for the job"
-    )
-    model: Optional[str] = Field(
+    fileName: str | None = Field(default=None, description="Original file name (informational)")
+    jobName: str | None = Field(default=None, description="User-provided label for the job")
+    model: str | None = Field(
         default=None, description="Override default LLM model for translation"
     )
-    temperature: Optional[float] = Field(
+    temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Override default temperature (0.0-2.0)"
     )
-    config: Optional[TranslationConfig] = Field(
+    config: TranslationConfig | None = Field(
         default=None, description="Per-request configuration overrides"
     )
 
@@ -154,8 +137,10 @@ class TranslateContentResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     lines: list[SubtitleLine] = Field(..., description="Translated subtitle lines")
-    model_used: str = Field(..., alias="modelUsed", description="The LLM model used for translation")
-    tokens_used: Optional[int] = Field(
+    model_used: str = Field(
+        ..., alias="modelUsed", description="The LLM model used for translation"
+    )
+    tokens_used: int | None = Field(
         default=None, alias="tokensUsed", description="Total tokens consumed (if available)"
     )
 
@@ -163,28 +148,24 @@ class TranslateContentResponse(BaseModel):
 class TranslateFileRequest(BaseModel):
     """Request model for translating an entire SRT file."""
 
-    content: str = Field(..., max_length=10_000_000, description="Complete SRT file content as string")
+    content: str = Field(
+        ..., max_length=10_000_000, description="Complete SRT file content as string"
+    )
     sourceLanguage: str = Field(..., description="Source language code")
     targetLanguage: str = Field(..., description="Target language code")
-    title: Optional[str] = Field(
+    title: str | None = Field(
         default=None, description="Title of the media (helps translation context)"
     )
-    mediaType: Optional[str] = Field(
-        default=None, description="Type of media: 'Episode' or 'Movie'"
-    )
-    fileName: Optional[str] = Field(
-        default=None, description="Original file name (informational)"
-    )
-    jobName: Optional[str] = Field(
-        default=None, description="User-provided label for the job"
-    )
-    model: Optional[str] = Field(
+    mediaType: str | None = Field(default=None, description="Type of media: 'Episode' or 'Movie'")
+    fileName: str | None = Field(default=None, description="Original file name (informational)")
+    jobName: str | None = Field(default=None, description="User-provided label for the job")
+    model: str | None = Field(
         default=None, description="Override default LLM model for translation"
     )
-    temperature: Optional[float] = Field(
+    temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Override default temperature"
     )
-    config: Optional[TranslationConfig] = Field(
+    config: TranslationConfig | None = Field(
         default=None, description="Per-request configuration overrides"
     )
 
@@ -195,11 +176,15 @@ class TranslateFileResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     content: str = Field(..., description="Translated SRT file content")
-    model_used: str = Field(..., alias="modelUsed", description="The LLM model used for translation")
-    tokens_used: Optional[int] = Field(
+    model_used: str = Field(
+        ..., alias="modelUsed", description="The LLM model used for translation"
+    )
+    tokens_used: int | None = Field(
         default=None, alias="tokensUsed", description="Total tokens consumed (if available)"
     )
-    subtitle_count: int = Field(..., alias="subtitleCount", description="Number of subtitles translated")
+    subtitle_count: int = Field(
+        ..., alias="subtitleCount", description="Number of subtitles translated"
+    )
 
 
 class ModelInfo(BaseModel):
@@ -209,14 +194,16 @@ class ModelInfo(BaseModel):
 
     id: str = Field(..., description="Model identifier for API calls")
     name: str = Field(..., description="Human-readable model name")
-    description: Optional[str] = Field(default=None, description="Model description")
-    context_length: Optional[int] = Field(
+    description: str | None = Field(default=None, description="Model description")
+    context_length: int | None = Field(
         default=None, alias="contextLength", description="Maximum context length in tokens"
     )
-    pricing: Optional[dict] = Field(
+    pricing: dict | None = Field(
         default=None, description="Pricing information (prompt/completion per token)"
     )
-    is_default: bool = Field(default=False, alias="isDefault", description="Whether this is the default model")
+    is_default: bool = Field(
+        default=False, alias="isDefault", description="Whether this is the default model"
+    )
 
 
 class ModelsResponse(BaseModel):
@@ -245,7 +232,7 @@ class ErrorResponse(BaseModel):
 
     error: str = Field(..., description="Error type/code")
     message: str = Field(..., description="Human-readable error message")
-    details: Optional[dict] = Field(default=None, description="Additional error details")
+    details: dict | None = Field(default=None, description="Additional error details")
 
 
 class TranslationProgress(BaseModel):
@@ -253,59 +240,78 @@ class TranslationProgress(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    total_batches: int = Field(..., alias="totalBatches", description="Total number of batches to process")
-    completed_batches: int = Field(..., alias="completedBatches", description="Number of completed batches")
-    total_lines: int = Field(..., alias="totalLines", description="Total number of lines to translate")
-    completed_lines: int = Field(..., alias="completedLines", description="Number of lines translated")
-    percent_complete: float = Field(..., alias="percentComplete", description="Percentage of completion (0-100)")
+    total_batches: int = Field(
+        ..., alias="totalBatches", description="Total number of batches to process"
+    )
+    completed_batches: int = Field(
+        ..., alias="completedBatches", description="Number of completed batches"
+    )
+    total_lines: int = Field(
+        ..., alias="totalLines", description="Total number of lines to translate"
+    )
+    completed_lines: int = Field(
+        ..., alias="completedLines", description="Number of lines translated"
+    )
+    percent_complete: float = Field(
+        ..., alias="percentComplete", description="Percentage of completion (0-100)"
+    )
     status: str = Field(..., description="Current status: 'processing', 'completed', 'failed'")
 
 
 # Job Queue Models
+
 
 class JobSubmitResponse(BaseModel):
     """Response model for job submission."""
 
     jobId: str = Field(..., description="Unique job identifier (UUID)")
     status: str = Field(default="queued", description="Initial job status")
-    position: Optional[int] = Field(default=None, description="Position in queue (1-based)")
+    position: int | None = Field(default=None, description="Position in queue (1-based)")
 
 
 class JobStatusResponse(BaseModel):
     """Response model for job status."""
 
     jobId: str = Field(..., description="Unique job identifier (UUID)")
-    jobType: Optional[str] = Field(default=None, description="Type of job (translate_content, translate_file)")
-    status: str = Field(..., description="Job status: queued, processing, completed, failed, cancelled")
+    jobType: str | None = Field(
+        default=None, description="Type of job (translate_content, translate_file)"
+    )
+    status: str = Field(
+        ..., description="Job status: queued, processing, completed, failed, cancelled"
+    )
     progress: int = Field(default=0, ge=0, le=100, description="Progress percentage (0-100)")
-    message: Optional[str] = Field(default=None, description="Status message")
+    message: str | None = Field(default=None, description="Status message")
     createdAt: datetime = Field(..., description="Job creation timestamp")
-    startedAt: Optional[datetime] = Field(default=None, description="Processing start timestamp")
-    completedAt: Optional[datetime] = Field(default=None, description="Completion timestamp")
-    result: Optional[Any] = Field(default=None, description="Translation result (only when completed)")
-    error: Optional[str] = Field(default=None, description="Error message (only when failed)")
+    startedAt: datetime | None = Field(default=None, description="Processing start timestamp")
+    completedAt: datetime | None = Field(default=None, description="Completion timestamp")
+    result: Any | None = Field(default=None, description="Translation result (only when completed)")
+    error: str | None = Field(default=None, description="Error message (only when failed)")
     # Input metadata
-    jobName: Optional[str] = Field(default=None, description="User-provided job label")
-    fileName: Optional[str] = Field(default=None, description="Original file name")
-    sourceLanguage: Optional[str] = Field(default=None, description="Source language code")
-    targetLanguage: Optional[str] = Field(default=None, description="Target language code")
-    title: Optional[str] = Field(default=None, description="Media title")
-    mediaType: Optional[str] = Field(default=None, description="Media type (Episode/Movie)")
-    model: Optional[str] = Field(default=None, description="Model used for translation")
-    totalLines: Optional[int] = Field(default=None, description="Total number of lines to translate")
+    jobName: str | None = Field(default=None, description="User-provided job label")
+    fileName: str | None = Field(default=None, description="Original file name")
+    sourceLanguage: str | None = Field(default=None, description="Source language code")
+    targetLanguage: str | None = Field(default=None, description="Target language code")
+    title: str | None = Field(default=None, description="Media title")
+    mediaType: str | None = Field(default=None, description="Media type (Episode/Movie)")
+    model: str | None = Field(default=None, description="Model used for translation")
+    totalLines: int | None = Field(default=None, description="Total number of lines to translate")
     # Processing metrics
-    totalBatches: Optional[int] = Field(default=None, description="Total number of batches")
-    completedBatches: Optional[int] = Field(default=None, description="Number of completed batches")
-    completedLines: Optional[int] = Field(default=None, description="Number of lines translated so far")
-    tokensUsed: Optional[int] = Field(default=None, description="Total tokens consumed so far")
-    totalCost: Optional[float] = Field(default=None, description="Total cost in USD (from OpenRouter)")
-    elapsedSeconds: Optional[float] = Field(default=None, description="Elapsed processing time in seconds")
+    totalBatches: int | None = Field(default=None, description="Total number of batches")
+    completedBatches: int | None = Field(default=None, description="Number of completed batches")
+    completedLines: int | None = Field(
+        default=None, description="Number of lines translated so far"
+    )
+    tokensUsed: int | None = Field(default=None, description="Total tokens consumed so far")
+    totalCost: float | None = Field(default=None, description="Total cost in USD (from OpenRouter)")
+    elapsedSeconds: float | None = Field(
+        default=None, description="Elapsed processing time in seconds"
+    )
 
 
 class JobListResponse(BaseModel):
     """Response model for listing jobs."""
 
-    jobs: List[JobStatusResponse] = Field(..., description="List of jobs")
+    jobs: list[JobStatusResponse] = Field(..., description="List of jobs")
     total: int = Field(..., description="Total number of jobs")
     processing: int = Field(..., description="Number of jobs currently processing")
     queued: int = Field(..., description="Number of jobs in queue")
@@ -325,7 +331,9 @@ class ConfigResponse(BaseModel):
     model: str = Field(..., description="Default translation model")
     temperature: float = Field(..., description="Default temperature")
     batchSize: int = Field(..., description="Batch size for translation")
-    parallelBatchesPerJob: int = Field(..., description="Number of batches processed in parallel per job")
+    parallelBatchesPerJob: int = Field(
+        ..., description="Number of batches processed in parallel per job"
+    )
     maxConcurrentJobs: int = Field(..., description="Max concurrent translation jobs")
     maxJobs: int = Field(..., description="Max jobs in memory")
     apiKeyConfigured: bool = Field(..., description="Whether API key is configured")
@@ -334,32 +342,17 @@ class ConfigResponse(BaseModel):
 
 class ConfigUpdateRequest(BaseModel):
     """Request model for updating runtime configuration."""
-    
-    apiKey: Optional[str] = Field(
-        default=None,
-        description="OpenRouter API key"
+
+    apiKey: str | None = Field(default=None, description="OpenRouter API key")
+    model: str | None = Field(default=None, description="Default model for translation")
+    temperature: float | None = Field(
+        default=None, ge=0.0, le=2.0, description="Default temperature"
     )
-    model: Optional[str] = Field(
-        default=None,
-        description="Default model for translation"
+    maxConcurrentJobs: int | None = Field(
+        default=None, ge=1, le=10, description="Max concurrent workers"
     )
-    temperature: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=2.0,
-        description="Default temperature"
-    )
-    maxConcurrentJobs: Optional[int] = Field(
-        default=None,
-        ge=1,
-        le=10,
-        description="Max concurrent workers"
-    )
-    parallelBatchesPerJob: Optional[int] = Field(
-        default=None,
-        ge=1,
-        le=10,
-        description="Number of batches to process in parallel per job"
+    parallelBatchesPerJob: int | None = Field(
+        default=None, ge=1, le=10, description="Number of batches to process in parallel per job"
     )
 
 

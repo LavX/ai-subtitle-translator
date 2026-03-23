@@ -3,12 +3,12 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
 from subtitle_translator.config import Settings, get_settings
-from subtitle_translator.core.batch_processor import BatchProcessor, BatchProcessingResult
-from subtitle_translator.core.srt_parser import SRTParser, SubtitleEntry, add_rtl_markers
+from subtitle_translator.core.batch_processor import BatchProcessor
+from subtitle_translator.core.srt_parser import SRTParser, add_rtl_markers
 from subtitle_translator.providers.base import TranslationProvider
 from subtitle_translator.providers.openrouter import OpenRouterProvider
 
@@ -24,9 +24,9 @@ class ContentTranslationResult:
 
     lines: list[SubtitleLine]
     model_used: str
-    tokens_used: Optional[int] = None
+    tokens_used: int | None = None
     success: bool = True
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -35,10 +35,10 @@ class FileTranslationResult:
 
     content: str
     model_used: str
-    tokens_used: Optional[int] = None
+    tokens_used: int | None = None
     subtitle_count: int = 0
     success: bool = True
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class SubtitleTranslator:
@@ -46,8 +46,8 @@ class SubtitleTranslator:
 
     def __init__(
         self,
-        provider: Optional[TranslationProvider] = None,
-        settings: Optional[Settings] = None,
+        provider: TranslationProvider | None = None,
+        settings: Settings | None = None,
     ):
         """
         Initialize the subtitle translator.
@@ -89,7 +89,7 @@ class SubtitleTranslator:
         """
         # Use config from request if not provided explicitly
         effective_config = config_override or request.config
-        
+
         if not request.lines:
             return ContentTranslationResult(
                 lines=[],
@@ -98,10 +98,7 @@ class SubtitleTranslator:
             )
 
         # Convert request lines to internal format
-        lines = [
-            {"index": str(line.position), "content": line.line}
-            for line in request.lines
-        ]
+        lines = [{"index": str(line.position), "content": line.line} for line in request.lines]
 
         # Create batch processor
         processor = BatchProcessor(self.provider, self.settings)
@@ -123,7 +120,7 @@ class SubtitleTranslator:
             if not result.success:
                 failed_batches = [r for r in result.batch_results if not r.success]
                 error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
-                
+
                 # Return partial results if any
                 if result.all_translations:
                     translated_lines = self._map_translations_to_lines(
@@ -170,9 +167,9 @@ class SubtitleTranslator:
         content: str,
         source_language: str,
         target_language: str,
-        title: Optional[str] = None,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
+        title: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
     ) -> FileTranslationResult:
         """
@@ -226,7 +223,7 @@ class SubtitleTranslator:
             if not result.success:
                 failed_batches = [r for r in result.batch_results if not r.success]
                 error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
-                
+
                 # Return partial results if any
                 if result.all_translations:
                     is_rtl = self.settings.is_rtl_language(target_language)
@@ -234,7 +231,7 @@ class SubtitleTranslator:
                         entries, result.all_translations, is_rtl=is_rtl
                     )
                     translated_content = self._srt_parser.compose(translated_entries)
-                    
+
                     return FileTranslationResult(
                         content=translated_content,
                         model_used=result.model_used,
@@ -328,22 +325,18 @@ def map_translations_to_lines(
 
     result = []
     for line in original_lines:
-        translated_text = translation_map.get(
-            str(line.position), line.line
-        )
+        translated_text = translation_map.get(str(line.position), line.line)
 
         if is_rtl:
             translated_text = add_rtl_markers(translated_text)
 
-        result.append(
-            SubtitleLine(position=line.position, line=translated_text)
-        )
+        result.append(SubtitleLine(position=line.position, line=translated_text))
 
     return result
 
 
 # Global translator instance for dependency injection
-_translator_instance: Optional[SubtitleTranslator] = None
+_translator_instance: SubtitleTranslator | None = None
 _translator_lock: asyncio.Lock = asyncio.Lock()
 
 

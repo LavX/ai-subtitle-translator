@@ -1,8 +1,8 @@
 """FastAPI API endpoints for subtitle translation."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Annotated, Optional
+from datetime import UTC, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
@@ -19,7 +19,6 @@ from subtitle_translator.api.models import (
     ModelInfo,
     ModelsResponse,
     ServiceStatusResponse,
-    SubtitleLine,
     TranslateContentRequest,
     TranslateContentResponse,
     TranslateFileRequest,
@@ -325,7 +324,7 @@ def _build_job_status_response(job: "Job") -> JobStatusResponse:
     """Build a JobStatusResponse from a Job, computing elapsedSeconds."""
     elapsed = None
     if job.started_at:
-        end = job.completed_at or datetime.now(timezone.utc)
+        end = job.completed_at or datetime.now(UTC)
         elapsed = round((end - job.started_at).total_seconds(), 2)
 
     return JobStatusResponse(
@@ -463,7 +462,7 @@ async def submit_translate_content_job(
                 "error": "queue_full",
                 "message": str(e),
             },
-        )
+        ) from e
 
 
 @jobs_router.post(
@@ -566,7 +565,7 @@ async def submit_translate_file_job(
                 "error": "queue_full",
                 "message": str(e),
             },
-        )
+        ) from e
 
 
 @jobs_router.get(
@@ -576,7 +575,7 @@ async def submit_translate_file_job(
     description="List all jobs with optional status filtering.",
 )
 async def list_jobs(
-    status_filter: Optional[str] = Query(
+    status_filter: str | None = Query(
         default=None,
         alias="status",
         description="Filter by status: queued, processing, completed, failed, cancelled",
@@ -599,7 +598,7 @@ async def list_jobs(
     if status_filter:
         try:
             job_status = JobStatus(status_filter.lower())
-        except ValueError:
+        except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
@@ -607,7 +606,7 @@ async def list_jobs(
                     "message": f"Invalid status: {status_filter}. "
                     f"Valid values: {', '.join(s.value for s in JobStatus)}",
                 },
-            )
+            ) from e
 
     jobs = job_manager.list_jobs(status_filter=job_status, limit=limit)
     stats = job_manager.get_stats()
@@ -803,7 +802,7 @@ async def get_config() -> ConfigResponse:
 )
 async def update_config(
     request: ConfigUpdateRequest,
-    x_admin_key: Annotated[Optional[str], Header()] = None,
+    x_admin_key: Annotated[str | None, Header()] = None,
 ) -> ConfigUpdateResponse:
     """
     Update runtime configuration.
@@ -866,4 +865,4 @@ async def update_config(
                 "error": "invalid_config",
                 "message": str(e),
             },
-        )
+        ) from e
