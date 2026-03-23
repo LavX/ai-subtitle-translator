@@ -3,7 +3,6 @@
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional
 
 import srt
 
@@ -45,7 +44,7 @@ class SubtitleEntry:
 class SRTParserError(Exception):
     """Exception raised for SRT parsing errors."""
 
-    def __init__(self, message: str, line_number: Optional[int] = None):
+    def __init__(self, message: str, line_number: int | None = None):
         super().__init__(message)
         self.message = message
         self.line_number = line_number
@@ -93,9 +92,7 @@ class SRTParser:
         subtitles = [entry.to_srt_subtitle() for entry in entries]
         return srt.compose(subtitles)
 
-    def extract_lines_for_translation(
-        self, entries: list[SubtitleEntry]
-    ) -> list[dict[str, str]]:
+    def extract_lines_for_translation(self, entries: list[SubtitleEntry]) -> list[dict[str, str]]:
         """
         Extract subtitle content for translation.
 
@@ -107,10 +104,7 @@ class SRTParser:
         Returns:
             List of {"index": "X", "content": "text"} dictionaries
         """
-        return [
-            {"index": str(entry.index), "content": entry.content}
-            for entry in entries
-        ]
+        return [{"index": str(entry.index), "content": entry.content} for entry in entries]
 
     def apply_translations(
         self,
@@ -135,7 +129,7 @@ class SRTParser:
         translated_entries = []
         for entry in entries:
             translated_content = translation_map.get(str(entry.index), entry.content)
-            
+
             # Add RTL markers if needed
             if is_rtl:
                 translated_content = self._add_rtl_markers(translated_content)
@@ -156,7 +150,7 @@ class SRTParser:
         """Add Right-to-Left directional markers to text."""
         return add_rtl_markers(text)
 
-    def validate_srt(self, content: str) -> tuple[bool, Optional[str]]:
+    def validate_srt(self, content: str) -> tuple[bool, str | None]:
         """
         Validate SRT content.
 
@@ -236,7 +230,7 @@ class SRTParser:
 
             # Limit to max_lines
             lines = lines[:max_lines]
-            
+
             processed.append(
                 SubtitleEntry(
                     index=entry.index,
@@ -260,8 +254,8 @@ def add_rtl_markers(text: str) -> str:
     Returns:
         Text with RTL markers added
     """
-    RLE = "\u202B"  # RIGHT-TO-LEFT EMBEDDING
-    PDF = "\u202C"  # POP DIRECTIONAL FORMATTING
+    RLE = "\u202b"  # RIGHT-TO-LEFT EMBEDDING
+    PDF = "\u202c"  # POP DIRECTIONAL FORMATTING
 
     lines = text.split("\n")
     marked_lines = []

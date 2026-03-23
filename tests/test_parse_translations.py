@@ -1,7 +1,8 @@
 """Tests for OpenRouterProvider._parse_translations JSON parsing."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from subtitle_translator.providers.openrouter import OpenRouterProvider
 
@@ -82,9 +83,7 @@ class TestParseTranslationsDuplicateKeys:
 
     def test_duplicate_keys_many_pairs(self, provider):
         """Realistic batch size with duplicate keys."""
-        pairs = ",".join(
-            f'"index":"{i}","content":"Line {i}"' for i in range(10)
-        )
+        pairs = ",".join(f'"index":"{i}","content":"Line {i}"' for i in range(10))
         content = "{" + pairs + "}"
         result = provider._parse_translations(content)
         assert len(result) == 10
@@ -141,5 +140,6 @@ class TestParseTranslationsFallbacks:
 
     def test_invalid_json_raises_error(self, provider):
         from subtitle_translator.providers.base import InvalidResponseError
+
         with pytest.raises(InvalidResponseError):
             provider._parse_translations("this is not json at all")

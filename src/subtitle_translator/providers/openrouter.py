@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 import httpx
 
@@ -117,7 +117,13 @@ EXCELLENT_FREE_MODELS = [
         "context_length": 131072,
         "supports_reasoning": False,
         "reasoning_type": None,
-        "recommended_for": ["hungarian", "free", "champion", "cost_efficient", "battle_royale_champion"],
+        "recommended_for": [
+            "hungarian",
+            "free",
+            "champion",
+            "cost_efficient",
+            "battle_royale_champion",
+        ],
         "success_rate": 95,
         "avg_speed_seconds": 17.0,
     },
@@ -230,9 +236,20 @@ RECOMMENDED_MODELS = EXCELLENT_MODELS + EXCELLENT_FREE_MODELS + GOOD_MODELS + PA
 # Testing reference for developers to run tests
 TESTING_REFERENCE = {
     "excellent_models": ["anthropic/claude-haiku-4.5", "moonshotai/kimi-k2-0905:exacto"],
-    "good_models": ["google/gemini-2.5-flash-preview-09-2025", "google/gemini-2.5-flash-lite-preview-09-2025",
-                  "anthropic/claude-sonnet-4.5", "openai/gpt-oss-120b:exacto", "openai/gpt-oss-120b", "meta-llama/llama-4-maverick"],
-    "avoid_models": ["x-ai/grok-4.1-fast", "minimax/minimax-m2", "deepseek/deepseek-v3.2-speciale", "z-ai/glm-4.6"],
+    "good_models": [
+        "google/gemini-2.5-flash-preview-09-2025",
+        "google/gemini-2.5-flash-lite-preview-09-2025",
+        "anthropic/claude-sonnet-4.5",
+        "openai/gpt-oss-120b:exacto",
+        "openai/gpt-oss-120b",
+        "meta-llama/llama-4-maverick",
+    ],
+    "avoid_models": [
+        "x-ai/grok-4.1-fast",
+        "minimax/minimax-m2",
+        "deepseek/deepseek-v3.2-speciale",
+        "z-ai/glm-4.6",
+    ],
     "hungarian_success_rate": {
         "claude_haiku_4.5": 100,
         "kimi_k2_exacto": 100,
@@ -240,8 +257,8 @@ TESTING_REFERENCE = {
         "gemini_flash_lite": 66,
         "claude_sonnet_4.5": 66,
         "gpt_oss_120b": 66,
-        "llama_4_maverick": 66
-    }
+        "llama_4_maverick": 66,
+    },
 }
 
 # Anthropic models that require explicit cache_control
@@ -294,7 +311,7 @@ MAX_TOKENS_REASONING_MODELS = [
 class OpenRouterProvider(TranslationProvider):
     """Translation provider using OpenRouter API."""
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Settings | None = None):
         """
         Initialize OpenRouter provider.
 
@@ -302,7 +319,9 @@ class OpenRouterProvider(TranslationProvider):
             settings: Optional settings instance. Uses global settings if not provided.
         """
         self.settings = settings or get_settings()
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
+        self._model_params_cache: dict[str, list[str]] = {}
+        self._model_params_fetched: bool = False
 
     @property
     def provider_name(self) -> str:
@@ -347,14 +366,14 @@ class OpenRouterProvider(TranslationProvider):
         """
         default_model = self.settings.openrouter_default_model
         models = []
-        
+
         # Prioritize the excellent models first
         for model in EXCELLENT_MODELS:
             model_info = model.copy()
             model_info["is_default"] = model["id"] == default_model
             model_info["priority"] = "excellent"
             models.append(model_info)
-        
+
         # Add good models as secondary options
         for model in GOOD_MODELS:
             model_info = model.copy()
@@ -369,15 +388,15 @@ class OpenRouterProvider(TranslationProvider):
             if model.get("id") in [m["id"] for m in EXCELLENT_MODELS]:
                 priority_score = -2  # Existing excellent models get second priority
             success_rate = model.get("success_rate", 0)
-            
+
             # If default model, put it first regardless of priority
             if model.get("is_default", False):
                 return (-100, -success_rate)  # Default model always first
             return (priority_score, -success_rate)
-        
+
         return sorted(models, key=sort_key)
 
-    def get_model_metadata(self, model_id: str) -> Optional[dict]:
+    def get_model_metadata(self, model_id: str) -> dict | None:
         if not hasattr(self, "_model_metadata_cache"):
             self._model_metadata_cache: dict[str, dict] = {}
             for model_list in [EXCELLENT_MODELS, EXCELLENT_FREE_MODELS, GOOD_MODELS, POOR_MODELS]:
@@ -385,18 +404,18 @@ class OpenRouterProvider(TranslationProvider):
                     self._model_metadata_cache[model["id"]] = model
         return self._model_metadata_cache.get(model_id)
 
-    def get_best_model_for_language(self, target_language: str) -> Optional[str]:
+    def get_best_model_for_language(self, target_language: str) -> str | None:
         """
         Get the best model for the specified target language.
-        
+
         Args:
             target_language: Target language code (e.g., 'hu' for Hungarian)
-            
+
         Returns:
             Best model ID for the language, or None if no specific recommendations
         """
         target_lang = target_language.lower()
-        
+
         # Check for Hungarian specifically
         if "hu" in target_lang or "hungarian" in target_lang:
             # Return the best performing Hungarian model
@@ -404,22 +423,22 @@ class OpenRouterProvider(TranslationProvider):
                 return EXCELLENT_MODELS[0]["id"]
             elif GOOD_MODELS:
                 return GOOD_MODELS[0]["id"]
-        
+
         # For other languages, return reasoning-enabled models
         for model_info in RECOMMENDED_MODELS:
             if model_info.get("supports_reasoning"):
                 return model_info["id"]
-        
+
         # Fallback to first recommended model
         if RECOMMENDED_MODELS:
             return RECOMMENDED_MODELS[0]["id"]
-        
+
         return None
 
     def get_hungarian_recommendations(self) -> dict[str, Any]:
         """
         Get specific recommendations for Hungarian subtitle translation.
-        
+
         Returns:
             Dictionary with model recommendations and configurations for Hungarian
         """
@@ -431,21 +450,54 @@ class OpenRouterProvider(TranslationProvider):
                 "reasoning": {"enabled": True},
                 "temperature": 0.3,
             },
-            "testing_reference": TESTING_REFERENCE
+            "testing_reference": TESTING_REFERENCE,
         }
 
-    def _get_reasoning_type(self, model_id: str) -> Optional[str]:
+    async def _ensure_model_params_cache(self) -> None:
+        """Fetch and cache supported_parameters for all models from OpenRouter API."""
+        if self._model_params_fetched:
+            return
+        try:
+            # Use a plain client without auth headers — /models is a public endpoint
+            async with httpx.AsyncClient(
+                base_url=self.settings.openrouter_api_base,
+                timeout=httpx.Timeout(15.0),
+            ) as plain_client:
+                response = await plain_client.get("/models")
+            if response.status_code == 200:
+                data = response.json()
+                for model in data.get("data", []):
+                    model_id = model.get("id", "")
+                    params = model.get("supported_parameters", [])
+                    if model_id and params:
+                        self._model_params_cache[model_id] = params
+                logger.info(
+                    f"Cached supported_parameters for {len(self._model_params_cache)} models from OpenRouter API"
+                )
+            else:
+                logger.warning(
+                    f"Failed to fetch models from OpenRouter API: {response.status_code}"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to fetch model params from OpenRouter API: {e}")
+        self._model_params_fetched = True
+
+    async def _get_reasoning_type(self, model_id: str) -> str | None:
         """
         Determine the reasoning type supported by a model.
-        
+
+        Checks the OpenRouter API's supported_parameters first, then falls back
+        to hardcoded lists for models with specific reasoning styles.
+
         Args:
             model_id: The model identifier (without :thinking suffix)
-            
+
         Returns:
             Reasoning type: 'thinking_variant', 'effort', 'max_tokens', 'enabled', or None
         """
         base_model = model_id.replace(":thinking", "")
-        
+
+        # Hardcoded overrides for models with specific reasoning styles
         if base_model in THINKING_VARIANT_MODELS:
             return "thinking_variant"
         if base_model in ENABLED_REASONING_MODELS:
@@ -454,43 +506,49 @@ class OpenRouterProvider(TranslationProvider):
             return "effort"
         if base_model in MAX_TOKENS_REASONING_MODELS:
             return "max_tokens"
-        
+
         # Check RECOMMENDED_MODELS for reasoning type
         for model_info in RECOMMENDED_MODELS:
             if model_info["id"] == base_model:
                 if model_info.get("supports_reasoning"):
                     return model_info.get("reasoning_type")
                 return None
-                
+
+        # Dynamic lookup: check OpenRouter API's supported_parameters
+        await self._ensure_model_params_cache()
+        params = self._model_params_cache.get(base_model, [])
+        if "reasoning" in params:
+            return "effort"
+
         return None
 
-    def _build_reasoning_payload(
+    async def _build_reasoning_payload(
         self,
         model_id: str,
         config_override: Optional["TranslationConfig"],
     ) -> tuple[str, dict[str, Any]]:
         """
         Build reasoning-related payload parameters.
-        
+
         Args:
             model_id: The base model identifier
             config_override: Optional config with reasoning settings
-            
+
         Returns:
             Tuple of (final_model_id, reasoning_params_dict)
         """
         reasoning_params: dict[str, Any] = {}
         final_model_id = model_id
-        
+
         if not config_override:
             return final_model_id, reasoning_params
-            
+
         reasoning_config = config_override.reasoning
         use_thinking = config_override.use_thinking_variant
-        
+
         # Check if model supports reasoning
-        reasoning_type = self._get_reasoning_type(model_id)
-        
+        reasoning_type = await self._get_reasoning_type(model_id)
+
         if reasoning_type is None:
             # Model doesn't support reasoning, skip
             if reasoning_config or use_thinking:
@@ -499,16 +557,21 @@ class OpenRouterProvider(TranslationProvider):
                     "Reasoning settings will be ignored."
                 )
             return final_model_id, reasoning_params
-        
+
         # Handle :thinking variant
         if use_thinking and reasoning_type == "thinking_variant":
             if not model_id.endswith(":thinking"):
                 final_model_id = f"{model_id}:thinking"
                 logger.info(f"Using thinking variant: {final_model_id}")
             return final_model_id, reasoning_params
-        
+
         # Handle reasoning config
         if reasoning_config:
+            # effort: "none" means disable reasoning regardless of type
+            if reasoning_config.effort and reasoning_config.effort.lower() == "none":
+                logger.info("Reasoning effort: none — reasoning disabled")
+                return final_model_id, reasoning_params
+
             if reasoning_type == "enabled":
                 # For models like Grok that use reasoning.enabled parameter
                 if reasoning_config.enabled:
@@ -517,20 +580,37 @@ class OpenRouterProvider(TranslationProvider):
                 elif reasoning_config.enabled is False:
                     reasoning_params["reasoning"] = {"enabled": False}
                     logger.info("Using reasoning enabled: false")
-                    
+
             elif reasoning_type == "effort":
-                # Build effort-based reasoning params (OpenAI o-series)
+                # Build effort-based reasoning params
                 if reasoning_config.effort:
-                    valid_efforts = ["xhigh", "high", "medium", "low", "minimal", "none"]
-                    if reasoning_config.effort.lower() in valid_efforts:
+                    if reasoning_config.effort.lower() in [
+                        "xhigh",
+                        "high",
+                        "medium",
+                        "low",
+                        "minimal",
+                    ]:
                         reasoning_params["reasoning"] = {"effort": reasoning_config.effort.lower()}
                         logger.info(f"Using reasoning effort: {reasoning_config.effort}")
                     else:
                         logger.warning(f"Invalid reasoning effort: {reasoning_config.effort}")
+                elif reasoning_config.max_tokens:
+                    # User sent max_tokens but model expects effort — map it
+                    if reasoning_config.max_tokens >= 4000:
+                        effort = "high"
+                    elif reasoning_config.max_tokens >= 2000:
+                        effort = "medium"
+                    else:
+                        effort = "low"
+                    reasoning_params["reasoning"] = {"effort": effort}
+                    logger.info(
+                        f"Mapped reasoning max_tokens={reasoning_config.max_tokens} to effort: {effort}"
+                    )
                 elif reasoning_config.enabled:
                     reasoning_params["reasoning"] = {"effort": "medium"}
                     logger.info("Using default reasoning effort: medium")
-                    
+
             elif reasoning_type == "max_tokens":
                 # Build max_tokens-based reasoning params (Gemini, Claude, MiniMax)
                 if reasoning_config.max_tokens:
@@ -540,13 +620,13 @@ class OpenRouterProvider(TranslationProvider):
                     # Default to 2000 tokens for reasoning
                     reasoning_params["reasoning"] = {"max_tokens": 2000}
                     logger.info("Using default reasoning max_tokens: 2000")
-                    
+
             elif reasoning_type == "thinking_variant":
                 # For thinking variant models (DeepSeek, Qwen), use :thinking suffix
                 if reasoning_config.enabled and not model_id.endswith(":thinking"):
                     final_model_id = f"{model_id}:thinking"
                     logger.info(f"Using thinking variant: {final_model_id}")
-        
+
         return final_model_id, reasoning_params
 
     def _build_provider_payload(
@@ -555,50 +635,50 @@ class OpenRouterProvider(TranslationProvider):
     ) -> dict[str, Any]:
         """
         Build provider routing configuration for OpenRouter.
-        
+
         Args:
             config_override: Optional config with provider settings
-            
+
         Returns:
             Provider configuration dict for the payload
         """
         provider_params: dict[str, Any] = {}
-        
+
         if not config_override or not config_override.provider:
             # Default: prioritize throughput for fastest response
             return {"provider": {"sort": "throughput"}}
-        
+
         provider_config = config_override.provider
-        
+
         if provider_config.order:
             provider_params["order"] = provider_config.order
-        
+
         if provider_config.allow_fallbacks is not None:
             provider_params["allow_fallbacks"] = provider_config.allow_fallbacks
-            
+
         if provider_config.sort:
             provider_params["sort"] = provider_config.sort
         elif not provider_config.order:
             # Default to throughput sorting if no order specified
             provider_params["sort"] = "throughput"
-            
+
         if provider_config.only:
             provider_params["only"] = provider_config.only
-            
+
         if provider_config.ignore:
             provider_params["ignore"] = provider_config.ignore
-        
+
         if provider_params:
             logger.debug(f"Provider routing params: {provider_params}")
             return {"provider": provider_params}
-        
+
         return {}
 
     async def translate_batch(
         self,
         batch: TranslationBatch,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
     ) -> TranslationResult:
         """
@@ -623,17 +703,25 @@ class OpenRouterProvider(TranslationProvider):
             temp_to_use = (
                 config_override.temperature
                 if config_override.temperature is not None
-                else (temperature if temperature is not None else self.settings.openrouter_temperature)
+                else (
+                    temperature if temperature is not None else self.settings.openrouter_temperature
+                )
             )
             # Debug logging for API key tracking
             if config_override.api_key:
-                logger.debug(f"Using API key from config_override: ...{config_override.api_key[-4:]}")
+                logger.debug(
+                    f"Using API key from config_override: ...{config_override.api_key[-4:]}"
+                )
             else:
-                logger.warning(f"config_override exists but api_key is None/empty. config_override fields: api_key={config_override.api_key is not None}, model={config_override.model}")
+                logger.warning(
+                    f"config_override exists but api_key is None/empty. config_override fields: api_key={config_override.api_key is not None}, model={config_override.model}"
+                )
         else:
             api_key = self.settings.openrouter_api_key
             model_to_use = model or self.settings.openrouter_default_model
-            temp_to_use = temperature if temperature is not None else self.settings.openrouter_temperature
+            temp_to_use = (
+                temperature if temperature is not None else self.settings.openrouter_temperature
+            )
             logger.debug("No config_override, using settings")
 
         # Validate API key
@@ -645,7 +733,9 @@ class OpenRouterProvider(TranslationProvider):
             )
 
         # Build reasoning configuration
-        model_to_use, reasoning_params = self._build_reasoning_payload(model_to_use, config_override)
+        model_to_use, reasoning_params = await self._build_reasoning_payload(
+            model_to_use, config_override
+        )
 
         # Build messages
         system_prompt = self.build_system_prompt(
@@ -661,7 +751,7 @@ class OpenRouterProvider(TranslationProvider):
 
         # Build messages with cache_control for Anthropic models
         is_anthropic = any(model_to_use.startswith(prefix) for prefix in ["anthropic/"])
-        
+
         if is_anthropic:
             # Anthropic requires explicit cache_control breakpoints
             # Cache the system prompt since it's consistent across requests
@@ -672,9 +762,9 @@ class OpenRouterProvider(TranslationProvider):
                         {
                             "type": "text",
                             "text": system_prompt,
-                            "cache_control": {"type": "ephemeral"}
+                            "cache_control": {"type": "ephemeral"},
                         }
-                    ]
+                    ],
                 },
                 {"role": "user", "content": user_content},
             ]
@@ -685,38 +775,45 @@ class OpenRouterProvider(TranslationProvider):
                 {"role": "user", "content": user_content},
             ]
 
-        # Build request payload
+        # Build request payload — omit max_tokens to let OpenRouter/provider decide
+        # the optimal output budget per model.
         payload: dict[str, Any] = {
             "model": model_to_use,
             "messages": messages,
             "temperature": temp_to_use,
-            "max_tokens": self.settings.openrouter_max_tokens,
-            "response_format": {"type": "json_object"},
             # Include usage stats to track cache savings
             "usage": {"include": True},
         }
-        
+
+        # Only use json_object response format when reasoning is NOT enabled.
+        # Some models (e.g. mistral-small-2603) with reasoning + json_object
+        # return a single JSON object instead of an array, translating only 1 line.
+        if not reasoning_params:
+            payload["response_format"] = {"type": "json_object"}
+
         # Add reasoning params if configured
         if reasoning_params:
             payload.update(reasoning_params)
-            
+
         # Add provider routing params
         if provider_params:
             payload.update(provider_params)
 
         # Debug logging: Log incoming batch data
-        debug_logger.debug(f"=== INCOMING BATCH DATA ===")
+        debug_logger.debug("=== INCOMING BATCH DATA ===")
         debug_logger.debug(f"Source language: {batch.source_language}")
         debug_logger.debug(f"Target language: {batch.target_language}")
         debug_logger.debug(f"Lines count: {len(batch.lines)}")
         debug_logger.debug(f"Input lines: {json.dumps(batch.lines, ensure_ascii=False, indent=2)}")
-        
-        logger.info(f"Sending translation request for {len(batch.lines)} lines using {model_to_use}")
+
+        logger.info(
+            f"Sending translation request for {len(batch.lines)} lines using {model_to_use}"
+        )
         if reasoning_params:
             logger.debug(f"Reasoning params: {reasoning_params}")
-        
+
         # Debug logging: Log the complete payload being sent to OpenRouter
-        debug_logger.debug(f"=== SENDING TO OPENROUTER ===")
+        debug_logger.debug("=== SENDING TO OPENROUTER ===")
         debug_logger.debug(f"Model: {model_to_use}")
         debug_logger.debug(f"Temperature: {temp_to_use}")
         debug_logger.debug(f"Payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
@@ -725,8 +822,12 @@ class OpenRouterProvider(TranslationProvider):
             # Create request-specific client if API key differs from default
             # Always use config_override API key if available
             if config_override and config_override.api_key:
-                headers = self.settings.get_openrouter_headers(api_key_override=config_override.api_key)
-                logger.info(f"Making request with per-request API key: ...{config_override.api_key[-4:]} Auth header set: {'Authorization' in headers}")
+                headers = self.settings.get_openrouter_headers(
+                    api_key_override=config_override.api_key
+                )
+                logger.info(
+                    f"Making request with per-request API key: ...{config_override.api_key[-4:]} Auth header set: {'Authorization' in headers}"
+                )
                 async with httpx.AsyncClient(
                     base_url=self.settings.openrouter_api_base,
                     headers=headers,
@@ -738,7 +839,9 @@ class OpenRouterProvider(TranslationProvider):
                     self._validate_and_warn_unchanged(batch.lines, result.translations)
                     return result
             else:
-                logger.info(f"Making request with default client (env API key configured: {bool(self.settings.openrouter_api_key)})")
+                logger.info(
+                    f"Making request with default client (env API key configured: {bool(self.settings.openrouter_api_key)})"
+                )
                 response = await self.client.post("/chat/completions", json=payload)
                 result = await self._process_response(response, model_to_use)
                 # Perform safety validation
@@ -824,6 +927,12 @@ class OpenRouterProvider(TranslationProvider):
         prompt_tokens = usage.get("prompt_tokens")
         completion_tokens = usage.get("completion_tokens")
         total_tokens = usage.get("total_tokens")
+        cost = usage.get("cost")
+        if cost is not None:
+            try:
+                cost = float(cost)
+            except (ValueError, TypeError):
+                cost = None
 
         # Extract translated content
         choices = data.get("choices", [])
@@ -843,18 +952,22 @@ class OpenRouterProvider(TranslationProvider):
             )
 
         # Debug logging: Log the raw response content
-        debug_logger.debug(f"=== RECEIVED FROM OPENROUTER ===")
+        debug_logger.debug("=== RECEIVED FROM OPENROUTER ===")
         debug_logger.debug(f"Model used: {model_used}")
-        debug_logger.debug(f"Token usage - prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}")
+        debug_logger.debug(
+            f"Token usage - prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}"
+        )
         debug_logger.debug(f"Raw content: {content}")
-        
+
         # Parse the JSON array from content
         translations = self._parse_translations(content)
-        
+
         # Debug logging: Log parsed translations
-        debug_logger.debug(f"=== PARSED TRANSLATIONS ===")
+        debug_logger.debug("=== PARSED TRANSLATIONS ===")
         debug_logger.debug(f"Translations count: {len(translations)}")
-        debug_logger.debug(f"Translations: {json.dumps(translations, ensure_ascii=False, indent=2)}")
+        debug_logger.debug(
+            f"Translations: {json.dumps(translations, ensure_ascii=False, indent=2)}"
+        )
 
         return TranslationResult(
             translations=translations,
@@ -862,9 +975,10 @@ class OpenRouterProvider(TranslationProvider):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
+            cost=cost,
             raw_response=data,
         )
-    
+
     def _validate_and_warn_unchanged(
         self,
         original_lines: list[dict[str, str]],
@@ -872,23 +986,25 @@ class OpenRouterProvider(TranslationProvider):
     ) -> None:
         """
         Validate that translations are actually different from the original text.
-        
+
         This is a safety check to detect when the model returns the original text
         instead of actually translating it. Logs warnings but does not fail.
-        
+
         Args:
             original_lines: Original lines sent for translation
             translations: Translations received from the model
         """
         # Build lookup maps
-        original_map: dict[str, str] = {str(line["index"]): line["content"] for line in original_lines}
-        
+        original_map: dict[str, str] = {
+            str(line["index"]): line["content"] for line in original_lines
+        }
+
         unchanged_indices: list[int] = []
         for trans in translations:
             idx = str(trans["index"])
             translated_content = trans["content"]
             original_content = original_map.get(idx, "")
-            
+
             # Check if the content is exactly the same (potential untranslated)
             if translated_content.strip() == original_content.strip():
                 try:
@@ -901,7 +1017,7 @@ class OpenRouterProvider(TranslationProvider):
                     f"Original: '{original_content[:50]}...' -> "
                     f"Translated: '{translated_content[:50]}...'"
                 )
-        
+
         # Calculate the percentage of unchanged translations
         if len(translations) > 0:
             unchanged_pct = (len(unchanged_indices) / len(translations)) * 100
@@ -987,11 +1103,11 @@ class OpenRouterProvider(TranslationProvider):
                 if not isinstance(item, dict):
                     logger.warning(f"Skipping non-dict item in translations: {item}")
                     continue
-                    
+
                 # Handle various key names
                 index = str(item.get("index", item.get("idx", item.get("position", ""))))
                 text = item.get("content", item.get("text", item.get("translation", "")))
-                
+
                 if index and text is not None:
                     translations.append({"index": index, "content": str(text)})
 
@@ -1000,10 +1116,11 @@ class OpenRouterProvider(TranslationProvider):
         except json.JSONDecodeError as e:
             # Try to extract JSON from markdown code blocks
             import re
+
             json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
             if json_match:
                 return self._parse_translations(json_match.group(1))
-            
+
             # Try to find JSON array directly
             array_match = re.search(r"\[[\s\S]*\]", content)
             if array_match:

@@ -2,7 +2,7 @@
 
 import threading
 from datetime import timedelta
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -37,7 +37,9 @@ class Settings(BaseSettings):
     request_timeout: float = 120.0
 
     # Job Queue Configuration
-    job_queue_max_concurrent: int = 15  # Max concurrent translation jobs (increased for battle royale)
+    job_queue_max_concurrent: int = (
+        15  # Max concurrent translation jobs (increased for battle royale)
+    )
     job_queue_max_jobs: int = 500  # Max jobs in memory (increased for high-throughput testing)
     job_queue_ttl_hours: int = 1  # TTL for completed/failed jobs
 
@@ -46,7 +48,7 @@ class Settings(BaseSettings):
 
     # App identification for OpenRouter analytics
     app_name: str = "ai-subtitle-translator"
-    app_url: Optional[str] = "https://lavx.hu"
+    app_url: str | None = "https://lavx.hu"
 
     # RTL (Right-to-Left) language codes
     rtl_languages: list[str] = [
@@ -60,13 +62,13 @@ class Settings(BaseSettings):
         "ku",  # Kurdish (Sorani)
     ]
 
-    def get_openrouter_headers(self, api_key_override: Optional[str] = None) -> dict[str, str]:
+    def get_openrouter_headers(self, api_key_override: str | None = None) -> dict[str, str]:
         """
         Get headers for OpenRouter API requests.
-        
+
         Args:
             api_key_override: Optional API key to use instead of the configured one
-            
+
         Returns:
             Headers dictionary for OpenRouter API requests
         """
@@ -98,10 +100,10 @@ class Settings(BaseSettings):
 
 
 # Global settings instance with lock for thread safety
-_settings: Optional[Settings] = None
+_settings: Settings | None = None
 _settings_lock = threading.Lock()
-_runtime_overrides: Dict[str, Any] = {}
-_overridden_settings: Optional[Settings] = None
+_runtime_overrides: dict[str, Any] = {}
+_overridden_settings: Settings | None = None
 
 
 def get_settings() -> Settings:
@@ -133,14 +135,14 @@ def get_settings() -> Settings:
 def update_runtime_config(key: str, value: Any) -> None:
     """
     Update configuration at runtime without restarting.
-    
+
     This allows dynamic configuration changes through the API.
     The changes are stored in memory and will be lost on restart.
-    
+
     Args:
         key: Configuration key to update (must be a valid Settings field)
         value: New value for the configuration
-        
+
     Raises:
         ValueError: If key is not a valid Settings field
     """
@@ -156,10 +158,10 @@ def update_runtime_config(key: str, value: Any) -> None:
         _overridden_settings = None
 
 
-def get_runtime_overrides() -> Dict[str, Any]:
+def get_runtime_overrides() -> dict[str, Any]:
     """
     Get current runtime configuration overrides.
-    
+
     Returns:
         Dictionary of runtime overrides (keys are masked for sensitive values)
     """

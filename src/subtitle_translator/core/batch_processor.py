@@ -1,10 +1,10 @@
 """Batch processing logic for subtitle translation."""
 
 import asyncio
-import json
 import logging
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
-from typing import AsyncGenerator, Callable, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from subtitle_translator.config import Settings, get_settings
 from subtitle_translator.providers.base import (
@@ -13,7 +13,6 @@ from subtitle_translator.providers.base import (
     TranslationBatch,
     TranslationProvider,
     TranslationProviderError,
-    TranslationResult,
 )
 
 if TYPE_CHECKING:
@@ -35,6 +34,7 @@ class BatchProgress:
     completed_lines: int = 0
     failed_batches: int = 0
     total_tokens: int = 0
+    total_cost: float = 0.0
 
     @property
     def percent_complete(self) -> float:
@@ -61,7 +61,8 @@ class BatchResult:
     success: bool
     translations: list[dict[str, str]] = field(default_factory=list)
     tokens_used: int = 0
-    error: Optional[str] = None
+    cost: float = 0.0
+    error: str | None = None
     retries: int = 0
 
 
@@ -87,7 +88,7 @@ class BatchProcessor:
     def __init__(
         self,
         provider: TranslationProvider,
-        settings: Optional[Settings] = None,
+        settings: Settings | None = None,
     ):
         """
         Initialize batch processor.
@@ -102,8 +103,8 @@ class BatchProcessor:
     def create_batches(
         self,
         lines: list[dict[str, str]],
-        batch_size: Optional[int] = None,
-        model: Optional[str] = None,
+        batch_size: int | None = None,
+        model: str | None = None,
     ) -> list[list[dict[str, str]]]:
         """
         Split lines into batches.
@@ -120,6 +121,7 @@ class BatchProcessor:
             size = batch_size
         elif model:
             from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
             metadata = self.provider.get_model_metadata(model)
             resolver = get_batch_size_resolver()
             size = resolver.resolve(
@@ -140,10 +142,11 @@ class BatchProcessor:
         self,
         batch: TranslationBatch,
         batch_index: int,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
         _is_adaptive_retry: bool = False,
+        _rate_limit_lock: asyncio.Lock | None = None,
     ) -> BatchResult:
         """
         Process a single batch with retry logic.
@@ -159,14 +162,16 @@ class BatchProcessor:
         Returns:
             BatchResult with translations or error
         """
-        from subtitle_translator.core.batch_sizing import get_batch_size_resolver, MIN_BATCH_SIZE
+        from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, get_batch_size_resolver
 
         retries = 0
-        last_error: Optional[str] = None
+        last_error: str | None = None
         is_timeout = False
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
+        # Rate limits get extra retries (3 more than normal errors)
+        max_retries_with_rate_limit = self.settings.max_retries + 3
 
-        while retries <= self.settings.max_retries:
+        while retries <= max_retries_with_rate_limit:
             try:
                 result = await self.provider.translate_batch(
                     batch, model=model, temperature=temperature, config_override=config_override
@@ -179,16 +184,26 @@ class BatchProcessor:
                     )
                     if can_adaptive:
                         return await self._retry_with_smaller_batches(
-                            batch, batch_index, model, temperature, config_override
+                            batch,
+                            batch_index,
+                            model,
+                            temperature,
+                            config_override,
+                            _rate_limit_lock,
                         )
                     # In sub-batch retry or at floor - treat as failure
                     return BatchResult(
-                        batch_index=batch_index, success=False,
+                        batch_index=batch_index,
+                        success=False,
                         error=f"Partial translations: expected {len(batch.lines)}, got {len(result.translations)}",
                         retries=retries,
                     )
 
-                model_id = model or self.settings.openrouter_default_model
+                model_id = (
+                    (config_override.model if config_override and config_override.model else None)
+                    or model
+                    or self.settings.openrouter_default_model
+                )
                 get_batch_size_resolver().record_success(model_id, len(batch.lines))
 
                 return BatchResult(
@@ -196,13 +211,14 @@ class BatchProcessor:
                     success=True,
                     translations=result.translations,
                     tokens_used=result.total_tokens or 0,
+                    cost=result.cost or 0.0,
                     retries=retries,
                 )
 
             except InvalidResponseError as e:
                 if can_adaptive:
                     return await self._retry_with_smaller_batches(
-                        batch, batch_index, model, temperature, config_override
+                        batch, batch_index, model, temperature, config_override, _rate_limit_lock
                     )
                 # At floor or already in adaptive retry - use normal retry
                 if retries < self.settings.max_retries:
@@ -211,23 +227,38 @@ class BatchProcessor:
                     await asyncio.sleep(self.settings.retry_delay * (2 ** (retries - 1)))
                 else:
                     return BatchResult(
-                        batch_index=batch_index, success=False,
-                        error=e.message, retries=retries,
+                        batch_index=batch_index,
+                        success=False,
+                        error=e.message,
+                        retries=retries,
                     )
 
             except RateLimitError as e:
-                delay = e.retry_after or (self.settings.retry_delay * (2 ** retries))
-                logger.warning(
-                    f"Rate limit hit on batch {batch_index}, waiting {delay}s (retry {retries + 1})"
-                )
-                await asyncio.sleep(delay)
+                # Rate limits: start at 5s, exponential backoff, cap at 30s.
+                # Use lock to serialize retries so parallel batches don't all
+                # hammer the API simultaneously after a 429.
+                rate_limit_base_delay = 5.0
+                delay = e.retry_after or min(rate_limit_base_delay * (2**retries), 30.0)
                 retries += 1
+                if _rate_limit_lock:
+                    async with _rate_limit_lock:
+                        logger.warning(
+                            f"Rate limit (429) on batch {batch_index}, waiting {delay:.0f}s "
+                            f"(retry {retries}/{max_retries_with_rate_limit})"
+                        )
+                        await asyncio.sleep(delay)
+                else:
+                    logger.warning(
+                        f"Rate limit (429) on batch {batch_index}, waiting {delay:.0f}s "
+                        f"(retry {retries}/{max_retries_with_rate_limit})"
+                    )
+                    await asyncio.sleep(delay)
                 last_error = str(e)
 
             except TranslationProviderError as e:
                 is_timeout = "timeout" in e.message.lower()
                 if e.retryable and retries < self.settings.max_retries:
-                    delay = self.settings.retry_delay * (2 ** retries)
+                    delay = self.settings.retry_delay * (2**retries)
                     logger.warning(
                         f"Retryable error on batch {batch_index}: {e.message}, "
                         f"waiting {delay}s (retry {retries + 1})"
@@ -252,7 +283,7 @@ class BatchProcessor:
         # Max retries exceeded
         if is_timeout and can_adaptive:
             return await self._retry_with_smaller_batches(
-                batch, batch_index, model, temperature, config_override
+                batch, batch_index, model, temperature, config_override, _rate_limit_lock
             )
 
         return BatchResult(
@@ -266,14 +297,19 @@ class BatchProcessor:
         self,
         batch: TranslationBatch,
         batch_index: int,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
+        model: str | None = None,
+        temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
+        _rate_limit_lock: asyncio.Lock | None = None,
     ) -> BatchResult:
         """Retry a failed batch by splitting it into smaller sub-batches."""
         from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 
-        model_id = model or self.settings.openrouter_default_model
+        model_id = (
+            (config_override.model if config_override and config_override.model else None)
+            or model
+            or self.settings.openrouter_default_model
+        )
         resolver = get_batch_size_resolver()
         new_size = resolver.record_failure(model_id, len(batch.lines))
 
@@ -281,10 +317,11 @@ class BatchProcessor:
             f"Batch {batch_index}: adaptive retry with size {new_size} (was {len(batch.lines)})"
         )
 
-        sub_batches = [batch.lines[i:i + new_size] for i in range(0, len(batch.lines), new_size)]
+        sub_batches = [batch.lines[i : i + new_size] for i in range(0, len(batch.lines), new_size)]
 
         all_translations: list[dict[str, str]] = []
         total_tokens = 0
+        total_cost = 0.0
         total_retries = 0
 
         for sub_batch_lines in sub_batches:
@@ -296,37 +333,47 @@ class BatchProcessor:
                 context_media_type=batch.context_media_type,
             )
             sub_result = await self.process_batch(
-                sub_batch, batch_index, model, temperature, config_override,
+                sub_batch,
+                batch_index,
+                model,
+                temperature,
+                config_override,
                 _is_adaptive_retry=True,
+                _rate_limit_lock=_rate_limit_lock,
             )
             if not sub_result.success:
                 return BatchResult(
-                    batch_index=batch_index, success=False,
+                    batch_index=batch_index,
+                    success=False,
                     translations=all_translations,
                     error=f"Adaptive retry failed at size {new_size}: {sub_result.error}",
                     retries=total_retries,
                 )
             all_translations.extend(sub_result.translations)
             total_tokens += sub_result.tokens_used
+            total_cost += sub_result.cost
             total_retries += sub_result.retries
 
         return BatchResult(
-            batch_index=batch_index, success=True,
-            translations=all_translations, tokens_used=total_tokens,
+            batch_index=batch_index,
+            success=True,
+            translations=all_translations,
+            tokens_used=total_tokens,
+            cost=total_cost,
             retries=total_retries,
         )
 
     async def _process_batch_group(
         self,
-        batch_group: List[tuple[int, list[dict[str, str]]]],
+        batch_group: list[tuple[int, list[dict[str, str]]]],
         source_language: str,
         target_language: str,
-        context_title: Optional[str],
-        context_media_type: Optional[str],
-        model: Optional[str],
-        temperature: Optional[float],
+        context_title: str | None,
+        context_media_type: str | None,
+        model: str | None,
+        temperature: float | None,
         config_override: Optional["TranslationConfig"],
-    ) -> List[BatchResult]:
+    ) -> list[BatchResult]:
         """
         Process a group of batches in parallel.
 
@@ -360,7 +407,7 @@ class BatchProcessor:
                 config_override=config_override,
             )
             tasks.append(task)
-        
+
         return await asyncio.gather(*tasks)
 
     async def process_all_batches(
@@ -368,12 +415,12 @@ class BatchProcessor:
         lines: list[dict[str, str]],
         source_language: str,
         target_language: str,
-        context_title: Optional[str] = None,
-        context_media_type: Optional[str] = None,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        batch_size: Optional[int] = None,
-        progress_callback: Optional[Callable[[BatchProgress], None]] = None,
+        context_title: str | None = None,
+        context_media_type: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        batch_size: int | None = None,
+        progress_callback: Callable[[BatchProgress], None] | None = None,
         config_override: Optional["TranslationConfig"] = None,
     ) -> BatchProcessingResult:
         """
@@ -410,7 +457,7 @@ class BatchProcessor:
             parallel_count = config_override.parallel_batches
         else:
             parallel_count = self.settings.parallel_batches_per_job
-        
+
         progress = BatchProgress(
             total_batches=len(batches),
             total_lines=len(lines),
@@ -421,47 +468,76 @@ class BatchProcessor:
 
         # Create indexed batches for tracking
         indexed_batches = list(enumerate(batches))
-        
-        logger.info(f"Processing {len(batches)} batches with {parallel_count} parallel batches per group - "
-                   f"source={source_language}, target={target_language}, "
-                   f"model={model_to_use}, temperature={temperature or 'default'}")
 
-        # Process batches in parallel groups
+        logger.info(
+            f"Processing {len(batches)} batches with {parallel_count} parallel batches per group - "
+            f"source={source_language}, target={target_language}, "
+            f"model={model_to_use}, temperature={temperature or 'default'}"
+        )
+
+        # Shared lock so rate-limited retries don't all fire simultaneously
+        rate_limit_lock = asyncio.Lock()
+
+        # Fire initial progress so job shows totalBatches immediately
+        if progress_callback:
+            progress_callback(progress)
+
+        # Process batches in parallel groups, updating progress per batch
         for group_start in range(0, len(indexed_batches), parallel_count):
-            batch_group = indexed_batches[group_start:group_start + parallel_count]
-            
+            batch_group = indexed_batches[group_start : group_start + parallel_count]
+
             group_indices = [idx for idx, _ in batch_group]
-            logger.info(f"Processing parallel batch group: batches {group_indices} "
-                       f"({len(batch_group)} batches in parallel)")
-            
-            # Process batch group in parallel
-            group_results = await self._process_batch_group(
-                batch_group,
-                source_language=source_language,
-                target_language=target_language,
-                context_title=context_title,
-                context_media_type=context_media_type,
-                model=model,
-                temperature=temperature,
-                config_override=config_override,
+            logger.info(
+                f"Processing parallel batch group: batches {group_indices} "
+                f"({len(batch_group)} batches in parallel)"
             )
-            
-            # Process results from this group
-            for (batch_index, batch_lines), result in zip(batch_group, group_results):
+
+            # Create tasks with staggered start to avoid hitting rate limits
+            async def _run_batch(
+                bi: int, bl: list, stagger: float
+            ) -> tuple[int, list, BatchResult]:
+                if stagger > 0:
+                    await asyncio.sleep(stagger)
+                b = TranslationBatch(
+                    lines=bl,
+                    source_language=source_language,
+                    target_language=target_language,
+                    context_title=context_title,
+                    context_media_type=context_media_type,
+                )
+                r = await self.process_batch(
+                    b,
+                    batch_index=bi,
+                    model=model,
+                    temperature=temperature,
+                    config_override=config_override,
+                    _rate_limit_lock=rate_limit_lock,
+                )
+                return bi, bl, r
+
+            tasks = [
+                asyncio.ensure_future(_run_batch(bi, bl, i * 0.5))
+                for i, (bi, bl) in enumerate(batch_group)
+            ]
+
+            # Process results as each batch completes (not waiting for all)
+            for coro in asyncio.as_completed(tasks):
+                batch_index, batch_lines, result = await coro
                 batch_results.append(result)
-                
+
                 if result.success:
                     all_translations.extend(result.translations)
                     progress.completed_lines += len(batch_lines)
                     progress.total_tokens += result.tokens_used
+                    progress.total_cost += result.cost
                 else:
                     progress.failed_batches += 1
                     logger.error(f"Batch {batch_index + 1} failed: {result.error}")
-                
+
                 progress.completed_batches += 1
-            
-            if progress_callback:
-                progress_callback(progress)
+
+                if progress_callback:
+                    progress_callback(progress)
 
         # Sort batch_results by batch_index to maintain order
         batch_results.sort(key=lambda r: r.batch_index)
@@ -479,11 +555,11 @@ class BatchProcessor:
         lines: list[dict[str, str]],
         source_language: str,
         target_language: str,
-        context_title: Optional[str] = None,
-        context_media_type: Optional[str] = None,
-        model: Optional[str] = None,
-        temperature: Optional[float] = None,
-        batch_size: Optional[int] = None,
+        context_title: str | None = None,
+        context_media_type: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        batch_size: int | None = None,
         config_override: Optional["TranslationConfig"] = None,
     ) -> AsyncGenerator[tuple[BatchResult, BatchProgress], None]:
         """
@@ -522,12 +598,17 @@ class BatchProcessor:
             )
 
             result = await self.process_batch(
-                batch, batch_index=i, model=model, temperature=temperature, config_override=config_override
+                batch,
+                batch_index=i,
+                model=model,
+                temperature=temperature,
+                config_override=config_override,
             )
 
             if result.success:
                 progress.completed_lines += len(batch_lines)
                 progress.total_tokens += result.tokens_used
+                progress.total_cost += result.cost
             else:
                 progress.failed_batches += 1
 

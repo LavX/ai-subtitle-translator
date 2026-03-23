@@ -1,18 +1,19 @@
 """Tests for translator core functionality."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import timedelta
+from unittest.mock import AsyncMock, MagicMock
 
-from subtitle_translator.core.translator import SubtitleTranslator, ContentTranslationResult
-from subtitle_translator.core.srt_parser import SRTParser, SubtitleEntry, SRTParserError
-from subtitle_translator.core.batch_processor import BatchProcessor, BatchProgress, BatchResult
+import pytest
+
 from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
+from subtitle_translator.core.batch_processor import BatchProcessor, BatchProgress
+from subtitle_translator.core.srt_parser import SRTParser, SRTParserError, SubtitleEntry
+from subtitle_translator.core.translator import SubtitleTranslator
 from subtitle_translator.providers.base import (
-    TranslationBatch,
-    TranslationResult,
-    TranslationProviderError,
     RateLimitError,
+    TranslationBatch,
+    TranslationProviderError,
+    TranslationResult,
 )
 
 
@@ -31,7 +32,7 @@ Hello world
 How are you?
 """
         entries = parser.parse(srt_content)
-        
+
         assert len(entries) == 2
         assert entries[0].index == 1
         assert entries[0].content == "Hello world"
@@ -47,7 +48,7 @@ Line one
 Line two
 """
         entries = parser.parse(srt_content)
-        
+
         assert len(entries) == 1
         assert "Line one" in entries[0].content
         assert "Line two" in entries[0].content
@@ -55,7 +56,7 @@ Line two
     def test_parse_invalid_srt(self):
         """Test parsing invalid SRT raises error."""
         parser = SRTParser()
-        
+
         # This should not raise but return empty or handle gracefully
         # depending on the srt library behavior
         try:
@@ -83,9 +84,9 @@ Line two
                 content="How are you?",
             ),
         ]
-        
+
         result = parser.compose(entries)
-        
+
         assert "Hello world" in result
         assert "How are you?" in result
         assert "00:00:01,000" in result
@@ -107,9 +108,9 @@ Line two
                 content="World",
             ),
         ]
-        
+
         lines = parser.extract_lines_for_translation(entries)
-        
+
         assert len(lines) == 2
         assert lines[0] == {"index": "1", "content": "Hello"}
         assert lines[1] == {"index": "2", "content": "World"}
@@ -126,9 +127,9 @@ Line two
             ),
         ]
         translations = [{"index": "1", "content": "Hola"}]
-        
+
         result = parser.apply_translations(entries, translations)
-        
+
         assert len(result) == 1
         assert result[0].content == "Hola"
         assert result[0].start == entries[0].start
@@ -145,17 +146,17 @@ Line two
             ),
         ]
         translations = [{"index": "1", "content": "שלום"}]
-        
+
         result = parser.apply_translations(entries, translations, is_rtl=True)
-        
+
         assert len(result) == 1
         # Check RTL markers are present
-        assert "\u202B" in result[0].content or "\u202C" in result[0].content
+        assert "\u202b" in result[0].content or "\u202c" in result[0].content
 
     def test_validate_srt(self):
         """Test SRT validation."""
         parser = SRTParser()
-        
+
         valid_srt = """1
 00:00:01,000 --> 00:00:04,000
 Hello
@@ -175,9 +176,9 @@ Hello
                 content="This is a very long subtitle line that should be split into multiple lines for better readability",
             ),
         ]
-        
+
         result = parser.split_long_subtitles(entries, max_chars_per_line=40)
-        
+
         assert len(result) == 1
         # Content should have line breaks
         assert "\n" in result[0].content
@@ -207,11 +208,11 @@ class TestBatchProcessor:
     def test_create_batches(self, mock_provider, mock_settings):
         """Test batch creation."""
         processor = BatchProcessor(mock_provider, mock_settings)
-        
+
         lines = [{"index": str(i), "content": f"Line {i}"} for i in range(125)]
-        
+
         batches = processor.create_batches(lines, batch_size=50)
-        
+
         assert len(batches) == 3
         assert len(batches[0]) == 50
         assert len(batches[1]) == 50
@@ -221,7 +222,7 @@ class TestBatchProcessor:
     async def test_process_batch_success(self, mock_provider, mock_settings):
         """Test successful batch processing."""
         processor = BatchProcessor(mock_provider, mock_settings)
-        
+
         mock_provider.translate_batch = AsyncMock(
             return_value=TranslationResult(
                 translations=[{"index": "0", "content": "Translated"}],
@@ -229,15 +230,15 @@ class TestBatchProcessor:
                 total_tokens=100,
             )
         )
-        
+
         batch = TranslationBatch(
             lines=[{"index": "0", "content": "Original"}],
             source_language="en",
             target_language="es",
         )
-        
+
         result = await processor.process_batch(batch, batch_index=0)
-        
+
         assert result.success is True
         assert len(result.translations) == 1
         assert result.tokens_used == 100
@@ -246,7 +247,7 @@ class TestBatchProcessor:
     async def test_process_batch_retry_on_rate_limit(self, mock_provider, mock_settings):
         """Test retry logic on rate limit."""
         processor = BatchProcessor(mock_provider, mock_settings)
-        
+
         # First call raises rate limit, second succeeds
         mock_provider.translate_batch = AsyncMock(
             side_effect=[
@@ -258,15 +259,15 @@ class TestBatchProcessor:
                 ),
             ]
         )
-        
+
         batch = TranslationBatch(
             lines=[{"index": "0", "content": "Original"}],
             source_language="en",
             target_language="es",
         )
-        
+
         result = await processor.process_batch(batch, batch_index=0)
-        
+
         assert result.success is True
         assert result.retries == 1
 
@@ -275,19 +276,19 @@ class TestBatchProcessor:
         """Test failure after max retries."""
         mock_settings.max_retries = 2
         processor = BatchProcessor(mock_provider, mock_settings)
-        
+
         mock_provider.translate_batch = AsyncMock(
             side_effect=TranslationProviderError("Error", retryable=True)
         )
-        
+
         batch = TranslationBatch(
             lines=[{"index": "0", "content": "Original"}],
             source_language="en",
             target_language="es",
         )
-        
+
         result = await processor.process_batch(batch, batch_index=0)
-        
+
         assert result.success is False
         assert "Max retries exceeded" in result.error
 
@@ -328,15 +329,15 @@ class TestSubtitleTranslator:
     async def test_translate_content_success(self, mock_provider, mock_settings):
         """Test successful content translation."""
         translator = SubtitleTranslator(provider=mock_provider, settings=mock_settings)
-        
+
         request = TranslateContentRequest(
             sourceLanguage="en",
             targetLanguage="es",
             lines=[SubtitleLine(position=1, line="Hello")],
         )
-        
+
         result = await translator.translate_content(request)
-        
+
         assert result.success is True
         assert len(result.lines) == 1
         assert result.model_used == "test-model"
@@ -345,15 +346,15 @@ class TestSubtitleTranslator:
     async def test_translate_content_empty_lines(self, mock_provider, mock_settings):
         """Test translation with empty lines."""
         translator = SubtitleTranslator(provider=mock_provider, settings=mock_settings)
-        
+
         request = TranslateContentRequest(
             sourceLanguage="en",
             targetLanguage="es",
             lines=[],
         )
-        
+
         result = await translator.translate_content(request)
-        
+
         assert result.success is True
         assert len(result.lines) == 0
 
@@ -361,7 +362,7 @@ class TestSubtitleTranslator:
     async def test_translate_file_success(self, mock_provider, mock_settings):
         """Test successful file translation."""
         translator = SubtitleTranslator(provider=mock_provider, settings=mock_settings)
-        
+
         mock_provider.translate_batch = AsyncMock(
             return_value=TranslationResult(
                 translations=[
@@ -372,7 +373,7 @@ class TestSubtitleTranslator:
                 total_tokens=200,
             )
         )
-        
+
         srt_content = """1
 00:00:01,000 --> 00:00:04,000
 Hello world
@@ -381,13 +382,13 @@ Hello world
 00:00:05,000 --> 00:00:08,000
 How are you?
 """
-        
+
         result = await translator.translate_file(
             content=srt_content,
             source_language="en",
             target_language="es",
         )
-        
+
         assert result.success is True
         assert result.subtitle_count == 2
         assert "Hola mundo" in result.content
@@ -396,13 +397,13 @@ How are you?
     async def test_translate_file_invalid_srt(self, mock_provider, mock_settings):
         """Test translation with invalid SRT."""
         translator = SubtitleTranslator(provider=mock_provider, settings=mock_settings)
-        
+
         result = await translator.translate_file(
             content="Not valid SRT",
             source_language="en",
             target_language="es",
         )
-        
+
         # Should either fail gracefully or return empty
         # depending on how the parser handles it
         assert result.success is False or result.subtitle_count == 0
@@ -411,18 +412,18 @@ How are you?
     async def test_health_check(self, mock_provider, mock_settings):
         """Test health check."""
         translator = SubtitleTranslator(provider=mock_provider, settings=mock_settings)
-        
+
         result = await translator.health_check()
-        
+
         assert result is True
 
     @pytest.mark.asyncio
     async def test_close(self, mock_provider, mock_settings):
         """Test resource cleanup."""
         translator = SubtitleTranslator(provider=mock_provider, settings=mock_settings)
-        
+
         await translator.close()
-        
+
         mock_provider.close.assert_called_once()
 
 
