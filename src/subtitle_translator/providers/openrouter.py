@@ -567,6 +567,11 @@ class OpenRouterProvider(TranslationProvider):
 
         # Handle reasoning config
         if reasoning_config:
+            # effort: "none" means disable reasoning regardless of type
+            if reasoning_config.effort and reasoning_config.effort.lower() == "none":
+                logger.info("Reasoning effort: none — reasoning disabled")
+                return final_model_id, reasoning_params
+
             if reasoning_type == "enabled":
                 # For models like Grok that use reasoning.enabled parameter
                 if reasoning_config.enabled:
@@ -579,9 +584,16 @@ class OpenRouterProvider(TranslationProvider):
             elif reasoning_type == "effort":
                 # Build effort-based reasoning params
                 if reasoning_config.effort:
-                    valid_efforts = ["xhigh", "high", "medium", "low", "minimal", "none"]
-                    if reasoning_config.effort.lower() in valid_efforts:
-                        reasoning_params["reasoning"] = {"effort": reasoning_config.effort.lower()}
+                    if reasoning_config.effort.lower() in [
+                        "xhigh",
+                        "high",
+                        "medium",
+                        "low",
+                        "minimal",
+                    ]:
+                        reasoning_params["reasoning"] = {
+                            "effort": reasoning_config.effort.lower()
+                        }
                         logger.info(f"Using reasoning effort: {reasoning_config.effort}")
                     else:
                         logger.warning(f"Invalid reasoning effort: {reasoning_config.effort}")
