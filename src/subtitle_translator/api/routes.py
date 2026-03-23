@@ -1,6 +1,7 @@
 """FastAPI API endpoints for subtitle translation."""
 
 import logging
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -26,7 +27,7 @@ from subtitle_translator.api.models import (
 )
 from subtitle_translator.config import get_settings, update_runtime_config
 from subtitle_translator.core.translator import SubtitleTranslator, get_translator
-from subtitle_translator.queue.job_manager import JobStatus, JobType, job_manager
+from subtitle_translator.queue.job_manager import Job, JobStatus, JobType, job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -318,6 +319,43 @@ async def translate_file(
     )
 
 
+def _build_job_status_response(job: "Job") -> JobStatusResponse:
+    """Build a JobStatusResponse from a Job, computing elapsedSeconds."""
+    elapsed = None
+    if job.started_at:
+        end = job.completed_at or datetime.now(timezone.utc)
+        elapsed = round((end - job.started_at).total_seconds(), 2)
+
+    return JobStatusResponse(
+        jobId=job.id,
+        jobType=job.job_type.value,
+        status=job.status.value,
+        progress=job.progress,
+        message=job.message or None,
+        createdAt=job.created_at,
+        startedAt=job.started_at,
+        completedAt=job.completed_at,
+        result=job.result if job.status in (JobStatus.COMPLETED, JobStatus.PARTIAL) else None,
+        error=job.error if job.status in (JobStatus.FAILED, JobStatus.PARTIAL) else None,
+        # Input metadata
+        jobName=job.job_name,
+        fileName=job.file_name,
+        sourceLanguage=job.source_language,
+        targetLanguage=job.target_language,
+        title=job.title,
+        mediaType=job.media_type,
+        model=job.model,
+        totalLines=job.total_lines,
+        # Processing metrics
+        totalBatches=job.total_batches,
+        completedBatches=job.completed_batches if job.total_batches is not None else None,
+        completedLines=job.completed_lines if job.total_batches is not None else None,
+        tokensUsed=job.tokens_used if job.tokens_used > 0 else None,
+        totalCost=job.total_cost if job.total_cost > 0 else None,
+        elapsedSeconds=elapsed,
+    )
+
+
 # ============================================================================
 # Job Queue Endpoints
 # ============================================================================
@@ -381,12 +419,30 @@ async def submit_translate_content_job(
         api_key_override = None
         if request_data.get("config") and request_data["config"].get("api_key"):
             api_key_override = request_data["config"].pop("api_key")
+
+        resolved_model = (
+            (request.config.model if request.config and request.config.model else None)
+            or request.model
+            or settings.openrouter_default_model
+        )
+        metadata = {
+            "job_name": request.jobName,
+            "file_name": request.fileName,
+            "source_language": request.sourceLanguage,
+            "target_language": request.targetLanguage,
+            "title": request.title,
+            "media_type": request.mediaType,
+            "model": resolved_model,
+            "total_lines": len(request.lines) if request.lines else 0,
+        }
+
         job_id = await job_manager.submit_job(
             request_data=request_data,
             job_type=JobType.TRANSLATE_CONTENT,
             api_key_override=api_key_override,
+            metadata=metadata,
         )
-        
+
         position = job_manager.get_queue_position(job_id)
         logger.info(f"Job {job_id}: Queued at position {position or 'N/A'}")
         
@@ -467,14 +523,32 @@ async def submit_translate_file_job(
         api_key_override = None
         if request_data.get("config") and request_data["config"].get("api_key"):
             api_key_override = request_data["config"].pop("api_key")
+
+        resolved_model = (
+            (request.config.model if request.config and request.config.model else None)
+            or request.model
+            or settings.openrouter_default_model
+        )
+        metadata = {
+            "job_name": request.jobName,
+            "file_name": request.fileName,
+            "source_language": request.sourceLanguage,
+            "target_language": request.targetLanguage,
+            "title": request.title,
+            "media_type": request.mediaType,
+            "model": resolved_model,
+            "total_lines": None,  # unknown until SRT is parsed during processing
+        }
+
         job_id = await job_manager.submit_job(
             request_data=request_data,
             job_type=JobType.TRANSLATE_FILE,
             api_key_override=api_key_override,
+            metadata=metadata,
         )
-        
+
         position = job_manager.get_queue_position(job_id)
-        
+
         return JobSubmitResponse(
             jobId=job_id,
             status="queued",
@@ -534,22 +608,7 @@ async def list_jobs(
     jobs = job_manager.list_jobs(status_filter=job_status, limit=limit)
     stats = job_manager.get_stats()
     
-    job_responses = []
-    for job in jobs:
-        job_responses.append(
-            JobStatusResponse(
-                jobId=job.id,
-                jobType=job.job_type.value,
-                status=job.status.value,
-                progress=job.progress,
-                message=job.message or None,
-                createdAt=job.created_at,
-                startedAt=job.started_at,
-                completedAt=job.completed_at,
-                result=job.result if job.status == JobStatus.COMPLETED else None,
-                error=job.error if job.status == JobStatus.FAILED else None,
-            )
-        )
+    job_responses = [_build_job_status_response(job) for job in jobs]
     
     return JobListResponse(
         jobs=job_responses,
@@ -587,18 +646,7 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
             },
         )
     
-    return JobStatusResponse(
-        jobId=job.id,
-        jobType=job.job_type.value,
-        status=job.status.value,
-        progress=job.progress,
-        message=job.message or None,
-        createdAt=job.created_at,
-        startedAt=job.started_at,
-        completedAt=job.completed_at,
-        result=job.result if job.status == JobStatus.COMPLETED else None,
-        error=job.error if job.status == JobStatus.FAILED else None,
-    )
+    return _build_job_status_response(job)
 
 
 @jobs_router.delete(
@@ -642,7 +690,7 @@ async def cancel_or_delete_job(job_id: str) -> JobDeleteResponse:
         )
     
     # Try to delete if completed/failed/cancelled
-    if job.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
+    if job.status in (JobStatus.COMPLETED, JobStatus.PARTIAL, JobStatus.FAILED, JobStatus.CANCELLED):
         job_manager.delete_job(job_id)
         return JobDeleteResponse(
             jobId=job_id,

@@ -14,10 +14,11 @@ logger = logging.getLogger(__name__)
 
 class JobStatus(str, Enum):
     """Status of a translation job."""
-    
+
     QUEUED = "queued"
     PROCESSING = "processing"
     COMPLETED = "completed"
+    PARTIAL = "partial"
     FAILED = "failed"
     CANCELLED = "cancelled"
 
@@ -46,6 +47,21 @@ class Job(BaseModel):
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    # Input metadata
+    job_name: Optional[str] = None
+    file_name: Optional[str] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+    title: Optional[str] = None
+    media_type: Optional[str] = None
+    model: Optional[str] = None
+    total_lines: Optional[int] = None
+    # Processing metrics
+    total_batches: Optional[int] = None
+    completed_batches: int = 0
+    completed_lines: int = 0
+    tokens_used: int = 0
+    total_cost: float = 0.0
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert job to dictionary for API response."""
@@ -154,6 +170,7 @@ class JobManager:
         request_data: Dict[str, Any],
         job_type: JobType,
         api_key_override: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Submit a new job to the queue.
@@ -162,10 +179,11 @@ class JobManager:
             request_data: The request data for the translation job
             job_type: Type of translation job
             api_key_override: API key to use for this job (kept separate from request_data)
-            
+            metadata: Optional input metadata (job_name, file_name, languages, etc.)
+
         Returns:
             The job ID
-            
+
         Raises:
             RuntimeError: If max jobs limit is reached
         """
@@ -174,12 +192,13 @@ class JobManager:
             1 for j in self.jobs.values()
             if j.status in (JobStatus.QUEUED, JobStatus.PROCESSING)
         )
-        
+
         if active_jobs >= self.max_jobs:
             raise RuntimeError(f"Maximum job limit ({self.max_jobs}) reached")
-        
+
         # Create job
         job_id = str(uuid.uuid4())
+        meta = metadata or {}
         job = Job(
             id=job_id,
             job_type=job_type,
@@ -187,6 +206,14 @@ class JobManager:
             request_data=request_data,
             api_key_override=api_key_override,
             created_at=datetime.now(timezone.utc),
+            job_name=meta.get("job_name"),
+            file_name=meta.get("file_name"),
+            source_language=meta.get("source_language"),
+            target_language=meta.get("target_language"),
+            title=meta.get("title"),
+            media_type=meta.get("media_type"),
+            model=meta.get("model"),
+            total_lines=meta.get("total_lines"),
         )
         
         self.jobs[job_id] = job
@@ -213,20 +240,40 @@ class JobManager:
         job_id: str,
         progress: int,
         message: str = "",
+        total_batches: Optional[int] = None,
+        completed_batches: Optional[int] = None,
+        completed_lines: Optional[int] = None,
+        tokens_used: Optional[int] = None,
+        total_cost: Optional[float] = None,
     ) -> None:
         """
-        Update job progress.
-        
+        Update job progress and metrics.
+
         Args:
             job_id: The job ID
             progress: Progress percentage (0-100)
             message: Optional status message
+            total_batches: Total number of batches
+            completed_batches: Number of completed batches
+            completed_lines: Number of lines translated so far
+            tokens_used: Total tokens consumed so far
+            total_cost: Total cost in USD so far
         """
         if job_id in self.jobs:
             job = self.jobs[job_id]
             job.progress = min(max(progress, 0), 100)
             if message:
                 job.message = message
+            if total_batches is not None:
+                job.total_batches = total_batches
+            if completed_batches is not None:
+                job.completed_batches = completed_batches
+            if completed_lines is not None:
+                job.completed_lines = completed_lines
+            if tokens_used is not None:
+                job.tokens_used = tokens_used
+            if total_cost is not None:
+                job.total_cost = total_cost
     
     def set_job_processing(self, job_id: str) -> None:
         """Mark a job as processing."""
@@ -256,7 +303,30 @@ class JobManager:
             job.completed_at = datetime.now(timezone.utc)
             job.message = "Translation completed"
             logger.info(f"Job {job_id} completed successfully")
-    
+
+    def set_job_partial(
+        self,
+        job_id: str,
+        result: Any,
+        error: str,
+    ) -> None:
+        """
+        Mark a job as partially completed.
+
+        Args:
+            job_id: The job ID
+            result: The partial translation result
+            error: Description of what failed
+        """
+        if job_id in self.jobs:
+            job = self.jobs[job_id]
+            job.status = JobStatus.PARTIAL
+            job.result = result
+            job.error = error
+            job.completed_at = datetime.now(timezone.utc)
+            job.message = f"Partial translation: {error}"
+            logger.warning(f"Job {job_id} partially completed: {error}")
+
     def set_job_failed(
         self,
         job_id: str,
@@ -312,8 +382,8 @@ class JobManager:
         """
         if job_id in self.jobs:
             job = self.jobs[job_id]
-            # Only delete completed, failed, or cancelled jobs
-            if job.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
+            # Only delete completed, partial, failed, or cancelled jobs
+            if job.status in (JobStatus.COMPLETED, JobStatus.PARTIAL, JobStatus.FAILED, JobStatus.CANCELLED):
                 del self.jobs[job_id]
                 logger.info(f"Job {job_id} deleted")
                 return True
@@ -493,7 +563,7 @@ class JobManager:
         expired_ids = []
         
         for job_id, job in self.jobs.items():
-            if job.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
+            if job.status in (JobStatus.COMPLETED, JobStatus.PARTIAL, JobStatus.FAILED, JobStatus.CANCELLED):
                 if job.completed_at and (now - job.completed_at) > self.job_ttl:
                     expired_ids.append(job_id)
         

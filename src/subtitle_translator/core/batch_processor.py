@@ -35,6 +35,7 @@ class BatchProgress:
     completed_lines: int = 0
     failed_batches: int = 0
     total_tokens: int = 0
+    total_cost: float = 0.0
 
     @property
     def percent_complete(self) -> float:
@@ -61,6 +62,7 @@ class BatchResult:
     success: bool
     translations: list[dict[str, str]] = field(default_factory=list)
     tokens_used: int = 0
+    cost: float = 0.0
     error: Optional[str] = None
     retries: int = 0
 
@@ -165,8 +167,10 @@ class BatchProcessor:
         last_error: Optional[str] = None
         is_timeout = False
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
+        # Rate limits get extra retries (3 more than normal errors)
+        max_retries_with_rate_limit = self.settings.max_retries + 3
 
-        while retries <= self.settings.max_retries:
+        while retries <= max_retries_with_rate_limit:
             try:
                 result = await self.provider.translate_batch(
                     batch, model=model, temperature=temperature, config_override=config_override
@@ -188,7 +192,7 @@ class BatchProcessor:
                         retries=retries,
                     )
 
-                model_id = model or self.settings.openrouter_default_model
+                model_id = (config_override.model if config_override and config_override.model else None) or model or self.settings.openrouter_default_model
                 get_batch_size_resolver().record_success(model_id, len(batch.lines))
 
                 return BatchResult(
@@ -196,6 +200,7 @@ class BatchProcessor:
                     success=True,
                     translations=result.translations,
                     tokens_used=result.total_tokens or 0,
+                    cost=result.cost or 0.0,
                     retries=retries,
                 )
 
@@ -216,9 +221,12 @@ class BatchProcessor:
                     )
 
             except RateLimitError as e:
-                delay = e.retry_after or (self.settings.retry_delay * (2 ** retries))
+                # Rate limits: start at 5s, exponential backoff, cap at 30s
+                rate_limit_base_delay = 5.0
+                delay = e.retry_after or min(rate_limit_base_delay * (2 ** retries), 30.0)
                 logger.warning(
-                    f"Rate limit hit on batch {batch_index}, waiting {delay}s (retry {retries + 1})"
+                    f"Rate limit (429) on batch {batch_index}, waiting {delay:.0f}s "
+                    f"(retry {retries + 1}/{max_retries_with_rate_limit})"
                 )
                 await asyncio.sleep(delay)
                 retries += 1
@@ -273,7 +281,7 @@ class BatchProcessor:
         """Retry a failed batch by splitting it into smaller sub-batches."""
         from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 
-        model_id = model or self.settings.openrouter_default_model
+        model_id = (config_override.model if config_override and config_override.model else None) or model or self.settings.openrouter_default_model
         resolver = get_batch_size_resolver()
         new_size = resolver.record_failure(model_id, len(batch.lines))
 
@@ -285,6 +293,7 @@ class BatchProcessor:
 
         all_translations: list[dict[str, str]] = []
         total_tokens = 0
+        total_cost = 0.0
         total_retries = 0
 
         for sub_batch_lines in sub_batches:
@@ -308,12 +317,13 @@ class BatchProcessor:
                 )
             all_translations.extend(sub_result.translations)
             total_tokens += sub_result.tokens_used
+            total_cost += sub_result.cost
             total_retries += sub_result.retries
 
         return BatchResult(
             batch_index=batch_index, success=True,
             translations=all_translations, tokens_used=total_tokens,
-            retries=total_retries,
+            cost=total_cost, retries=total_retries,
         )
 
     async def _process_batch_group(
@@ -426,42 +436,56 @@ class BatchProcessor:
                    f"source={source_language}, target={target_language}, "
                    f"model={model_to_use}, temperature={temperature or 'default'}")
 
-        # Process batches in parallel groups
+        # Fire initial progress so job shows totalBatches immediately
+        if progress_callback:
+            progress_callback(progress)
+
+        # Process batches in parallel groups, updating progress per batch
         for group_start in range(0, len(indexed_batches), parallel_count):
             batch_group = indexed_batches[group_start:group_start + parallel_count]
-            
+
             group_indices = [idx for idx, _ in batch_group]
             logger.info(f"Processing parallel batch group: batches {group_indices} "
                        f"({len(batch_group)} batches in parallel)")
-            
-            # Process batch group in parallel
-            group_results = await self._process_batch_group(
-                batch_group,
-                source_language=source_language,
-                target_language=target_language,
-                context_title=context_title,
-                context_media_type=context_media_type,
-                model=model,
-                temperature=temperature,
-                config_override=config_override,
-            )
-            
-            # Process results from this group
-            for (batch_index, batch_lines), result in zip(batch_group, group_results):
+
+            # Create tasks that return (batch_index, batch_lines, result)
+            async def _run_batch(bi: int, bl: list) -> tuple[int, list, BatchResult]:
+                b = TranslationBatch(
+                    lines=bl,
+                    source_language=source_language,
+                    target_language=target_language,
+                    context_title=context_title,
+                    context_media_type=context_media_type,
+                )
+                r = await self.process_batch(
+                    b, batch_index=bi, model=model,
+                    temperature=temperature, config_override=config_override,
+                )
+                return bi, bl, r
+
+            tasks = [
+                asyncio.ensure_future(_run_batch(bi, bl))
+                for bi, bl in batch_group
+            ]
+
+            # Process results as each batch completes (not waiting for all)
+            for coro in asyncio.as_completed(tasks):
+                batch_index, batch_lines, result = await coro
                 batch_results.append(result)
-                
+
                 if result.success:
                     all_translations.extend(result.translations)
                     progress.completed_lines += len(batch_lines)
                     progress.total_tokens += result.tokens_used
+                    progress.total_cost += result.cost
                 else:
                     progress.failed_batches += 1
                     logger.error(f"Batch {batch_index + 1} failed: {result.error}")
-                
+
                 progress.completed_batches += 1
-            
-            if progress_callback:
-                progress_callback(progress)
+
+                if progress_callback:
+                    progress_callback(progress)
 
         # Sort batch_results by batch_index to maintain order
         batch_results.sort(key=lambda r: r.batch_index)
@@ -528,6 +552,7 @@ class BatchProcessor:
             if result.success:
                 progress.completed_lines += len(batch_lines)
                 progress.total_tokens += result.tokens_used
+                progress.total_cost += result.cost
             else:
                 progress.failed_batches += 1
 

@@ -17,6 +17,7 @@ class TranslationResult:
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
     total_tokens: Optional[int] = None
+    cost: Optional[float] = None
     raw_response: Optional[dict] = None
 
 

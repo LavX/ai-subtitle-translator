@@ -131,6 +131,12 @@ class TranslateContentRequest(BaseModel):
         default=None, description="Type of media: 'Episode' or 'Movie'"
     )
     lines: list[SubtitleLine] = Field(..., max_length=50_000, description="List of subtitle lines to translate")
+    fileName: Optional[str] = Field(
+        default=None, description="Original file name (informational)"
+    )
+    jobName: Optional[str] = Field(
+        default=None, description="User-provided label for the job"
+    )
     model: Optional[str] = Field(
         default=None, description="Override default LLM model for translation"
     )
@@ -162,6 +168,15 @@ class TranslateFileRequest(BaseModel):
     targetLanguage: str = Field(..., description="Target language code")
     title: Optional[str] = Field(
         default=None, description="Title of the media (helps translation context)"
+    )
+    mediaType: Optional[str] = Field(
+        default=None, description="Type of media: 'Episode' or 'Movie'"
+    )
+    fileName: Optional[str] = Field(
+        default=None, description="Original file name (informational)"
+    )
+    jobName: Optional[str] = Field(
+        default=None, description="User-provided label for the job"
     )
     model: Optional[str] = Field(
         default=None, description="Override default LLM model for translation"
@@ -269,6 +284,22 @@ class JobStatusResponse(BaseModel):
     completedAt: Optional[datetime] = Field(default=None, description="Completion timestamp")
     result: Optional[Any] = Field(default=None, description="Translation result (only when completed)")
     error: Optional[str] = Field(default=None, description="Error message (only when failed)")
+    # Input metadata
+    jobName: Optional[str] = Field(default=None, description="User-provided job label")
+    fileName: Optional[str] = Field(default=None, description="Original file name")
+    sourceLanguage: Optional[str] = Field(default=None, description="Source language code")
+    targetLanguage: Optional[str] = Field(default=None, description="Target language code")
+    title: Optional[str] = Field(default=None, description="Media title")
+    mediaType: Optional[str] = Field(default=None, description="Media type (Episode/Movie)")
+    model: Optional[str] = Field(default=None, description="Model used for translation")
+    totalLines: Optional[int] = Field(default=None, description="Total number of lines to translate")
+    # Processing metrics
+    totalBatches: Optional[int] = Field(default=None, description="Total number of batches")
+    completedBatches: Optional[int] = Field(default=None, description="Number of completed batches")
+    completedLines: Optional[int] = Field(default=None, description="Number of lines translated so far")
+    tokensUsed: Optional[int] = Field(default=None, description="Total tokens consumed so far")
+    totalCost: Optional[float] = Field(default=None, description="Total cost in USD (from OpenRouter)")
+    elapsedSeconds: Optional[float] = Field(default=None, description="Elapsed processing time in seconds")
 
 
 class JobListResponse(BaseModel):

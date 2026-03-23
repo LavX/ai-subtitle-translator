@@ -303,6 +303,8 @@ class OpenRouterProvider(TranslationProvider):
         """
         self.settings = settings or get_settings()
         self._client: Optional[httpx.AsyncClient] = None
+        self._model_params_cache: dict[str, list[str]] = {}
+        self._model_params_fetched: bool = False
 
     @property
     def provider_name(self) -> str:
@@ -434,18 +436,47 @@ class OpenRouterProvider(TranslationProvider):
             "testing_reference": TESTING_REFERENCE
         }
 
-    def _get_reasoning_type(self, model_id: str) -> Optional[str]:
+    async def _ensure_model_params_cache(self) -> None:
+        """Fetch and cache supported_parameters for all models from OpenRouter API."""
+        if self._model_params_fetched:
+            return
+        try:
+            # Use a plain client without auth headers — /models is a public endpoint
+            async with httpx.AsyncClient(
+                base_url=self.settings.openrouter_api_base,
+                timeout=httpx.Timeout(15.0),
+            ) as plain_client:
+                response = await plain_client.get("/models")
+            if response.status_code == 200:
+                data = response.json()
+                for model in data.get("data", []):
+                    model_id = model.get("id", "")
+                    params = model.get("supported_parameters", [])
+                    if model_id and params:
+                        self._model_params_cache[model_id] = params
+                logger.info(f"Cached supported_parameters for {len(self._model_params_cache)} models from OpenRouter API")
+            else:
+                logger.warning(f"Failed to fetch models from OpenRouter API: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch model params from OpenRouter API: {e}")
+        self._model_params_fetched = True
+
+    async def _get_reasoning_type(self, model_id: str) -> Optional[str]:
         """
         Determine the reasoning type supported by a model.
-        
+
+        Checks the OpenRouter API's supported_parameters first, then falls back
+        to hardcoded lists for models with specific reasoning styles.
+
         Args:
             model_id: The model identifier (without :thinking suffix)
-            
+
         Returns:
             Reasoning type: 'thinking_variant', 'effort', 'max_tokens', 'enabled', or None
         """
         base_model = model_id.replace(":thinking", "")
-        
+
+        # Hardcoded overrides for models with specific reasoning styles
         if base_model in THINKING_VARIANT_MODELS:
             return "thinking_variant"
         if base_model in ENABLED_REASONING_MODELS:
@@ -454,17 +485,23 @@ class OpenRouterProvider(TranslationProvider):
             return "effort"
         if base_model in MAX_TOKENS_REASONING_MODELS:
             return "max_tokens"
-        
+
         # Check RECOMMENDED_MODELS for reasoning type
         for model_info in RECOMMENDED_MODELS:
             if model_info["id"] == base_model:
                 if model_info.get("supports_reasoning"):
                     return model_info.get("reasoning_type")
                 return None
-                
+
+        # Dynamic lookup: check OpenRouter API's supported_parameters
+        await self._ensure_model_params_cache()
+        params = self._model_params_cache.get(base_model, [])
+        if "reasoning" in params:
+            return "effort"
+
         return None
 
-    def _build_reasoning_payload(
+    async def _build_reasoning_payload(
         self,
         model_id: str,
         config_override: Optional["TranslationConfig"],
@@ -489,7 +526,7 @@ class OpenRouterProvider(TranslationProvider):
         use_thinking = config_override.use_thinking_variant
         
         # Check if model supports reasoning
-        reasoning_type = self._get_reasoning_type(model_id)
+        reasoning_type = await self._get_reasoning_type(model_id)
         
         if reasoning_type is None:
             # Model doesn't support reasoning, skip
@@ -519,7 +556,7 @@ class OpenRouterProvider(TranslationProvider):
                     logger.info("Using reasoning enabled: false")
                     
             elif reasoning_type == "effort":
-                # Build effort-based reasoning params (OpenAI o-series)
+                # Build effort-based reasoning params
                 if reasoning_config.effort:
                     valid_efforts = ["xhigh", "high", "medium", "low", "minimal", "none"]
                     if reasoning_config.effort.lower() in valid_efforts:
@@ -527,6 +564,16 @@ class OpenRouterProvider(TranslationProvider):
                         logger.info(f"Using reasoning effort: {reasoning_config.effort}")
                     else:
                         logger.warning(f"Invalid reasoning effort: {reasoning_config.effort}")
+                elif reasoning_config.max_tokens:
+                    # User sent max_tokens but model expects effort — map it
+                    if reasoning_config.max_tokens >= 4000:
+                        effort = "high"
+                    elif reasoning_config.max_tokens >= 2000:
+                        effort = "medium"
+                    else:
+                        effort = "low"
+                    reasoning_params["reasoning"] = {"effort": effort}
+                    logger.info(f"Mapped reasoning max_tokens={reasoning_config.max_tokens} to effort: {effort}")
                 elif reasoning_config.enabled:
                     reasoning_params["reasoning"] = {"effort": "medium"}
                     logger.info("Using default reasoning effort: medium")
@@ -645,7 +692,7 @@ class OpenRouterProvider(TranslationProvider):
             )
 
         # Build reasoning configuration
-        model_to_use, reasoning_params = self._build_reasoning_payload(model_to_use, config_override)
+        model_to_use, reasoning_params = await self._build_reasoning_payload(model_to_use, config_override)
 
         # Build messages
         system_prompt = self.build_system_prompt(
@@ -685,17 +732,22 @@ class OpenRouterProvider(TranslationProvider):
                 {"role": "user", "content": user_content},
             ]
 
-        # Build request payload
+        # Build request payload — omit max_tokens to let OpenRouter/provider decide
+        # the optimal output budget per model.
         payload: dict[str, Any] = {
             "model": model_to_use,
             "messages": messages,
             "temperature": temp_to_use,
-            "max_tokens": self.settings.openrouter_max_tokens,
-            "response_format": {"type": "json_object"},
             # Include usage stats to track cache savings
             "usage": {"include": True},
         }
-        
+
+        # Only use json_object response format when reasoning is NOT enabled.
+        # Some models (e.g. mistral-small-2603) with reasoning + json_object
+        # return a single JSON object instead of an array, translating only 1 line.
+        if not reasoning_params:
+            payload["response_format"] = {"type": "json_object"}
+
         # Add reasoning params if configured
         if reasoning_params:
             payload.update(reasoning_params)
@@ -824,6 +876,12 @@ class OpenRouterProvider(TranslationProvider):
         prompt_tokens = usage.get("prompt_tokens")
         completion_tokens = usage.get("completion_tokens")
         total_tokens = usage.get("total_tokens")
+        cost = usage.get("cost")
+        if cost is not None:
+            try:
+                cost = float(cost)
+            except (ValueError, TypeError):
+                cost = None
 
         # Extract translated content
         choices = data.get("choices", [])
@@ -847,10 +905,10 @@ class OpenRouterProvider(TranslationProvider):
         debug_logger.debug(f"Model used: {model_used}")
         debug_logger.debug(f"Token usage - prompt: {prompt_tokens}, completion: {completion_tokens}, total: {total_tokens}")
         debug_logger.debug(f"Raw content: {content}")
-        
+
         # Parse the JSON array from content
         translations = self._parse_translations(content)
-        
+
         # Debug logging: Log parsed translations
         debug_logger.debug(f"=== PARSED TRANSLATIONS ===")
         debug_logger.debug(f"Translations count: {len(translations)}")
@@ -862,6 +920,7 @@ class OpenRouterProvider(TranslationProvider):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
+            cost=cost,
             raw_response=data,
         )
     

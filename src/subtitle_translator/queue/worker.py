@@ -91,9 +91,20 @@ async def process_content_translation_job(
         # Define progress callback
         def progress_callback(progress: BatchProgress) -> None:
             percent = int(progress.percent_complete)
-            message = f"Processing batch {progress.completed_batches}/{progress.total_batches}"
-            job_manager.update_progress(job_id, percent, message)
-        
+            failed_info = f", {progress.failed_batches} failed" if progress.failed_batches else ""
+            message = (
+                f"Translated {progress.completed_lines}/{progress.total_lines} lines "
+                f"({progress.completed_batches}/{progress.total_batches} batches{failed_info})"
+            )
+            job_manager.update_progress(
+                job_id, percent, message,
+                total_batches=progress.total_batches,
+                completed_batches=progress.completed_batches,
+                completed_lines=progress.completed_lines,
+                tokens_used=progress.total_tokens,
+                total_cost=progress.total_cost,
+            )
+
         # Process all batches
         result = await processor.process_all_batches(
             lines=lines,
@@ -106,12 +117,13 @@ async def process_content_translation_job(
             progress_callback=progress_callback,
             config_override=config_override,
         )
-        
+
         if not result.success:
             failed_batches = [r for r in result.batch_results if not r.success]
+            successful_batches = [r for r in result.batch_results if r.success]
             error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
-            
-            # Check if we have partial results
+
+            # Report as partial if we have some results, otherwise fail
             if result.all_translations:
                 translated_lines = map_translations_to_lines(
                     request.lines,
@@ -119,18 +131,23 @@ async def process_content_translation_job(
                     request.targetLanguage,
                     translator.settings,
                 )
-                job_manager.set_job_completed(
+                total_lines = len(request.lines)
+                translated_count = len(translated_lines)
+                job_manager.set_job_partial(
                     job_id,
                     {
                         "lines": [line.model_dump() for line in translated_lines],
                         "model_used": result.model_used,
                         "tokens_used": result.total_tokens,
-                        "partial": True,
-                        "warning": f"Partial failure: {error_msg}",
                     },
+                    error=f"{translated_count}/{total_lines} lines translated. "
+                          f"{len(failed_batches)} of {len(result.batch_results)} batches failed: {error_msg}",
                 )
             else:
-                job_manager.set_job_failed(job_id, error_msg)
+                job_manager.set_job_failed(
+                    job_id,
+                    f"All {len(failed_batches)} batches failed: {error_msg}",
+                )
             return
         
         # Map translations back to SubtitleLine format
@@ -242,6 +259,10 @@ async def process_file_translation_job(
         
         # Extract lines for translation
         lines = translator._srt_parser.extract_lines_for_translation(entries)
+
+        # Update total_lines now that we know the actual count
+        if job_id in job_manager.jobs:
+            job_manager.jobs[job_id].total_lines = len(lines)
         
         # Create batch processor
         processor = BatchProcessor(translator.provider, translator.settings)
@@ -249,9 +270,20 @@ async def process_file_translation_job(
         # Define progress callback
         def progress_callback(progress: BatchProgress) -> None:
             percent = int(progress.percent_complete)
-            message = f"Processing batch {progress.completed_batches}/{progress.total_batches}"
-            job_manager.update_progress(job_id, percent, message)
-        
+            failed_info = f", {progress.failed_batches} failed" if progress.failed_batches else ""
+            message = (
+                f"Translated {progress.completed_lines}/{progress.total_lines} lines "
+                f"({progress.completed_batches}/{progress.total_batches} batches{failed_info})"
+            )
+            job_manager.update_progress(
+                job_id, percent, message,
+                total_batches=progress.total_batches,
+                completed_batches=progress.completed_batches,
+                completed_lines=progress.completed_lines,
+                tokens_used=progress.total_tokens,
+                total_cost=progress.total_cost,
+            )
+
         # Process all batches
         result = await processor.process_all_batches(
             lines=lines,
@@ -267,28 +299,32 @@ async def process_file_translation_job(
         if not result.success:
             failed_batches = [r for r in result.batch_results if not r.success]
             error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
-            
-            # Check if we have partial results
+
             if result.all_translations:
                 is_rtl = translator.settings.is_rtl_language(target_language)
                 translated_entries = translator._srt_parser.apply_translations(
                     entries, result.all_translations, is_rtl=is_rtl
                 )
                 translated_content = translator._srt_parser.compose(translated_entries)
-                
-                job_manager.set_job_completed(
+                translated_count = len(result.all_translations)
+                total_count = len(lines)
+
+                job_manager.set_job_partial(
                     job_id,
                     {
                         "content": translated_content,
                         "model_used": result.model_used,
                         "tokens_used": result.total_tokens,
                         "subtitle_count": len(entries),
-                        "partial": True,
-                        "warning": f"Partial failure: {error_msg}",
                     },
+                    error=f"{translated_count}/{total_count} lines translated. "
+                          f"{len(failed_batches)} of {len(result.batch_results)} batches failed: {error_msg}",
                 )
             else:
-                job_manager.set_job_failed(job_id, error_msg)
+                job_manager.set_job_failed(
+                    job_id,
+                    f"All {len(failed_batches)} batches failed: {error_msg}",
+                )
             return
         
         # Check if target language is RTL
