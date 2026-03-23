@@ -171,7 +171,7 @@ class BatchProcessor:
         # Rate limits get extra retries (3 more than normal errors)
         max_retries_with_rate_limit = self.settings.max_retries + 3
 
-        while retries <= max_retries_with_rate_limit:
+        while retries < max_retries_with_rate_limit:
             try:
                 result = await self.provider.translate_batch(
                     batch, model=model, temperature=temperature, config_override=config_override
