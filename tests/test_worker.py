@@ -114,6 +114,7 @@ class TestProcessContentTranslationJob:
 
             with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
                 from subtitle_translator.api.models import SubtitleLine
+
                 mock_map.return_value = [SubtitleLine(position=1, line="Szia")]
 
                 job_id = await manager.submit_job(
@@ -161,7 +162,9 @@ class TestProcessContentTranslationJob:
 
     @pytest.mark.asyncio
     async def test_exception_sets_job_failed(self, manager, mock_translator):
-        with patch("subtitle_translator.queue.worker.BatchProcessor", side_effect=Exception("boom")):
+        with patch(
+            "subtitle_translator.queue.worker.BatchProcessor", side_effect=Exception("boom")
+        ):
             job_id = await manager.submit_job(
                 request_data={
                     "sourceLanguage": "en",
@@ -193,6 +196,7 @@ class TestProcessContentTranslationJob:
 
             with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
                 from subtitle_translator.api.models import SubtitleLine
+
                 mock_map.return_value = [SubtitleLine(position=1, line="Szia")]
 
                 job_id = await manager.submit_job(
@@ -281,7 +285,9 @@ class TestProcessFileTranslationJob:
         ]
         mock_translator._srt_parser.apply_translations.return_value = entries
         mock_translator._srt_parser.split_long_subtitles.return_value = entries
-        mock_translator._srt_parser.compose.return_value = "1\n00:00:01,000 --> 00:00:02,000\nSzia\n\n"
+        mock_translator._srt_parser.compose.return_value = (
+            "1\n00:00:01,000 --> 00:00:02,000\nSzia\n\n"
+        )
 
         mock_result = MagicMock()
         mock_result.success = True
@@ -350,7 +356,9 @@ class TestJobWorkerHandler:
         with patch("subtitle_translator.queue.worker.get_translator") as mock_get:
             translator = AsyncMock()
             mock_get.return_value = translator
-            with patch("subtitle_translator.queue.worker.process_content_translation_job") as mock_proc:
+            with patch(
+                "subtitle_translator.queue.worker.process_content_translation_job"
+            ) as mock_proc:
                 mock_proc.return_value = None
                 await job_worker_handler(manager, job_id, JobType.TRANSLATE_CONTENT)
                 mock_proc.assert_called_once_with(manager, job_id, translator)
@@ -370,7 +378,9 @@ class TestJobWorkerHandler:
         with patch("subtitle_translator.queue.worker.get_translator") as mock_get:
             translator = AsyncMock()
             mock_get.return_value = translator
-            with patch("subtitle_translator.queue.worker.process_file_translation_job") as mock_proc:
+            with patch(
+                "subtitle_translator.queue.worker.process_file_translation_job"
+            ) as mock_proc:
                 mock_proc.return_value = None
                 await job_worker_handler(manager, job_id, JobType.TRANSLATE_FILE)
                 mock_proc.assert_called_once_with(manager, job_id, translator)

@@ -94,19 +94,13 @@ class TestJobSubmission:
     @pytest.mark.asyncio
     async def test_submit_job_max_limit(self, manager):
         for _ in range(5):
-            await manager.submit_job(
-                request_data={}, job_type=JobType.TRANSLATE_CONTENT
-            )
+            await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         with pytest.raises(RuntimeError, match="Maximum job limit"):
-            await manager.submit_job(
-                request_data={}, job_type=JobType.TRANSLATE_CONTENT
-            )
+            await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
 
     @pytest.mark.asyncio
     async def test_submit_job_adds_to_queue(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         assert not manager.queue.empty()
 
 
@@ -115,9 +109,7 @@ class TestJobRetrieval:
 
     @pytest.mark.asyncio
     async def test_get_existing_job(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         assert manager.get_job(job_id) is not None
 
     def test_get_nonexistent_job(self, manager):
@@ -129,9 +121,7 @@ class TestJobStatusTransitions:
 
     @pytest.mark.asyncio
     async def test_set_job_processing(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         job = manager.get_job(job_id)
         assert job.status == JobStatus.PROCESSING
@@ -140,9 +130,7 @@ class TestJobStatusTransitions:
 
     @pytest.mark.asyncio
     async def test_set_job_completed(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         manager.set_job_completed(job_id, {"lines": [], "model_used": "test"})
         job = manager.get_job(job_id)
@@ -153,9 +141,7 @@ class TestJobStatusTransitions:
 
     @pytest.mark.asyncio
     async def test_set_job_failed(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         manager.set_job_failed(job_id, "Something went wrong")
         job = manager.get_job(job_id)
@@ -165,9 +151,7 @@ class TestJobStatusTransitions:
 
     @pytest.mark.asyncio
     async def test_cancel_queued_job(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         result = manager.cancel_job(job_id)
         assert result is True
         job = manager.get_job(job_id)
@@ -175,9 +159,7 @@ class TestJobStatusTransitions:
 
     @pytest.mark.asyncio
     async def test_cancel_processing_job_fails(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         result = manager.cancel_job(job_id)
         assert result is False
@@ -204,9 +186,7 @@ class TestUpdateProgress:
 
     @pytest.mark.asyncio
     async def test_update_progress_basic(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.update_progress(job_id, 50, "Halfway")
         job = manager.get_job(job_id)
         assert job.progress == 50
@@ -214,9 +194,7 @@ class TestUpdateProgress:
 
     @pytest.mark.asyncio
     async def test_update_progress_clamps(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.update_progress(job_id, 150)
         assert manager.get_job(job_id).progress == 100
         manager.update_progress(job_id, -10)
@@ -224,11 +202,11 @@ class TestUpdateProgress:
 
     @pytest.mark.asyncio
     async def test_update_progress_with_metrics(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.update_progress(
-            job_id, 50, "Processing",
+            job_id,
+            50,
+            "Processing",
             total_batches=10,
             completed_batches=5,
             completed_lines=100,
@@ -244,9 +222,7 @@ class TestUpdateProgress:
 
     @pytest.mark.asyncio
     async def test_update_progress_partial_metrics(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.update_progress(job_id, 25, tokens_used=1000)
         job = manager.get_job(job_id)
         assert job.tokens_used == 1000
@@ -259,9 +235,7 @@ class TestUpdateProgress:
 
     @pytest.mark.asyncio
     async def test_update_progress_preserves_message(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.update_progress(job_id, 25, "First")
         manager.update_progress(job_id, 50)  # empty message
         job = manager.get_job(job_id)
@@ -273,9 +247,7 @@ class TestDeleteJob:
 
     @pytest.mark.asyncio
     async def test_delete_completed_job(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         manager.set_job_completed(job_id, {})
         assert manager.delete_job(job_id) is True
@@ -283,33 +255,25 @@ class TestDeleteJob:
 
     @pytest.mark.asyncio
     async def test_delete_failed_job(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         manager.set_job_failed(job_id, "err")
         assert manager.delete_job(job_id) is True
 
     @pytest.mark.asyncio
     async def test_delete_cancelled_job(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.cancel_job(job_id)
         assert manager.delete_job(job_id) is True
 
     @pytest.mark.asyncio
     async def test_cannot_delete_queued_job(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         assert manager.delete_job(job_id) is False
 
     @pytest.mark.asyncio
     async def test_cannot_delete_processing_job(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         assert manager.delete_job(job_id) is False
 
@@ -434,9 +398,7 @@ class TestCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_expired_jobs(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         manager.set_job_completed(job_id, {})
         # Manually set completed_at to be past TTL
@@ -447,9 +409,7 @@ class TestCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_keeps_fresh_jobs(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         manager.set_job_completed(job_id, {})
         await manager._cleanup_expired_jobs()
@@ -457,9 +417,7 @@ class TestCleanup:
 
     @pytest.mark.asyncio
     async def test_cleanup_keeps_active_jobs(self, manager):
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.set_job_processing(job_id)
         await manager._cleanup_expired_jobs()
         assert manager.get_job(job_id) is not None
@@ -477,6 +435,7 @@ class TestWorkerLifecycle:
     async def test_start_with_handler(self, manager):
         async def dummy_handler(jm, jid, jt):
             pass
+
         manager.set_worker_handler(dummy_handler)
         await manager.start_workers()
         assert manager._workers_started
@@ -488,6 +447,7 @@ class TestWorkerLifecycle:
     async def test_start_workers_twice_warns(self, manager):
         async def dummy_handler(jm, jid, jt):
             pass
+
         manager.set_worker_handler(dummy_handler)
         await manager.start_workers()
         await manager.start_workers()  # should warn but not crash
@@ -505,14 +465,13 @@ class TestWorkerProcessing:
     @pytest.mark.asyncio
     async def test_worker_processes_job(self, manager):
         processed = []
+
         async def handler(jm, jid, jt):
             processed.append(jid)
             jm.set_job_completed(jid, {"done": True})
 
         manager.set_worker_handler(handler)
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         await manager.start_workers()
         # Wait for the job to be processed
         await asyncio.sleep(0.1)
@@ -528,9 +487,7 @@ class TestWorkerProcessing:
             raise ValueError("handler boom")
 
         manager.set_worker_handler(failing_handler)
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         await manager.start_workers()
         await asyncio.sleep(0.1)
         await manager.stop_workers()
@@ -545,9 +502,7 @@ class TestWorkerProcessing:
             pass
 
         manager.set_worker_handler(handler)
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         # Remove job before worker picks it up
         del manager.jobs[job_id]
         await manager.start_workers()
@@ -557,13 +512,12 @@ class TestWorkerProcessing:
     @pytest.mark.asyncio
     async def test_worker_skips_cancelled_job(self, manager):
         processed = []
+
         async def handler(jm, jid, jt):
             processed.append(jid)
 
         manager.set_worker_handler(handler)
-        job_id = await manager.submit_job(
-            request_data={}, job_type=JobType.TRANSLATE_CONTENT
-        )
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
         manager.cancel_job(job_id)
         await manager.start_workers()
         await asyncio.sleep(0.1)

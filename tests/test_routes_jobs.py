@@ -315,7 +315,9 @@ class TestSubmitContentJob:
         assert config.get("api_key") is None
 
     def test_submit_content_job_queue_full(self, client, mock_settings):
-        with patch.object(job_manager, "submit_job", side_effect=RuntimeError("Maximum job limit (100) reached")):
+        with patch.object(
+            job_manager, "submit_job", side_effect=RuntimeError("Maximum job limit (100) reached")
+        ):
             resp = client.post(
                 "/api/v1/jobs/translate/content",
                 json=_make_content_request(),
@@ -416,7 +418,9 @@ class TestSubmitFileJob:
             assert job.api_key_override == "sk-from-request"
 
     def test_submit_file_job_queue_full(self, client, mock_settings):
-        with patch.object(job_manager, "submit_job", side_effect=RuntimeError("Maximum job limit (100) reached")):
+        with patch.object(
+            job_manager, "submit_job", side_effect=RuntimeError("Maximum job limit (100) reached")
+        ):
             resp = client.post(
                 "/api/v1/jobs/translate/file",
                 json=_make_file_request(),
@@ -437,8 +441,10 @@ class TestGetJobStatus:
         resp = client.post(
             "/api/v1/jobs/translate/content",
             json=_make_content_request(
-                jobName="test-job", fileName="test.srt",
-                title="Test", mediaType="Movie",
+                jobName="test-job",
+                fileName="test.srt",
+                title="Test",
+                mediaType="Movie",
             ),
         )
         job_id = resp.json()["jobId"]
@@ -473,9 +479,14 @@ class TestGetJobStatus:
         job = job_manager.get_job(job_id)
         job_manager.set_job_processing(job_id)
         job_manager.update_progress(
-            job_id, 50, "Processing batch 5/10",
-            total_batches=10, completed_batches=5,
-            completed_lines=100, tokens_used=5000, total_cost=0.04,
+            job_id,
+            50,
+            "Processing batch 5/10",
+            total_batches=10,
+            completed_batches=5,
+            completed_lines=100,
+            tokens_used=5000,
+            total_cost=0.04,
         )
 
         resp = client.get(f"/api/v1/jobs/{job_id}")
@@ -714,7 +725,10 @@ class TestConfigEndpoints:
             assert "maxConcurrentJobs" in resp.json()["message"]
 
     def test_update_config_value_error(self, client, mock_settings):
-        with patch("subtitle_translator.api.routes.update_runtime_config", side_effect=ValueError("bad value")):
+        with patch(
+            "subtitle_translator.api.routes.update_runtime_config",
+            side_effect=ValueError("bad value"),
+        ):
             resp = client.put("/api/v1/config", json={"model": "bad"})
             assert resp.status_code == 400
             assert "invalid_config" in resp.json()["detail"]["error"]

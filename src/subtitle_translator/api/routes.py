@@ -56,12 +56,12 @@ TranslatorDep = Annotated[SubtitleTranslator, Depends(get_translator_dependency)
 async def health_check(translator: TranslatorDep) -> HealthResponse:
     """
     Health check endpoint.
-    
+
     Returns service status and configuration state.
     """
     settings = get_settings()
     openrouter_configured = bool(settings.openrouter_api_key)
-    
+
     # Optionally check if OpenRouter is actually reachable
     is_healthy = True
     if openrouter_configured:
@@ -87,12 +87,12 @@ async def health_check(translator: TranslatorDep) -> HealthResponse:
 async def list_models(translator: TranslatorDep) -> ModelsResponse:
     """
     List available models for translation.
-    
+
     Returns a list of recommended models with their capabilities and pricing.
     """
     settings = get_settings()
     models_data = await translator.get_available_models()
-    
+
     models = [
         ModelInfo(
             id=m["id"],
@@ -104,7 +104,7 @@ async def list_models(translator: TranslatorDep) -> ModelsResponse:
         )
         for m in models_data
     ]
-    
+
     return ModelsResponse(
         models=models,
         default_model=settings.openrouter_default_model,
@@ -132,43 +132,45 @@ async def translate_content(
 ) -> TranslateContentResponse:
     """
     Translate subtitle content.
-    
+
     This endpoint accepts subtitle lines and returns translated lines.
     It is compatible with the Lingarr API format for Bazarr integration.
-    
+
     The lines are processed in batches to handle large subtitle files efficiently.
-    
+
     Accepts optional `config` object with:
     - `apiKey`: OpenRouter API key (overrides environment variable)
     - `model`: Model to use for translation
     - `temperature`: Sampling temperature (0.0-2.0)
     """
     settings = get_settings()
-    
+
     # Log incoming request metadata (without actual content)
-    logger.info(f"API request: translate_content - "
-               f"sourceLanguage={request.sourceLanguage}, "
-               f"targetLanguage={request.targetLanguage}, "
-               f"lines={len(request.lines)}, "
-               f"title='{request.title or 'N/A'}', "
-               f"mediaType='{request.mediaType or 'N/A'}', "
-               f"model='{request.model or 'default'}', "
-               f"temperature={request.temperature or 'default'}")
-    
+    logger.info(
+        f"API request: translate_content - "
+        f"sourceLanguage={request.sourceLanguage}, "
+        f"targetLanguage={request.targetLanguage}, "
+        f"lines={len(request.lines)}, "
+        f"title='{request.title or 'N/A'}', "
+        f"mediaType='{request.mediaType or 'N/A'}', "
+        f"model='{request.model or 'default'}', "
+        f"temperature={request.temperature or 'default'}"
+    )
+
     if request.config:
         safe_config = {}
         for key, value in request.config.model_dump(exclude_none=True).items():
-            if 'key' in key.lower() or 'secret' in key.lower() or 'password' in key.lower():
-                safe_config[key] = '***' if value else None
+            if "key" in key.lower() or "secret" in key.lower() or "password" in key.lower():
+                safe_config[key] = "***" if value else None
             else:
                 safe_config[key] = value
         logger.info(f"API request config: {safe_config}")
-    
+
     # Check if API key is available (either from env or request config)
     has_api_key = bool(settings.openrouter_api_key)
     if request.config and request.config.api_key:
         has_api_key = True
-    
+
     if not has_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -198,7 +200,7 @@ async def translate_content(
                 model_used=result.model_used,
                 tokens_used=result.tokens_used,
             )
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -232,26 +234,26 @@ async def translate_file(
 ) -> TranslateFileResponse:
     """
     Translate an entire SRT file.
-    
+
     This endpoint accepts raw SRT content and returns the translated SRT file.
     It handles:
     - SRT parsing and validation
     - Batch processing for large files
     - RTL language support with directional markers
     - Line length optimization
-    
+
     Accepts optional `config` object with:
     - `apiKey`: OpenRouter API key (overrides environment variable)
     - `model`: Model to use for translation
     - `temperature`: Sampling temperature (0.0-2.0)
     """
     settings = get_settings()
-    
+
     # Check if API key is available (either from env or request config)
     has_api_key = bool(settings.openrouter_api_key)
     if request.config and request.config.api_key:
         has_api_key = True
-    
+
     if not has_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -292,7 +294,7 @@ async def translate_file(
                 tokens_used=result.tokens_used,
                 subtitle_count=result.subtitle_count,
             )
-        
+
         # Check for specific error types
         if "Invalid SRT" in (result.error or ""):
             raise HTTPException(
@@ -302,7 +304,7 @@ async def translate_file(
                     "message": result.error,
                 },
             )
-        
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -381,23 +383,23 @@ async def submit_translate_content_job(
 ) -> JobSubmitResponse:
     """
     Submit a content translation job to the async queue.
-    
+
     This endpoint accepts the same request format as /translate/content
     but processes it asynchronously. Use the returned jobId to poll
     for status and results.
-    
+
     Accepts optional `config` object with:
     - `apiKey`: OpenRouter API key (overrides environment variable)
     - `model`: Model to use for translation
     - `temperature`: Sampling temperature (0.0-2.0)
     """
     settings = get_settings()
-    
+
     # Check if API key is available (either from env or request config)
     has_api_key = bool(settings.openrouter_api_key)
     if request.config and request.config.api_key:
         has_api_key = True
-    
+
     if not has_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -406,15 +408,17 @@ async def submit_translate_content_job(
                 "message": "OpenRouter API key is not configured. Set OPENROUTER_API_KEY or pass apiKey in request config.",
             },
         )
-    
+
     try:
         # Log job submission metadata (without content)
         lines_count = len(request.lines) if request.lines else 0
-        logger.info(f"Submitting content translation job - "
-                   f"source={request.sourceLanguage}, target={request.targetLanguage}, "
-                   f"lines={lines_count}, "
-                   f"model={request.model or 'default'}, temperature={request.temperature or 'default'}")
-        
+        logger.info(
+            f"Submitting content translation job - "
+            f"source={request.sourceLanguage}, target={request.targetLanguage}, "
+            f"lines={lines_count}, "
+            f"model={request.model or 'default'}, temperature={request.temperature or 'default'}"
+        )
+
         request_data = request.model_dump()
         api_key_override = None
         if request_data.get("config") and request_data["config"].get("api_key"):
@@ -445,13 +449,13 @@ async def submit_translate_content_job(
 
         position = job_manager.get_queue_position(job_id)
         logger.info(f"Job {job_id}: Queued at position {position or 'N/A'}")
-        
+
         return JobSubmitResponse(
             jobId=job_id,
             status="queued",
             position=position,
         )
-        
+
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -482,23 +486,23 @@ async def submit_translate_file_job(
 ) -> JobSubmitResponse:
     """
     Submit a file translation job to the async queue.
-    
+
     This endpoint accepts the same request format as /translate/file
     but processes it asynchronously. Use the returned jobId to poll
     for status and results.
-    
+
     Accepts optional `config` object with:
     - `apiKey`: OpenRouter API key (overrides environment variable)
     - `model`: Model to use for translation
     - `temperature`: Sampling temperature (0.0-2.0)
     """
     settings = get_settings()
-    
+
     # Check if API key is available (either from env or request config)
     has_api_key = bool(settings.openrouter_api_key)
     if request.config and request.config.api_key:
         has_api_key = True
-    
+
     if not has_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -507,7 +511,7 @@ async def submit_translate_file_job(
                 "message": "OpenRouter API key is not configured. Set OPENROUTER_API_KEY or pass apiKey in request config.",
             },
         )
-    
+
     # Validate request
     if not request.content or not request.content.strip():
         raise HTTPException(
@@ -517,7 +521,7 @@ async def submit_translate_file_job(
                 "message": "SRT content is required",
             },
         )
-    
+
     try:
         request_data = request.model_dump()
         api_key_override = None
@@ -554,7 +558,7 @@ async def submit_translate_file_job(
             status="queued",
             position=position,
         )
-        
+
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -586,7 +590,7 @@ async def list_jobs(
 ) -> JobListResponse:
     """
     List all jobs in the queue.
-    
+
     Use the status query parameter to filter by job status.
     Results are sorted by creation time (newest first).
     """
@@ -604,12 +608,12 @@ async def list_jobs(
                     f"Valid values: {', '.join(s.value for s in JobStatus)}",
                 },
             )
-    
+
     jobs = job_manager.list_jobs(status_filter=job_status, limit=limit)
     stats = job_manager.get_stats()
-    
+
     job_responses = [_build_job_status_response(job) for job in jobs]
-    
+
     return JobListResponse(
         jobs=job_responses,
         total=stats["total"],
@@ -630,13 +634,13 @@ async def list_jobs(
 async def get_job_status(job_id: str) -> JobStatusResponse:
     """
     Get the status of a specific job.
-    
+
     When the job is completed, the result field will contain
     the translation output. When failed, the error field will
     contain the error message.
     """
     job = job_manager.get_job(job_id)
-    
+
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -645,7 +649,7 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
                 "message": f"Job {job_id} not found",
             },
         )
-    
+
     return _build_job_status_response(job)
 
 
@@ -654,8 +658,7 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
     response_model=JobDeleteResponse,
     summary="Cancel/Delete Job",
     description=(
-        "Cancel a queued job or delete a completed/failed job. "
-        "Processing jobs cannot be cancelled."
+        "Cancel a queued job or delete a completed/failed job. Processing jobs cannot be cancelled."
     ),
     responses={
         404: {"model": ErrorResponse, "description": "Job not found"},
@@ -664,13 +667,13 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
 async def cancel_or_delete_job(job_id: str) -> JobDeleteResponse:
     """
     Cancel a queued job or delete a completed job.
-    
+
     - Queued jobs will be cancelled
     - Completed/failed/cancelled jobs will be deleted
     - Processing jobs cannot be cancelled (returns current status)
     """
     job = job_manager.get_job(job_id)
-    
+
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -679,7 +682,7 @@ async def cancel_or_delete_job(job_id: str) -> JobDeleteResponse:
                 "message": f"Job {job_id} not found",
             },
         )
-    
+
     # Try to cancel if queued
     if job.status == JobStatus.QUEUED:
         job_manager.cancel_job(job_id)
@@ -688,16 +691,21 @@ async def cancel_or_delete_job(job_id: str) -> JobDeleteResponse:
             status=JobStatus.CANCELLED.value,
             message="Job cancelled successfully",
         )
-    
+
     # Try to delete if completed/failed/cancelled
-    if job.status in (JobStatus.COMPLETED, JobStatus.PARTIAL, JobStatus.FAILED, JobStatus.CANCELLED):
+    if job.status in (
+        JobStatus.COMPLETED,
+        JobStatus.PARTIAL,
+        JobStatus.FAILED,
+        JobStatus.CANCELLED,
+    ):
         job_manager.delete_job(job_id)
         return JobDeleteResponse(
             jobId=job_id,
             status="deleted",
             message="Job deleted successfully",
         )
-    
+
     # Processing jobs cannot be cancelled
     return JobDeleteResponse(
         jobId=job_id,
@@ -762,12 +770,12 @@ async def get_service_status(translator: TranslatorDep) -> ServiceStatusResponse
 async def get_config() -> ConfigResponse:
     """
     Get current configuration.
-    
+
     Returns all configuration values, with sensitive values (like API key) masked.
     """
     settings = get_settings()
     jobs = list(job_manager.jobs.values())
-    
+
     return ConfigResponse(
         model=settings.openrouter_default_model,
         temperature=settings.openrouter_temperature,
@@ -799,10 +807,10 @@ async def update_config(
 ) -> ConfigUpdateResponse:
     """
     Update runtime configuration.
-    
+
     Updates configuration values at runtime without restarting the service.
     Changes are stored in memory and will be lost on restart.
-    
+
     Available fields:
     - apiKey: OpenRouter API key
     - model: Default translation model
@@ -823,34 +831,34 @@ async def update_config(
         if request.apiKey is not None:
             update_runtime_config("openrouter_api_key", request.apiKey)
             updated_fields.append("apiKey")
-        
+
         if request.model is not None:
             update_runtime_config("openrouter_default_model", request.model)
             updated_fields.append("model")
-        
+
         if request.temperature is not None:
             update_runtime_config("openrouter_temperature", request.temperature)
             updated_fields.append("temperature")
-        
+
         if request.maxConcurrentJobs is not None:
             await job_manager.set_max_concurrent(request.maxConcurrentJobs)
             updated_fields.append("maxConcurrentJobs")
-        
+
         if request.parallelBatchesPerJob is not None:
             update_runtime_config("parallel_batches_per_job", request.parallelBatchesPerJob)
             updated_fields.append("parallelBatchesPerJob")
-        
+
         if not updated_fields:
             return ConfigUpdateResponse(
                 status="no_change",
                 message="No configuration fields provided",
             )
-        
+
         return ConfigUpdateResponse(
             status="updated",
             message=f"Updated: {', '.join(updated_fields)}",
         )
-        
+
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
