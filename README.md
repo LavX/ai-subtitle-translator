@@ -1,19 +1,23 @@
 # AI Subtitle Translator
 
-Subtitle translation microservice using LLMs via [OpenRouter](https://openrouter.ai/). Ships as a standalone API — built for [LavX's Bazarr fork](https://github.com/LavX/bazarr) but works with anything that speaks HTTP.
+LLM-powered subtitle translation API using [OpenRouter](https://openrouter.ai/). Translate SRT files and subtitle content through any OpenRouter-supported model (Gemini, Claude, Llama, GPT, Mistral, and more). Built as a standalone microservice for [LavX's Bazarr fork](https://github.com/LavX/bazarr), but works with any HTTP client.
+
+**Keywords:** subtitle translation API, SRT translator, AI subtitle translation, LLM translation service, OpenRouter translation, automated subtitle localization, Bazarr AI translation, multilingual subtitle converter
 
 [![CI](https://github.com/LavX/ai-subtitle-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/LavX/ai-subtitle-translator/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
-## What it does
+## Features
 
-- Translates SRT subtitle files or raw subtitle lines via REST API
-- Routes through OpenRouter to any supported LLM (Gemini, Claude, Llama, etc.)
-- Batches large files automatically — adapts batch size per model capability
-- Handles RTL languages (Arabic, Hebrew, Persian, etc.)
-- Async job queue for long-running translations
-- Retries with exponential backoff on failures
+- Translate SRT subtitle files or raw subtitle lines via REST API
+- Routes through OpenRouter to 300+ LLMs (Gemini, Claude, Llama, GPT, Mercury, Mistral, etc.)
+- Automatic batch sizing per model. Adapts to model context windows and retries with smaller batches on failure
+- RTL language support (Arabic, Hebrew, Persian, Urdu, etc.)
+- Async job queue with real-time progress tracking, cost reporting, and per-batch status updates
+- Dynamic reasoning detection. Fetches model capabilities from OpenRouter API, no hardcoded lists
+- Rate limit handling with exponential backoff, serialized retries, and staggered parallel requests
+- Per-request config overrides: model, temperature, API key, reasoning, parallel batch count
 
 ## Quick start
 
@@ -29,7 +33,7 @@ echo "OPENROUTER_API_KEY=sk-or-..." > .env
 docker compose up -d
 ```
 
-Service runs at `http://localhost:8765`. Docs at `/docs`.
+Service runs at `http://localhost:8765`. Interactive docs at `/docs`.
 
 ### Manual
 
@@ -40,23 +44,26 @@ export OPENROUTER_API_KEY=sk-or-...
 cd src && uvicorn subtitle_translator.main:app --host 0.0.0.0 --port 8765
 ```
 
-## API
+## API endpoints
 
-Full docs at `/docs` (Swagger) or `/redoc` when running.
+Full interactive docs at `/docs` (Swagger) or `/redoc` when running.
 
-| Method | Endpoint | What it does |
+| Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/health` | Health check |
-| `GET` | `/api/v1/models` | List available models |
+| `GET` | `/api/v1/models` | List available translation models |
+| `GET` | `/api/v1/status` | Service status and queue stats |
 | `GET` | `/api/v1/config` | Current configuration |
 | `PUT` | `/api/v1/config` | Update config at runtime |
-| `POST` | `/api/v1/translate/content` | Translate subtitle lines |
-| `POST` | `/api/v1/translate/file` | Translate an SRT file |
-| `POST` | `/api/v1/jobs/translate/content` | Async translation job |
-| `POST` | `/api/v1/jobs/translate/file` | Async SRT translation job |
-| `GET` | `/api/v1/jobs/{id}` | Job status / result |
+| `POST` | `/api/v1/translate/content` | Translate subtitle lines (synchronous) |
+| `POST` | `/api/v1/translate/file` | Translate SRT file (synchronous) |
+| `POST` | `/api/v1/jobs/translate/content` | Submit async translation job |
+| `POST` | `/api/v1/jobs/translate/file` | Submit async SRT translation job |
+| `GET` | `/api/v1/jobs` | List all jobs (filter by status) |
+| `GET` | `/api/v1/jobs/{id}` | Job status, progress, metrics, and result |
+| `DELETE` | `/api/v1/jobs/{id}` | Cancel or delete a job |
 
-### Translate content
+### Translate subtitle content
 
 ```bash
 curl -X POST http://localhost:8765/api/v1/translate/content \
@@ -67,39 +74,81 @@ curl -X POST http://localhost:8765/api/v1/translate/content \
     "title": "Breaking Bad",
     "lines": [
       {"position": 1, "line": "Say my name."},
-      {"position": 2, "line": "You're goddamn right."}
+      {"position": 2, "line": "You are goddamn right."}
     ]
   }'
 ```
 
-### Translate SRT file
+### Submit async translation job
 
 ```bash
-curl -X POST http://localhost:8765/api/v1/translate/file \
+curl -X POST http://localhost:8765/api/v1/jobs/translate/content \
   -H "Content-Type: application/json" \
   -d '{
-    "content": "1\n00:00:01,000 --> 00:00:04,000\nSay my name.\n\n2\n00:00:05,000 --> 00:00:08,000\nYou'\''re goddamn right.\n",
     "sourceLanguage": "en",
-    "targetLanguage": "hu"
+    "targetLanguage": "hu",
+    "title": "Breaking Bad S05E07",
+    "mediaType": "Episode",
+    "fileName": "breaking.bad.s05e07.srt",
+    "jobName": "bb-s05e07-hungarian",
+    "lines": [
+      {"position": 1, "line": "Say my name."}
+    ],
+    "config": {
+      "model": "anthropic/claude-haiku-4.5",
+      "temperature": 0.3,
+      "reasoning": {"effort": "high"},
+      "parallelBatches": 4
+    }
   }'
 ```
 
-### Per-request config override
+### Job status response
 
-Any translate endpoint accepts an optional `config` block to override model, temperature, API key, etc. per request:
+Poll `GET /api/v1/jobs/{id}` for live progress and metrics:
 
 ```json
 {
+  "jobId": "3f1318c0-...",
+  "status": "processing",
+  "progress": 66,
+  "message": "Translated 400/600 lines (4/6 batches)",
+  "jobName": "bb-s05e07-hungarian",
+  "fileName": "breaking.bad.s05e07.srt",
   "sourceLanguage": "en",
   "targetLanguage": "hu",
-  "lines": [...],
+  "title": "Breaking Bad S05E07",
+  "mediaType": "Episode",
+  "model": "anthropic/claude-haiku-4.5",
+  "totalLines": 600,
+  "totalBatches": 6,
+  "completedBatches": 4,
+  "completedLines": 400,
+  "tokensUsed": 25000,
+  "totalCost": 0.0084,
+  "elapsedSeconds": 12.5
+}
+```
+
+Job statuses: `queued` | `processing` | `completed` | `partial` | `failed` | `cancelled`
+
+### Per-request config override
+
+Every translate endpoint accepts an optional `config` block to override defaults:
+
+```json
+{
   "config": {
+    "apiKey": "sk-or-different-key",
     "model": "anthropic/claude-haiku-4.5",
     "temperature": 0.5,
-    "api_key": "sk-or-different-key"
+    "parallelBatches": 2,
+    "reasoning": {"effort": "high"}
   }
 }
 ```
+
+Reasoning effort levels: `xhigh`, `high`, `medium`, `low`, `minimal`, `none` (disables reasoning).
 
 ## Configuration
 
@@ -107,76 +156,96 @@ Set via environment variables or `.env` file:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENROUTER_API_KEY` | *(required)* | OpenRouter API key |
-| `OPENROUTER_DEFAULT_MODEL` | `amazon/nova-2-lite-v1:free` | Default LLM |
-| `OPENROUTER_TEMPERATURE` | `0.3` | Generation temperature |
-| `OPENROUTER_MAX_TOKENS` | `8000` | Max tokens per response |
-| `BATCH_SIZE` | `100` | Max lines per batch (auto-adjusted per model) |
-| `PARALLEL_BATCHES_PER_JOB` | `4` | Concurrent batches per job |
-| `MAX_RETRIES` | `3` | Retry attempts on failure |
-| `REQUEST_TIMEOUT` | `120.0` | Request timeout (seconds) |
-| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed origins |
-| `ADMIN_API_KEY` | *(empty)* | If set, required as `X-Admin-Key` header for PUT /config |
-| `HOST` | `0.0.0.0` | Server host |
+| `OPENROUTER_API_KEY` | *(required)* | Your OpenRouter API key |
+| `OPENROUTER_DEFAULT_MODEL` | `amazon/nova-2-lite-v1:free` | Default translation model |
+| `OPENROUTER_TEMPERATURE` | `0.3` | Sampling temperature |
+| `BATCH_SIZE` | `100` | Max subtitle lines per batch (auto-adjusted per model) |
+| `PARALLEL_BATCHES_PER_JOB` | `4` | Concurrent batches per translation job |
+| `MAX_RETRIES` | `3` | Retry attempts on failure (rate limits get 3 extra) |
+| `REQUEST_TIMEOUT` | `120.0` | HTTP request timeout in seconds |
+| `LOG_LEVEL` | `INFO` | Log level (`DEBUG` for full request/response logging) |
+| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed CORS origins |
+| `ADMIN_API_KEY` | *(empty)* | Required as `X-Admin-Key` header for PUT /config when set |
+| `HOST` | `0.0.0.0` | Server bind address |
 | `PORT` | `8765` | Server port |
 
 ## Adaptive batch sizing
 
-Not all models handle large batches well — some truncate output, return garbage, or timeout. The translator automatically adjusts batch sizes per model:
+Different LLMs handle different batch sizes. Small-context models choke on 100 lines, while large-context models handle them fine. The translator adjusts automatically:
 
-1. **Known limits** — small-context models get hardcoded smaller batches
-2. **Context-length heuristic** — estimates safe batch size from the model's context window
-3. **Adaptive retry** — if a batch fails, halves the size and retries. Remembers the safe size for future requests (in-memory, resets on restart)
+1. **Known limits** - small-context models get smaller default batches
+2. **Context-length heuristic** - estimates safe batch size from the model's context window
+3. **Adaptive retry** - if a batch fails, halves the size and retries. Remembers the safe size for future requests to the same model (in-memory, resets on restart)
 
-This means you can throw any model at it and it'll figure out the right batch size.
+You can use any OpenRouter model and the service will find the right batch size.
 
-## Tested models
+## Rate limit handling
 
-Models were tested through a battle royale elimination (5/10/20/30/40/50 lines, 80% threshold for Hungarian translation).
+When OpenRouter returns 429 Too Many Requests:
+- Retries up to 6 times with exponential backoff (5s, 10s, 20s, 30s cap)
+- Serializes retries across parallel batches so they don't all hit the API at once
+- Staggers initial parallel requests by 0.5s to spread the load
+- Reports `partial` status if some batches completed before retries ran out
 
-**Fast:** `meta-llama/llama-4-maverick` (3s, 92%) — best speed
-**Quality:** `anthropic/claude-haiku-4.5` (13s, 93%) — best accuracy
-**Free:** `amazon/nova-2-lite-v1:free` (17s, 95%) — best free option
-**Balanced:** `google/gemini-2.5-flash-preview-09-2025` (8.5s, 92%)
+## Reasoning support
 
-Full results available via `GET /api/v1/models`.
+Model reasoning capabilities are detected automatically from the OpenRouter `/models` API. No hardcoded model lists to maintain. When reasoning is requested:
+- Models supporting `effort` get `{"reasoning": {"effort": "high"}}`
+- Models supporting `max_tokens` get `{"reasoning": {"max_tokens": N}}`
+- `effort: "none"` disables reasoning entirely
+- `response_format: json_object` is skipped when reasoning is active (prevents single-object response bugs with certain models)
+
+## Tested models for subtitle translation
+
+Models tested through elimination rounds (5/10/20/30/40/50 subtitle lines, 80% accuracy threshold for Hungarian).
+
+| Model | Speed | Accuracy | Notes |
+|-------|-------|----------|-------|
+| `meta-llama/llama-4-maverick` | ~3s | 92% | Fastest |
+| `anthropic/claude-haiku-4.5` | ~13s | 93% | Best accuracy |
+| `amazon/nova-2-lite-v1:free` | ~17s | 95% | Best free model |
+| `google/gemini-2.5-flash-preview-09-2025` | ~8.5s | 92% | Good all-rounder |
+| `inception/mercury-2` | ~3s | ~90% | ~$0.10/episode, 580+ tokens/sec |
+
+Full model list with metadata: `GET /api/v1/models`
 
 ## Development
 
 ```bash
 pip install -e ".[dev]"
-pytest                    # run tests
+pytest                    # 206 tests
 ruff check src/ tests/    # lint
+ruff format src/ tests/   # format
 ```
 
 ## Project structure
 
 ```
 src/subtitle_translator/
-  main.py                 # FastAPI app
-  config.py               # Settings (env vars)
+  main.py                 # FastAPI application
+  config.py               # Settings from environment variables
   api/
-    routes.py             # API endpoints
-    models.py             # Request/response models
+    routes.py             # REST API endpoints
+    models.py             # Pydantic request/response models
   core/
     translator.py         # Translation orchestration
-    srt_parser.py         # SRT parsing/composing
-    batch_processor.py    # Batch processing + adaptive retry
+    srt_parser.py         # SRT file parsing and composing
+    batch_processor.py    # Parallel batch processing with adaptive retry
     batch_sizing.py       # Per-model batch size resolution
   providers/
-    base.py               # Abstract provider interface
-    openrouter.py         # OpenRouter implementation
+    base.py               # Abstract translation provider interface
+    openrouter.py         # OpenRouter API implementation
   queue/
-    job_manager.py        # Async job queue
-    worker.py             # Job worker
+    job_manager.py        # Async job queue with progress tracking
+    worker.py             # Background job worker
 ```
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 ## Links
 
-- [LavX](https://lavx.hu) — Enterprise AI solutions
-- [LavX's Bazarr fork](https://github.com/LavX/bazarr) — Automated subtitle management with AI translation
-- [OpenRouter](https://openrouter.ai/) — LLM routing API
+- [LavX](https://lavx.hu) - Enterprise AI solutions
+- [LavX's Bazarr fork](https://github.com/LavX/bazarr) - Automated subtitle management with AI translation
+- [OpenRouter](https://openrouter.ai/) - Multi-model LLM routing API
