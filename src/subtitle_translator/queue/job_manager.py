@@ -323,6 +323,8 @@ class JobManager:
             job.result = result
             job.error = error
             job.completed_at = datetime.now(UTC)
+            if job.total_batches and job.total_batches > 0:
+                job.progress = int((job.completed_batches / job.total_batches) * 100)
             job.message = f"Partial translation: {error}"
             logger.warning(f"Job {job_id} partially completed: {error}")
 
