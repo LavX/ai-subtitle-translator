@@ -1,5 +1,6 @@
 """OpenRouter API implementation for subtitle translation."""
 
+import asyncio
 import json
 import logging
 from typing import TYPE_CHECKING, Any, Optional
@@ -322,6 +323,7 @@ class OpenRouterProvider(TranslationProvider):
         self._client: httpx.AsyncClient | None = None
         self._model_params_cache: dict[str, list[str]] = {}
         self._model_params_fetched: bool = False
+        self._model_params_lock: asyncio.Lock = asyncio.Lock()
 
     @property
     def provider_name(self) -> str:
@@ -457,30 +459,35 @@ class OpenRouterProvider(TranslationProvider):
         """Fetch and cache supported_parameters for all models from OpenRouter API."""
         if self._model_params_fetched:
             return
-        try:
-            # Use a plain client without auth headers — /models is a public endpoint
-            async with httpx.AsyncClient(
-                base_url=self.settings.openrouter_api_base,
-                timeout=httpx.Timeout(15.0),
-            ) as plain_client:
-                response = await plain_client.get("/models")
-            if response.status_code == 200:
-                data = response.json()
-                for model in data.get("data", []):
-                    model_id = model.get("id", "")
-                    params = model.get("supported_parameters", [])
-                    if model_id and params:
-                        self._model_params_cache[model_id] = params
-                logger.info(
-                    f"Cached supported_parameters for {len(self._model_params_cache)} models from OpenRouter API"
-                )
-            else:
-                logger.warning(
-                    f"Failed to fetch models from OpenRouter API: {response.status_code}"
-                )
-        except Exception as e:
-            logger.warning(f"Failed to fetch model params from OpenRouter API: {e}")
-        self._model_params_fetched = True
+        async with self._model_params_lock:
+            # Double-check after acquiring lock
+            if self._model_params_fetched:
+                return
+            try:
+                # Use a plain client without auth — /models is a public endpoint
+                async with httpx.AsyncClient(
+                    base_url=self.settings.openrouter_api_base,
+                    timeout=httpx.Timeout(15.0),
+                ) as plain_client:
+                    response = await plain_client.get("/models")
+                if response.status_code == 200:
+                    data = response.json()
+                    for model in data.get("data", []):
+                        model_id = model.get("id", "")
+                        params = model.get("supported_parameters", [])
+                        if model_id and params:
+                            self._model_params_cache[model_id] = params
+                    logger.info(
+                        f"Cached supported_parameters for "
+                        f"{len(self._model_params_cache)} models from OpenRouter API"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to fetch models from OpenRouter API: {response.status_code}"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to fetch model params from OpenRouter API: {e}")
+            self._model_params_fetched = True
 
     async def _get_reasoning_type(self, model_id: str) -> str | None:
         """

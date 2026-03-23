@@ -127,7 +127,6 @@ async def process_content_translation_job(
 
         if not result.success:
             failed_batches = [r for r in result.batch_results if not r.success]
-            [r for r in result.batch_results if r.success]
             error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
 
             # Report as partial if we have some results, otherwise fail
