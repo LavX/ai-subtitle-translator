@@ -453,6 +453,7 @@ class JobManager:
             "queued": 0,
             "processing": 0,
             "completed": 0,
+            "partial": 0,
             "failed": 0,
             "cancelled": 0,
         }
