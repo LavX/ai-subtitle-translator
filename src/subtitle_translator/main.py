@@ -79,7 +79,7 @@ def create_app() -> FastAPI:
             "Originally created for Bazarr but designed as a flexible API for any integration. "
             "Powered by OpenRouter for access to multiple AI models."
         ),
-        version="1.0.0",
+        version="1.2.0",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",

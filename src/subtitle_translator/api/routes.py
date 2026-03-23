@@ -72,7 +72,7 @@ async def health_check(translator: TranslatorDep) -> HealthResponse:
 
     return HealthResponse(
         status="healthy" if is_healthy else "unhealthy",
-        version="1.0.0",
+        version="1.2.0",
         openrouter_configured=openrouter_configured,
     )
 
@@ -743,7 +743,7 @@ async def get_service_status(translator: TranslatorDep) -> ServiceStatusResponse
 
     return ServiceStatusResponse(
         service="ai-subtitle-translator",
-        version="1.0.0",
+        version="1.2.0",
         healthy=is_healthy,
         config={
             "model": settings.openrouter_default_model,
