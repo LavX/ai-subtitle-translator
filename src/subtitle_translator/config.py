@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     job_queue_max_jobs: int = 500  # Max jobs in memory (increased for high-throughput testing)
     job_queue_ttl_hours: int = 1  # TTL for completed/failed jobs
 
+    # Encryption
+    encryption_enabled: bool = True
+    encryption_key: str = ""  # 64-char hex AES-256 key, overrides key file
+    encryption_key_file: str = "./data/encryption.key"
+
+    # Persistence
+    db_path: str = "./data/jobs.db"
+    job_retention_hours: int = 24
+
     # Admin API key for protecting config endpoints (optional)
     admin_api_key: str = ""
 
