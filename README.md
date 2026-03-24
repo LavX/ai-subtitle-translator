@@ -74,6 +74,7 @@ Full interactive docs at `/docs` (Swagger) or `/redoc` when running.
 | `GET` | `/api/v1/jobs` | List all jobs (filter by status) |
 | `GET` | `/api/v1/jobs/{id}` | Job status, progress, metrics, and result |
 | `DELETE` | `/api/v1/jobs/{id}` | Cancel or delete a job |
+| `POST` | `/api/v1/test` | Test encryption and API key validity |
 
 ### Translate subtitle content
 
@@ -206,27 +207,27 @@ The data directory contains:
 
 ## API key encryption
 
-API keys sent between Bazarr and the translator can be encrypted in transit using AES-256-GCM with a pre-shared key. This prevents API keys from being visible in plaintext on the network, even over HTTP.
+API keys sent between clients and the translator can be encrypted in transit using AES-256-GCM with a pre-shared key. This prevents API keys from being visible in plaintext on the network, even over HTTP.
 
 ### How it works
 
-1. On first startup, the translator generates an encryption key and prints it to the logs:
+1. On first startup, the translator generates an encryption key and saves it to `/app/data/encryption.key`
+2. Read the key: `docker exec ai-subtitle-translator cat /app/data/encryption.key`
+3. Paste the 64-character hex key into Bazarr's AI Subtitle Translator settings
+4. Bazarr encrypts the OpenRouter API key before sending it in requests
+5. The translator decrypts it on receipt
 
+Encrypted API keys use the format `enc:base64data`. Plaintext keys are accepted by default. Set `ENCRYPTION_STRICT=true` to require encryption on all requests.
+
+### Test encryption
+
+```bash
+curl -X POST http://localhost:8765/api/v1/test \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey": "enc:your-encrypted-key-here"}'
 ```
-======================================================================
-NEW ENCRYPTION KEY GENERATED
-Key: e2c65e79252379c1da0874f9d0928c6194fbc5e5460e3ab4047860560a2aa597
-Copy this key to your Bazarr AI Subtitle Translator settings.
-Saved to: /app/data/encryption.key
-This key will only be shown in full once.
-======================================================================
-```
 
-2. Copy this key to Bazarr's AI Subtitle Translator provider settings
-3. Bazarr encrypts the OpenRouter API key before sending it in requests
-4. The translator decrypts it on receipt
-
-Encrypted API keys use the format `enc:base64data`. Plaintext keys are still accepted for backward compatibility.
+Returns encryption status and OpenRouter API key validation in one call.
 
 ### Regenerate key
 
