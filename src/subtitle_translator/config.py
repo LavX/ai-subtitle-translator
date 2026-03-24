@@ -46,10 +46,10 @@ class Settings(BaseSettings):
     # Encryption
     encryption_enabled: bool = True
     encryption_key: str = ""  # 64-char hex AES-256 key, overrides key file
-    encryption_key_file: str = "./data/encryption.key"
+    encryption_key_file: str = "/app/data/encryption.key"
 
     # Persistence
-    db_path: str = "./data/jobs.db"
+    db_path: str = "/app/data/jobs.db"
     job_retention_hours: int = 24
 
     # Admin API key for protecting config endpoints (optional)
