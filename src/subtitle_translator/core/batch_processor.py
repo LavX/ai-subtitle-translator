@@ -363,53 +363,6 @@ class BatchProcessor:
             retries=total_retries,
         )
 
-    async def _process_batch_group(
-        self,
-        batch_group: list[tuple[int, list[dict[str, str]]]],
-        source_language: str,
-        target_language: str,
-        context_title: str | None,
-        context_media_type: str | None,
-        model: str | None,
-        temperature: float | None,
-        config_override: Optional["TranslationConfig"],
-    ) -> list[BatchResult]:
-        """
-        Process a group of batches in parallel.
-
-        Args:
-            batch_group: List of (batch_index, batch_lines) tuples
-            source_language: Source language code
-            target_language: Target language code
-            context_title: Optional media title for context
-            context_media_type: Optional media type (Episode/Movie)
-            model: Optional model override
-            temperature: Optional temperature override
-            config_override: Optional per-request configuration override
-
-        Returns:
-            List of BatchResults in the same order as input
-        """
-        tasks = []
-        for batch_index, batch_lines in batch_group:
-            batch = TranslationBatch(
-                lines=batch_lines,
-                source_language=source_language,
-                target_language=target_language,
-                context_title=context_title,
-                context_media_type=context_media_type,
-            )
-            task = self.process_batch(
-                batch,
-                batch_index=batch_index,
-                model=model,
-                temperature=temperature,
-                config_override=config_override,
-            )
-            tasks.append(task)
-
-        return await asyncio.gather(*tasks)
-
     async def process_all_batches(
         self,
         lines: list[dict[str, str]],

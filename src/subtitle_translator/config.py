@@ -187,14 +187,16 @@ def get_runtime_overrides() -> dict[str, Any]:
 
 def clear_runtime_overrides() -> None:
     """Clear all runtime configuration overrides."""
-    global _runtime_overrides
+    global _runtime_overrides, _overridden_settings
     with _settings_lock:
         _runtime_overrides = {}
+        _overridden_settings = None
 
 
 def reset_settings() -> None:
     """Reset settings instance to force reload from environment."""
-    global _settings, _runtime_overrides
+    global _settings, _runtime_overrides, _overridden_settings
     with _settings_lock:
         _settings = None
         _runtime_overrides = {}
+        _overridden_settings = None

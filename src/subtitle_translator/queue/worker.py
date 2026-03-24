@@ -71,12 +71,11 @@ async def process_content_translation_job(
             elif not config_override.api_key:
                 config_override.api_key = job.api_key_override
 
-        # Log API key tracking (masked)
+        # Log API key source (no key material)
         if config_override and config_override.api_key:
-            masked_key = f"...{config_override.api_key[-4:]}"
-            logger.info(f"Job {job_id}: Using API key from config: {masked_key}")
+            logger.debug(f"Job {job_id}: Using per-request API key")
         else:
-            logger.info(f"Job {job_id}: No API key in config_override, will use env default")
+            logger.debug(f"Job {job_id}: Using default API key")
 
         # Log reasoning and provider settings if configured
         if config_override and (config_override.reasoning or config_override.use_thinking_variant):
@@ -236,12 +235,11 @@ async def process_file_translation_job(
                     safe_config[key] = value
             logger.info(f"Job {job_id}: File translation config: {safe_config}")
 
-        # Debug log for API key tracking (masked)
+        # Log API key source (no key material)
         if config_override and config_override.api_key:
-            masked_key = f"...{config_override.api_key[-4:]}"
-            logger.debug(f"Job {job_id}: Using API key from config: {masked_key}")
+            logger.debug(f"Job {job_id}: Using per-request API key")
         else:
-            logger.warning(f"Job {job_id}: No API key in config_override, will use env default")
+            logger.debug(f"Job {job_id}: Using default API key")
 
         if not content or not content.strip():
             job_manager.set_job_failed(job_id, "SRT content is required")

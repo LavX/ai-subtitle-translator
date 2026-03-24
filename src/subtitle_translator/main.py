@@ -8,16 +8,18 @@ from datetime import timedelta
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from subtitle_translator import __version__
 from subtitle_translator.api.routes import (
     api_router,
     config_router,
     health_router,
     jobs_router,
+    set_auth_token,
     set_crypto_key,
 )
 from subtitle_translator.config import get_settings
 from subtitle_translator.core.translator import close_translator
-from subtitle_translator.crypto import load_or_generate_key
+from subtitle_translator.crypto import derive_auth_token, load_or_generate_key
 from subtitle_translator.queue.job_manager import job_manager
 from subtitle_translator.queue.job_store import JobStore
 from subtitle_translator.queue.worker import job_worker_handler
@@ -81,6 +83,15 @@ async def lifespan(app: FastAPI):
             logger.warning("ENCRYPTION_STRICT is set but encryption is disabled. Strict mode has no effect.")
     set_crypto_key(crypto_key)
 
+    # Auth token setup (derived from encryption key)
+    if crypto_key:
+        auth_token = derive_auth_token(crypto_key)
+        set_auth_token(auth_token)
+        logger.info("Auth token derived from encryption key (X-Auth-Token header required)")
+    else:
+        set_auth_token(None)
+        logger.warning("No encryption key, auth token disabled. All endpoints are open.")
+
     # Job persistence setup
     store = JobStore(db_path=settings.db_path, crypto_key=crypto_key)
     job_manager.set_store(store)
@@ -123,7 +134,7 @@ def create_app() -> FastAPI:
             "Originally created for Bazarr but designed as a flexible API for any integration. "
             "Powered by OpenRouter for access to multiple AI models."
         ),
-        version="1.2.0",
+        version=__version__,
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",

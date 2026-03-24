@@ -24,11 +24,11 @@ def regenerate_key():
     key = generate_key()
 
     os.makedirs(os.path.dirname(key_path) or ".", exist_ok=True)
-    with open(key_path, "w") as f:
+    fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         f.write(key.hex())
-    os.chmod(key_path, 0o600)
 
-    print(f"New encryption key generated: {key.hex()}")
+    print("New encryption key generated.")
     print(f"Saved to: {key_path}")
     print("Share this key with Bazarr for encrypted API key transport.")
 

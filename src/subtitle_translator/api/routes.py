@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
+from subtitle_translator import __version__
 from subtitle_translator.api.models import (
     ConfigResponse,
     ConfigUpdateRequest,
@@ -20,6 +21,7 @@ from subtitle_translator.api.models import (
     ModelInfo,
     ModelsResponse,
     ServiceStatusResponse,
+    TestConnectionRequest,
     TranslateContentRequest,
     TranslateContentResponse,
     TranslateFileRequest,
@@ -32,11 +34,37 @@ from subtitle_translator.queue.job_manager import Job, JobStatus, JobType, job_m
 # Crypto key set by main.py on startup (None = encryption disabled)
 _crypto_key: bytes | None = None
 
+# Auth token derived from encryption key (None = auth disabled)
+_auth_token: str | None = None
+
 
 def set_crypto_key(key: bytes | None) -> None:
     """Set the encryption key for API key decryption."""
     global _crypto_key
     _crypto_key = key
+
+
+def set_auth_token(token: str | None) -> None:
+    """Set the auth token derived from the encryption key."""
+    global _auth_token
+    _auth_token = token
+
+
+def _verify_auth_token(x_auth_token: Annotated[str | None, Header()] = None) -> None:
+    """Verify the X-Auth-Token header when auth is enabled.
+
+    Skipped when encryption is disabled (no key = no token).
+    """
+    if _auth_token is None:
+        return
+    if not x_auth_token or not hmac.compare_digest(x_auth_token, _auth_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "error": "unauthorized",
+                "message": "Invalid or missing X-Auth-Token header",
+            },
+        )
 
 
 def _decrypt_api_key(api_key: str) -> str:
@@ -77,10 +105,13 @@ def _decrypt_api_key(api_key: str) -> str:
 
 logger = logging.getLogger(__name__)
 
+# Auth dependency for protected endpoints
+AuthDep = Depends(_verify_auth_token)
+
 # Create routers
 health_router = APIRouter(tags=["Health"])
 api_router = APIRouter(prefix="/api/v1", tags=["Translation"])
-jobs_router = APIRouter(prefix="/api/v1/jobs", tags=["Jobs"])
+jobs_router = APIRouter(prefix="/api/v1/jobs", tags=["Jobs"], dependencies=[AuthDep])
 config_router = APIRouter(prefix="/api/v1", tags=["Configuration"])
 
 
@@ -119,7 +150,7 @@ async def health_check(translator: TranslatorDep) -> HealthResponse:
 
     return HealthResponse(
         status="healthy" if is_healthy else "unhealthy",
-        version="1.2.0",
+        version=__version__,
         openrouter_configured=openrouter_configured,
     )
 
@@ -175,6 +206,7 @@ async def list_models(translator: TranslatorDep) -> ModelsResponse:
 async def translate_content(
     request: TranslateContentRequest,
     translator: TranslatorDep,
+    _auth: None = AuthDep,
 ) -> TranslateContentResponse:
     """
     Translate subtitle content.
@@ -277,6 +309,7 @@ async def translate_content(
 async def translate_file(
     request: TranslateFileRequest,
     translator: TranslatorDep,
+    _auth: None = AuthDep,
 ) -> TranslateFileResponse:
     """
     Translate an entire SRT file.
@@ -798,7 +831,7 @@ async def get_service_status(translator: TranslatorDep) -> ServiceStatusResponse
 
     return ServiceStatusResponse(
         service="ai-subtitle-translator",
-        version="1.2.0",
+        version=__version__,
         healthy=is_healthy,
         config={
             "model": settings.openrouter_default_model,
@@ -932,7 +965,8 @@ async def update_config(
     ),
 )
 async def test_connection(
-    request: dict,
+    request: TestConnectionRequest,
+    _auth: None = AuthDep,
 ) -> dict:
     """
     Test encryption decryption and OpenRouter API key validity.
@@ -945,15 +979,11 @@ async def test_connection(
     """
     import httpx
 
-    api_key = request.get("apiKey", "")
+    api_key = request.apiKey
     results: dict = {
         "encryption": None,
         "apiKey": None,
     }
-
-    if not api_key:
-        results["apiKey"] = {"status": "error", "message": "apiKey is required"}
-        return results
 
     # Decrypt API key if encrypted
     actual_key = api_key

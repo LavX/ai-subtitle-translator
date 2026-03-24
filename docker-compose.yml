@@ -24,6 +24,8 @@ services:
       # App identification for OpenRouter analytics
       - APP_NAME=${APP_NAME:-ai-subtitle-translator}
       - APP_URL=${APP_URL:-https://lavx.hu}
+    volumes:
+      - translator-data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
@@ -40,3 +42,6 @@ services:
 networks:
   default:
     name: ai-subtitle-translator-network
+
+volumes:
+  translator-data:

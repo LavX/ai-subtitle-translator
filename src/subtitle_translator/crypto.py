@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 _NONCE_SIZE = 12
 _KEY_SIZE = 32
 _HEX_KEY_LEN = _KEY_SIZE * 2  # 64 hex chars
+_AUTH_LABEL = b"subtitle-translator-auth-v1"
 
 
 def generate_key() -> bytes:
@@ -66,6 +67,17 @@ def decrypt(ciphertext: str, key: bytes) -> str:
         raise ValueError(f"decryption failed (wrong key or tampered data): {exc}") from exc
 
     return plaintext_bytes.decode()
+
+
+def derive_auth_token(key: bytes) -> str:
+    """Derive a hex auth token from the encryption key via HMAC-SHA256.
+
+    This lets clients authenticate without sending the raw encryption key
+    as a header. Both sides compute the same HMAC over a fixed label.
+    """
+    import hmac
+    import hashlib
+    return hmac.new(key, _AUTH_LABEL, hashlib.sha256).hexdigest()
 
 
 def load_or_generate_key(key_value: str, key_file_path: str) -> tuple[bytes, bool]:

@@ -715,14 +715,8 @@ class OpenRouterProvider(TranslationProvider):
                 )
             )
             # Debug logging for API key tracking
-            if config_override.api_key:
-                logger.debug(
-                    f"Using API key from config_override: ...{config_override.api_key[-4:]}"
-                )
-            else:
-                logger.warning(
-                    f"config_override exists but api_key is None/empty. config_override fields: api_key={config_override.api_key is not None}, model={config_override.model}"
-                )
+            if not config_override.api_key:
+                logger.debug("config_override present but api_key is empty, using default")
         else:
             api_key = self.settings.openrouter_api_key
             model_to_use = model or self.settings.openrouter_default_model
@@ -832,9 +826,7 @@ class OpenRouterProvider(TranslationProvider):
                 headers = self.settings.get_openrouter_headers(
                     api_key_override=config_override.api_key
                 )
-                logger.info(
-                    f"Making request with per-request API key: ...{config_override.api_key[-4:]} Auth header set: {'Authorization' in headers}"
-                )
+                logger.debug("Making request with per-request API key")
                 async with httpx.AsyncClient(
                     base_url=self.settings.openrouter_api_base,
                     headers=headers,
@@ -846,9 +838,7 @@ class OpenRouterProvider(TranslationProvider):
                     self._validate_and_warn_unchanged(batch.lines, result.translations)
                     return result
             else:
-                logger.info(
-                    f"Making request with default client (env API key configured: {bool(self.settings.openrouter_api_key)})"
-                )
+                logger.debug("Making request with default API key")
                 response = await self.client.post("/chat/completions", json=payload)
                 result = await self._process_response(response, model_to_use)
                 # Perform safety validation

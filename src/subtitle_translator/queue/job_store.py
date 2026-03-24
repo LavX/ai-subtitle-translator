@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -120,8 +121,9 @@ class JobStore:
         """
         self._crypto_key = crypto_key
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(db_path)
+        self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._lock = threading.Lock()
         self._init_schema()
         # Restrict DB file permissions (contains encrypted API keys)
         try:
@@ -161,77 +163,81 @@ class JobStore:
 
         result_json = json.dumps(job.result) if job.result is not None else None
 
-        with self._conn:
-            self._conn.execute(
-                """
-                INSERT OR REPLACE INTO jobs (
-                    id, job_type, status, progress, message,
-                    request_data, api_key_override, result, error,
-                    created_at, started_at, completed_at,
-                    job_name, file_name, source_language, target_language,
-                    title, media_type, model,
-                    total_lines, total_batches, completed_batches,
-                    completed_lines, tokens_used, total_cost
-                ) VALUES (
-                    ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?, ?,
-                    ?, ?, ?,
-                    ?, ?, ?
+        with self._lock:
+            with self._conn:
+                self._conn.execute(
+                    """
+                    INSERT OR REPLACE INTO jobs (
+                        id, job_type, status, progress, message,
+                        request_data, api_key_override, result, error,
+                        created_at, started_at, completed_at,
+                        job_name, file_name, source_language, target_language,
+                        title, media_type, model,
+                        total_lines, total_batches, completed_batches,
+                        completed_lines, tokens_used, total_cost
+                    ) VALUES (
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?
+                    )
+                    """,
+                    (
+                        job.id,
+                        job.job_type.value,
+                        job.status.value,
+                        job.progress,
+                        job.message,
+                        json.dumps(job.request_data),
+                        api_key,
+                        result_json,
+                        job.error,
+                        _dt_to_str(job.created_at),
+                        _dt_to_str(job.started_at),
+                        _dt_to_str(job.completed_at),
+                        job.job_name,
+                        job.file_name,
+                        job.source_language,
+                        job.target_language,
+                        job.title,
+                        job.media_type,
+                        job.model,
+                        job.total_lines,
+                        job.total_batches,
+                        job.completed_batches,
+                        job.completed_lines,
+                        job.tokens_used,
+                        job.total_cost,
+                    ),
                 )
-                """,
-                (
-                    job.id,
-                    job.job_type.value,
-                    job.status.value,
-                    job.progress,
-                    job.message,
-                    json.dumps(job.request_data),
-                    api_key,
-                    result_json,
-                    job.error,
-                    _dt_to_str(job.created_at),
-                    _dt_to_str(job.started_at),
-                    _dt_to_str(job.completed_at),
-                    job.job_name,
-                    job.file_name,
-                    job.source_language,
-                    job.target_language,
-                    job.title,
-                    job.media_type,
-                    job.model,
-                    job.total_lines,
-                    job.total_batches,
-                    job.completed_batches,
-                    job.completed_lines,
-                    job.tokens_used,
-                    job.total_cost,
-                ),
-            )
         logger.debug("Saved job %s (status=%s)", job.id, job.status.value)
 
     def load_active_jobs(self) -> list[Job]:
         """Return all jobs with status QUEUED or PROCESSING."""
-        rows = self._conn.execute(
-            "SELECT * FROM jobs WHERE status IN (?, ?) ORDER BY created_at ASC",
-            (JobStatus.QUEUED.value, JobStatus.PROCESSING.value),
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM jobs WHERE status IN (?, ?) ORDER BY created_at ASC",
+                (JobStatus.QUEUED.value, JobStatus.PROCESSING.value),
+            ).fetchall()
         return [_row_to_job(row, self._crypto_key) for row in rows]
 
     def load_all_jobs(self, limit: int = 100) -> list[Job]:
         """Return all jobs ordered by created_at descending."""
-        rows = self._conn.execute(
-            "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
         return [_row_to_job(row, self._crypto_key) for row in rows]
 
     def delete_job(self, job_id: str) -> None:
         """Delete a job by ID."""
-        with self._conn:
-            self._conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        with self._lock:
+            with self._conn:
+                self._conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         logger.debug("Deleted job %s", job_id)
 
     def cleanup_expired(self, retention_hours: int) -> int:
@@ -249,11 +255,12 @@ class JobStore:
             JobStatus.CANCELLED.value,
         )
         placeholders = ",".join("?" * len(terminal_statuses))
-        with self._conn:
-            cursor = self._conn.execute(
-                f"DELETE FROM jobs WHERE status IN ({placeholders}) AND completed_at < ?",
-                (*terminal_statuses, cutoff_str),
-            )
+        with self._lock:
+            with self._conn:
+                cursor = self._conn.execute(
+                    f"DELETE FROM jobs WHERE status IN ({placeholders}) AND completed_at < ?",
+                    (*terminal_statuses, cutoff_str),
+                )
         count = cursor.rowcount
         if count:
             logger.info("cleanup_expired: removed %d job(s) older than %dh", count, retention_hours)
@@ -261,5 +268,6 @@ class JobStore:
 
     def close(self) -> None:
         """Close the underlying database connection."""
-        self._conn.close()
+        with self._lock:
+            self._conn.close()
         logger.debug("JobStore closed")

@@ -363,6 +363,12 @@ class ConfigUpdateResponse(BaseModel):
     message: str = Field(default="Configuration updated", description="Status message")
 
 
+class TestConnectionRequest(BaseModel):
+    """Request model for testing encryption and API key validity."""
+
+    apiKey: str = Field(..., min_length=1, description="API key to test (plaintext or enc: encrypted)")
+
+
 class ServiceStatusResponse(BaseModel):
     """Response model for service status endpoint."""
 
