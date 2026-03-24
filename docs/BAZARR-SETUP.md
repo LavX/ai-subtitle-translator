@@ -187,6 +187,6 @@ docker exec ai-subtitle-translator cat /app/data/encryption.key
 ## Links
 
 - [AI Subtitle Translator GitHub](https://github.com/LavX/ai-subtitle-translator)
-- [Bazarr++](https://github.com/LavX/Bazarr+)
+- [Bazarr+](https://github.com/LavX/Bazarr)
 - [OpenRouter](https://openrouter.ai/) (get your API key here)
 - [Full API docs](http://localhost:8765/docs) (when service is running)
