@@ -68,41 +68,36 @@ def decrypt(ciphertext: str, key: bytes) -> str:
     return plaintext_bytes.decode()
 
 
-def load_or_generate_key(env_key: str, key_file_path: str) -> tuple[bytes, bool]:
-    """Load an AES-256 key from an env variable, a file, or generate a new one.
+def load_or_generate_key(key_value: str, key_file_path: str) -> tuple[bytes, bool]:
+    """Load an AES-256 key from a direct value, a file, or generate a new one.
 
     Resolution order:
-    1. If the environment variable *env_key* is set and non-empty, validate
-       that it is a 64-character hex string and return the decoded bytes.
-    2. Elif *key_file_path* exists and contains a valid 64-char hex string,
-       load and return the decoded bytes.
-    3. Otherwise generate a new key, write its hex representation to
-       *key_file_path* (creating parent directories as needed, chmod 0o600),
-       and return the key.
+    1. If *key_value* is non-empty, validate as 64-char hex, return decoded bytes.
+    2. Elif *key_file_path* exists with valid 64-char hex, load and return.
+    3. Otherwise generate a new key, write to *key_file_path* (chmod 0o600).
 
     Returns:
         Tuple of (key_bytes, was_generated). was_generated is True only when
         a brand new key was created (case 3).
 
     Raises:
-        ValueError: if the env variable or file contains an invalid key.
+        ValueError: if the value or file contains an invalid key.
     """
-    env_value = os.environ.get(env_key, "")
-    if env_value:
-        return _parse_hex_key(env_value, source=f"environment variable {env_key!r}"), False
+    if key_value:
+        return _parse_hex_key(key_value, source="ENCRYPTION_KEY"), False
 
     key_path = Path(key_file_path)
     if key_path.exists():
         file_value = key_path.read_text().strip()
         return _parse_hex_key(file_value, source=f"key file {key_file_path!r}"), False
 
-    logger.info(
-        "No existing key found; generating a new AES-256 key and saving to %s", key_file_path
-    )
+    logger.info("Generating new encryption key, saving to %s", key_file_path)
     key = generate_key()
     key_path.parent.mkdir(parents=True, exist_ok=True)
-    key_path.write_text(key.hex())
-    os.chmod(key_path, 0o600)
+    # Write with restricted permissions from the start (no race window)
+    fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(key.hex())
     return key, True
 
 

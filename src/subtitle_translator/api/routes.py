@@ -1,5 +1,6 @@
 """FastAPI API endpoints for subtitle translation."""
 
+import hmac
 import logging
 from datetime import UTC, datetime
 from typing import Annotated
@@ -54,14 +55,15 @@ def _decrypt_api_key(api_key: str) -> str:
 
     try:
         return decrypt(api_key, _crypto_key)
-    except ValueError as e:
+    except ValueError:
+        logger.debug("API key decryption failed", exc_info=True)
         raise HTTPException(
             status_code=400,
             detail={
                 "error": "decryption_failed",
-                "message": f"Failed to decrypt API key: {e}",
+                "message": "Failed to decrypt API key. Verify the encryption key matches.",
             },
-        ) from e
+        ) from None
 
 
 logger = logging.getLogger(__name__)
@@ -456,8 +458,12 @@ async def submit_translate_content_job(
 
         request_data = request.model_dump()
         api_key_override = None
-        if request_data.get("config") and request_data["config"].get("api_key"):
-            api_key_override = _decrypt_api_key(request_data["config"].pop("api_key"))
+        if request_data.get("config"):
+            raw_key = request_data["config"].pop("api_key", None) or request_data["config"].pop(
+                "apiKey", None
+            )
+            if raw_key:
+                api_key_override = _decrypt_api_key(raw_key)
 
         resolved_model = (
             (request.config.model if request.config and request.config.model else None)
@@ -560,8 +566,12 @@ async def submit_translate_file_job(
     try:
         request_data = request.model_dump()
         api_key_override = None
-        if request_data.get("config") and request_data["config"].get("api_key"):
-            api_key_override = _decrypt_api_key(request_data["config"].pop("api_key"))
+        if request_data.get("config"):
+            raw_key = request_data["config"].pop("api_key", None) or request_data["config"].pop(
+                "apiKey", None
+            )
+            if raw_key:
+                api_key_override = _decrypt_api_key(raw_key)
 
         resolved_model = (
             (request.config.model if request.config and request.config.model else None)
@@ -854,7 +864,7 @@ async def update_config(
     """
     settings = get_settings()
     if settings.admin_api_key:
-        if not x_admin_key or x_admin_key != settings.admin_api_key:
+        if not x_admin_key or not hmac.compare_digest(x_admin_key, settings.admin_api_key):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={"error": "forbidden", "message": "Invalid or missing X-Admin-Key header"},
@@ -909,73 +919,50 @@ async def update_config(
     summary="Test Connection",
     description=(
         "Test encryption and OpenRouter API key validity. "
-        "Send an API key (plaintext or encrypted) to verify the setup works."
+        "Send an API key (plaintext or enc: encrypted) to verify the setup works."
     ),
 )
 async def test_connection(
     request: dict,
 ) -> dict:
     """
-    Test encryption roundtrip and OpenRouter API key validity.
+    Test encryption decryption and OpenRouter API key validity.
 
-    Accepts: {"apiKey": "sk-or-..." or "enc:...", "encryptionKey": "64charhex" (optional)}
+    Accepts: {"apiKey": "sk-or-..." or "enc:base64..."}
 
-    If encryptionKey is provided, tests encryption roundtrip locally.
-    Then validates the API key against OpenRouter's /auth/key endpoint.
+    If apiKey has enc: prefix, tests server-side decryption.
+    Then validates the (decrypted) API key against OpenRouter.
+    An API key is required; the server will not use its own key.
     """
     import httpx
 
     api_key = request.get("apiKey", "")
-    client_encryption_key = request.get("encryptionKey")
-    results = {
+    results: dict = {
         "encryption": None,
         "apiKey": None,
     }
 
-    # Test encryption if client sent an encryption key
-    if client_encryption_key:
-        try:
-            from subtitle_translator.crypto import decrypt, encrypt
-
-            key_bytes = bytes.fromhex(client_encryption_key)
-            test_encrypted = encrypt("test-roundtrip", key_bytes)
-            test_decrypted = decrypt(test_encrypted, key_bytes)
-            if test_decrypted == "test-roundtrip":
-                results["encryption"] = {
-                    "status": "ok",
-                    "message": "Encryption roundtrip successful",
-                }
-            else:
-                results["encryption"] = {"status": "error", "message": "Roundtrip mismatch"}
-        except Exception as e:
-            results["encryption"] = {"status": "error", "message": str(e)}
+    if not api_key:
+        results["apiKey"] = {"status": "error", "message": "apiKey is required"}
+        return results
 
     # Decrypt API key if encrypted
     actual_key = api_key
     if api_key.startswith("enc:"):
         try:
             actual_key = _decrypt_api_key(api_key)
-            if results["encryption"] is None:
-                results["encryption"] = {
-                    "status": "ok",
-                    "message": "Server-side decryption successful",
-                }
+            results["encryption"] = {
+                "status": "ok",
+                "message": "Server-side decryption successful",
+            }
         except HTTPException as e:
-            results["apiKey"] = {
+            results["encryption"] = {
                 "status": "error",
                 "message": e.detail.get("message", str(e.detail)),
             }
             return results
 
     # Validate API key against OpenRouter
-    if not actual_key:
-        settings = get_settings()
-        actual_key = settings.openrouter_api_key
-
-    if not actual_key:
-        results["apiKey"] = {"status": "error", "message": "No API key provided or configured"}
-        return results
-
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(

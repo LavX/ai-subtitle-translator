@@ -2,8 +2,10 @@
 
 import json
 import logging
+import os
 import sqlite3
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from subtitle_translator.crypto import decrypt, encrypt
@@ -117,9 +119,15 @@ class JobStore:
                 rest. If None, the field is stored as plaintext.
         """
         self._crypto_key = crypto_key
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path)
         self._conn.row_factory = sqlite3.Row
         self._init_schema()
+        # Restrict DB file permissions (contains encrypted API keys)
+        try:
+            os.chmod(db_path, 0o600)
+        except OSError:
+            pass
         logger.debug("JobStore opened: %s", db_path)
 
     # ------------------------------------------------------------------

@@ -25,7 +25,7 @@ COPY pyproject.toml .
 COPY src/ ./src/
 
 # Install the package itself (makes subtitle_translator importable)
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir .
 
 # Create data directory for persistence and non-root user
 RUN useradd --create-home --shell /bin/bash appuser && \
