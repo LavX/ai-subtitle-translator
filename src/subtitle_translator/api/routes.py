@@ -902,3 +902,103 @@ async def update_config(
                 "message": str(e),
             },
         ) from e
+
+
+@api_router.post(
+    "/test",
+    summary="Test Connection",
+    description=(
+        "Test encryption and OpenRouter API key validity. "
+        "Send an API key (plaintext or encrypted) to verify the setup works."
+    ),
+)
+async def test_connection(
+    request: dict,
+) -> dict:
+    """
+    Test encryption roundtrip and OpenRouter API key validity.
+
+    Accepts: {"apiKey": "sk-or-..." or "enc:...", "encryptionKey": "64charhex" (optional)}
+
+    If encryptionKey is provided, tests encryption roundtrip locally.
+    Then validates the API key against OpenRouter's /auth/key endpoint.
+    """
+    import httpx
+
+    api_key = request.get("apiKey", "")
+    client_encryption_key = request.get("encryptionKey")
+    results = {
+        "encryption": None,
+        "apiKey": None,
+    }
+
+    # Test encryption if client sent an encryption key
+    if client_encryption_key:
+        try:
+            from subtitle_translator.crypto import decrypt, encrypt
+
+            key_bytes = bytes.fromhex(client_encryption_key)
+            test_encrypted = encrypt("test-roundtrip", key_bytes)
+            test_decrypted = decrypt(test_encrypted, key_bytes)
+            if test_decrypted == "test-roundtrip":
+                results["encryption"] = {
+                    "status": "ok",
+                    "message": "Encryption roundtrip successful",
+                }
+            else:
+                results["encryption"] = {"status": "error", "message": "Roundtrip mismatch"}
+        except Exception as e:
+            results["encryption"] = {"status": "error", "message": str(e)}
+
+    # Decrypt API key if encrypted
+    actual_key = api_key
+    if api_key.startswith("enc:"):
+        try:
+            actual_key = _decrypt_api_key(api_key)
+            if results["encryption"] is None:
+                results["encryption"] = {
+                    "status": "ok",
+                    "message": "Server-side decryption successful",
+                }
+        except HTTPException as e:
+            results["apiKey"] = {
+                "status": "error",
+                "message": e.detail.get("message", str(e.detail)),
+            }
+            return results
+
+    # Validate API key against OpenRouter
+    if not actual_key:
+        settings = get_settings()
+        actual_key = settings.openrouter_api_key
+
+    if not actual_key:
+        results["apiKey"] = {"status": "error", "message": "No API key provided or configured"}
+        return results
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://openrouter.ai/api/v1/auth/key",
+                headers={"Authorization": f"Bearer {actual_key}"},
+            )
+            if resp.status_code == 200:
+                data = resp.json().get("data", {})
+                results["apiKey"] = {
+                    "status": "ok",
+                    "label": data.get("label", ""),
+                    "limitRemaining": data.get("limit_remaining"),
+                    "usage": data.get("usage"),
+                    "isFreeTier": data.get("is_free_tier"),
+                }
+            elif resp.status_code == 401:
+                results["apiKey"] = {"status": "error", "message": "Invalid API key"}
+            else:
+                results["apiKey"] = {
+                    "status": "error",
+                    "message": f"OpenRouter returned {resp.status_code}",
+                }
+    except Exception as e:
+        results["apiKey"] = {"status": "error", "message": f"Connection failed: {e}"}
+
+    return results
