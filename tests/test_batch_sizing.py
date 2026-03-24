@@ -192,7 +192,8 @@ class TestAdaptiveRetry:
                 raise InvalidResponseError("Truncated response")
             return TranslationResult(
                 translations=[
-                    {"index": line["index"], "content": f"T-{line['content']}"} for line in batch.lines
+                    {"index": line["index"], "content": f"T-{line['content']}"}
+                    for line in batch.lines
                 ],
                 model_used="test/model",
                 total_tokens=50,
@@ -221,7 +222,8 @@ class TestAdaptiveRetry:
                 )
             return TranslationResult(
                 translations=[
-                    {"index": line["index"], "content": f"T-{line['content']}"} for line in batch.lines
+                    {"index": line["index"], "content": f"T-{line['content']}"}
+                    for line in batch.lines
                 ],
                 model_used="test/model",
                 total_tokens=50,
@@ -260,7 +262,8 @@ class TestAdaptiveRetry:
                 raise TranslationProviderError("Request timeout", retryable=True)
             return TranslationResult(
                 translations=[
-                    {"index": line["index"], "content": f"T-{line['content']}"} for line in batch.lines
+                    {"index": line["index"], "content": f"T-{line['content']}"}
+                    for line in batch.lines
                 ],
                 model_used="test/model",
                 total_tokens=50,

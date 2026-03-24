@@ -60,9 +60,20 @@ async def lifespan(app: FastAPI):
     crypto_key = None
     if settings.encryption_enabled:
         try:
-            crypto_key = load_or_generate_key(settings.encryption_key, settings.encryption_key_file)
+            crypto_key, was_generated = load_or_generate_key(
+                settings.encryption_key, settings.encryption_key_file
+            )
             hex_key = crypto_key.hex()
-            logger.info(f"Encryption enabled. Key: {hex_key[:8]}...{hex_key[-8:]}")
+            if was_generated:
+                logger.info("=" * 70)
+                logger.info("NEW ENCRYPTION KEY GENERATED")
+                logger.info(f"Key: {hex_key}")
+                logger.info("Copy this key to your Bazarr AI Subtitle Translator settings.")
+                logger.info(f"Saved to: {settings.encryption_key_file}")
+                logger.info("This key will only be shown in full once.")
+                logger.info("=" * 70)
+            else:
+                logger.info(f"Encryption enabled. Key: {hex_key[:8]}...{hex_key[-8:]}")
         except Exception:
             logger.exception("Failed to initialize encryption")
             crypto_key = None

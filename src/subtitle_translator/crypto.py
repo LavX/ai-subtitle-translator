@@ -68,7 +68,7 @@ def decrypt(ciphertext: str, key: bytes) -> str:
     return plaintext_bytes.decode()
 
 
-def load_or_generate_key(env_key: str, key_file_path: str) -> bytes:
+def load_or_generate_key(env_key: str, key_file_path: str) -> tuple[bytes, bool]:
     """Load an AES-256 key from an env variable, a file, or generate a new one.
 
     Resolution order:
@@ -80,17 +80,21 @@ def load_or_generate_key(env_key: str, key_file_path: str) -> bytes:
        *key_file_path* (creating parent directories as needed, chmod 0o600),
        and return the key.
 
+    Returns:
+        Tuple of (key_bytes, was_generated). was_generated is True only when
+        a brand new key was created (case 3).
+
     Raises:
         ValueError: if the env variable or file contains an invalid key.
     """
     env_value = os.environ.get(env_key, "")
     if env_value:
-        return _parse_hex_key(env_value, source=f"environment variable {env_key!r}")
+        return _parse_hex_key(env_value, source=f"environment variable {env_key!r}"), False
 
     key_path = Path(key_file_path)
     if key_path.exists():
         file_value = key_path.read_text().strip()
-        return _parse_hex_key(file_value, source=f"key file {key_file_path!r}")
+        return _parse_hex_key(file_value, source=f"key file {key_file_path!r}"), False
 
     logger.info(
         "No existing key found; generating a new AES-256 key and saving to %s", key_file_path
@@ -99,7 +103,7 @@ def load_or_generate_key(env_key: str, key_file_path: str) -> bytes:
     key_path.parent.mkdir(parents=True, exist_ok=True)
     key_path.write_text(key.hex())
     os.chmod(key_path, 0o600)
-    return key
+    return key, True
 
 
 def _parse_hex_key(value: str, source: str) -> bytes:

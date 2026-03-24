@@ -73,8 +73,9 @@ class TestLoadOrGenerateKey:
         key = generate_key()
         hex_key = key.hex()
         monkeypatch.setenv("TEST_CRYPTO_KEY", hex_key)
-        result = load_or_generate_key("TEST_CRYPTO_KEY", "/nonexistent/path/key.hex")
+        result, was_generated = load_or_generate_key("TEST_CRYPTO_KEY", "/nonexistent/path/key.hex")
         assert result == key
+        assert was_generated is False
 
     def test_invalid_env_hex_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("TEST_CRYPTO_KEY", "not-valid-hex-string-of-64-chars!!")
@@ -91,17 +92,19 @@ class TestLoadOrGenerateKey:
         key = generate_key()
         key_file = tmp_path / "key.hex"
         key_file.write_text(key.hex())
-        result = load_or_generate_key("TEST_CRYPTO_KEY", str(key_file))
+        result, was_generated = load_or_generate_key("TEST_CRYPTO_KEY", str(key_file))
         assert result == key
+        assert was_generated is False
 
     def test_generates_and_saves_when_no_file(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.delenv("TEST_CRYPTO_KEY", raising=False)
         key_file = tmp_path / "subdir" / "key.hex"
-        result = load_or_generate_key("TEST_CRYPTO_KEY", str(key_file))
+        result, was_generated = load_or_generate_key("TEST_CRYPTO_KEY", str(key_file))
         assert isinstance(result, bytes)
         assert len(result) == 32
+        assert was_generated is True
         assert key_file.exists()
         saved_hex = key_file.read_text().strip()
         assert len(saved_hex) == 64
@@ -112,6 +115,6 @@ class TestLoadOrGenerateKey:
     ) -> None:
         monkeypatch.delenv("TEST_CRYPTO_KEY", raising=False)
         key_file = tmp_path / "key.hex"
-        load_or_generate_key("TEST_CRYPTO_KEY", str(key_file))
+        _key, _gen = load_or_generate_key("TEST_CRYPTO_KEY", str(key_file))
         file_mode = stat.S_IMODE(os.stat(key_file).st_mode)
         assert file_mode == 0o600
