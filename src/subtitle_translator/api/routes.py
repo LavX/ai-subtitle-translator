@@ -40,8 +40,17 @@ def set_crypto_key(key: bytes | None) -> None:
 
 
 def _decrypt_api_key(api_key: str) -> str:
-    """Decrypt an API key if it has the enc: prefix."""
+    """Decrypt an API key if it has the enc: prefix. Enforces strict mode."""
     if not api_key.startswith("enc:"):
+        settings = get_settings()
+        if settings.encryption_enabled and settings.encryption_strict:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "encryption_required",
+                    "message": "Strict encryption mode is enabled. API keys must be encrypted (enc: prefix).",
+                },
+            )
         return api_key
     if _crypto_key is None:
         raise HTTPException(

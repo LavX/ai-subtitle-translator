@@ -26,6 +26,8 @@ def mock_settings():
         settings.batch_size = 25
         settings.parallel_batches_per_job = 4
         settings.admin_api_key = ""
+        settings.encryption_enabled = True
+        settings.encryption_strict = False
         mock.return_value = settings
         yield settings
 
@@ -290,6 +292,8 @@ class TestSubmitContentJob:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             settings.openrouter_default_model = "test-model"
+            settings.encryption_enabled = True
+            settings.encryption_strict = False
             mock.return_value = settings
             resp = client.post(
                 "/api/v1/jobs/translate/content",
@@ -405,6 +409,8 @@ class TestSubmitFileJob:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             settings.openrouter_default_model = "test-model"
+            settings.encryption_enabled = True
+            settings.encryption_strict = False
             mock.return_value = settings
             resp = client.post(
                 "/api/v1/jobs/translate/file",

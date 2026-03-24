@@ -45,6 +45,7 @@ class Settings(BaseSettings):
 
     # Encryption
     encryption_enabled: bool = True
+    encryption_strict: bool = False  # When True, reject plaintext API keys
     encryption_key: str = ""  # 64-char hex AES-256 key, overrides key file
     encryption_key_file: str = "/app/data/encryption.key"
 

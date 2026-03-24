@@ -181,6 +181,7 @@ Set via environment variables or `.env` file:
 | `HOST` | `0.0.0.0` | Server bind address |
 | `PORT` | `8765` | Server port |
 | `ENCRYPTION_ENABLED` | `true` | Enable AES-256-GCM API key encryption |
+| `ENCRYPTION_STRICT` | `false` | When true, reject plaintext API keys (require enc: prefix) |
 | `ENCRYPTION_KEY` | *(auto-generated)* | 64-char hex AES-256 key. Overrides key file when set |
 | `ENCRYPTION_KEY_FILE` | `/app/data/encryption.key` | Path to persistent encryption key file |
 | `DB_PATH` | `/app/data/jobs.db` | SQLite database path for job persistence |
