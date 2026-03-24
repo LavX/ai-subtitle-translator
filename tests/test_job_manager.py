@@ -2,10 +2,11 @@
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 
 import pytest
 
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.queue.job_manager import Job, JobManager, JobStatus, JobType
 
 
 @pytest.fixture
@@ -550,3 +551,83 @@ class TestWorkerProcessing:
         await manager.set_max_concurrent(4)
         assert len(manager._workers) >= 4
         await manager.stop_workers()
+
+
+class TestStorePersistence:
+    """Tests for write-through store integration."""
+
+    @pytest.mark.asyncio
+    async def test_write_through_on_submit(self, manager):
+        store = MagicMock()
+        manager.set_store(store)
+        await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
+        store.save_job.assert_called_once()
+        saved_job = store.save_job.call_args[0][0]
+        assert saved_job.status == JobStatus.QUEUED
+
+    @pytest.mark.asyncio
+    async def test_write_through_on_complete(self, manager):
+        store = MagicMock()
+        manager.set_store(store)
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
+        store.save_job.reset_mock()
+        manager.set_job_processing(job_id)
+        manager.set_job_completed(job_id, {"lines": []})
+        # save_job called twice: once for processing, once for completed
+        assert store.save_job.call_count == 2
+        last_saved = store.save_job.call_args_list[-1][0][0]
+        assert last_saved.status == JobStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_recover_jobs(self):
+        manager = JobManager(max_concurrent=2, max_jobs=10)
+        store = MagicMock()
+
+        queued_job = Job(
+            id="job-queued",
+            job_type=JobType.TRANSLATE_CONTENT,
+            status=JobStatus.QUEUED,
+            request_data={},
+            created_at=datetime.now(UTC),
+        )
+        processing_job = Job(
+            id="job-processing",
+            job_type=JobType.TRANSLATE_FILE,
+            status=JobStatus.PROCESSING,
+            request_data={},
+            created_at=datetime.now(UTC),
+        )
+        store.load_active_jobs.return_value = [queued_job, processing_job]
+
+        manager.set_store(store)
+        count = await manager.recover_jobs()
+
+        assert count == 2
+        assert "job-queued" in manager.jobs
+        assert "job-processing" in manager.jobs
+        assert manager.jobs["job-queued"].status == JobStatus.QUEUED
+        assert manager.jobs["job-processing"].status == JobStatus.QUEUED
+        assert manager.jobs["job-queued"].message == "Recovered after restart"
+        assert manager.jobs["job-processing"].message == "Recovered after restart"
+        assert not manager.queue.empty()
+        # save_job called once per recovered job
+        assert store.save_job.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_existing_tests_pass_without_store(self, manager):
+        # store is None by default; all operations should work without error
+        assert manager._store is None
+        job_id = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
+        manager.set_job_processing(job_id)
+        manager.update_progress(job_id, 50, "halfway")
+        manager.set_job_completed(job_id, {"result": "ok"})
+        assert manager.get_job(job_id).status == JobStatus.COMPLETED
+        assert manager.delete_job(job_id) is True
+
+        job_id2 = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
+        manager.set_job_processing(job_id2)
+        manager.set_job_failed(job_id2, "boom")
+        assert manager.get_job(job_id2).status == JobStatus.FAILED
+
+        job_id3 = await manager.submit_job(request_data={}, job_type=JobType.TRANSLATE_CONTENT)
+        assert manager.cancel_job(job_id3) is True

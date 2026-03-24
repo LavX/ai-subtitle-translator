@@ -1,13 +1,18 @@
 """In-memory job queue manager for async translation processing."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict
+
+if TYPE_CHECKING:
+    from subtitle_translator.queue.job_store import JobStore
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +115,11 @@ class JobManager:
         self._workers: list[asyncio.Task] = []
         self._cleanup_task: asyncio.Task | None = None
         self._worker_handler: Any | None = None
+        self._store: JobStore | None = None
+
+    def set_store(self, store: JobStore) -> None:
+        """Set the persistent job store for write-through caching."""
+        self._store = store
 
     def set_worker_handler(self, handler: Any) -> None:
         """
@@ -118,6 +128,23 @@ class JobManager:
         The handler should be an async function that takes (job_manager, job_id, job_type).
         """
         self._worker_handler = handler
+
+    async def recover_jobs(self) -> int:
+        """Load active jobs from persistent store and re-queue them."""
+        if not self._store:
+            return 0
+        jobs = self._store.load_active_jobs()
+        count = 0
+        for job in jobs:
+            job.status = JobStatus.QUEUED
+            job.message = "Recovered after restart"
+            self.jobs[job.id] = job
+            await self.queue.put((job.id, job.job_type))
+            self._store.save_job(job)
+            count += 1
+        if count:
+            logger.info(f"Recovered {count} jobs from persistent store")
+        return count
 
     async def start_workers(self) -> None:
         """Start background workers to process jobs."""
@@ -216,6 +243,8 @@ class JobManager:
         )
 
         self.jobs[job_id] = job
+        if self._store:
+            self._store.save_job(job)
         await self.queue.put((job_id, job_type))
 
         logger.info(f"Job {job_id} submitted (type: {job_type.value})")
@@ -273,6 +302,8 @@ class JobManager:
                 job.tokens_used = tokens_used
             if total_cost is not None:
                 job.total_cost = total_cost
+            if self._store:
+                self._store.save_job(job)
 
     def set_job_processing(self, job_id: str) -> None:
         """Mark a job as processing."""
@@ -281,6 +312,8 @@ class JobManager:
             job.status = JobStatus.PROCESSING
             job.started_at = datetime.now(UTC)
             job.message = "Processing translation..."
+            if self._store:
+                self._store.save_job(job)
 
     def set_job_completed(
         self,
@@ -302,6 +335,8 @@ class JobManager:
             job.completed_at = datetime.now(UTC)
             job.message = "Translation completed"
             logger.info(f"Job {job_id} completed successfully")
+            if self._store:
+                self._store.save_job(job)
 
     def set_job_partial(
         self,
@@ -327,6 +362,8 @@ class JobManager:
                 job.progress = int((job.completed_batches / job.total_batches) * 100)
             job.message = f"Partial translation: {error}"
             logger.warning(f"Job {job_id} partially completed: {error}")
+            if self._store:
+                self._store.save_job(job)
 
     def set_job_failed(
         self,
@@ -347,6 +384,8 @@ class JobManager:
             job.completed_at = datetime.now(UTC)
             job.message = f"Translation failed: {error}"
             logger.error(f"Job {job_id} failed: {error}")
+            if self._store:
+                self._store.save_job(job)
 
     def cancel_job(self, job_id: str) -> bool:
         """
@@ -367,6 +406,8 @@ class JobManager:
             job.completed_at = datetime.now(UTC)
             job.message = "Job cancelled by user"
             logger.info(f"Job {job_id} cancelled")
+            if self._store:
+                self._store.save_job(job)
             return True
 
         return False
@@ -391,6 +432,8 @@ class JobManager:
                 JobStatus.CANCELLED,
             ):
                 del self.jobs[job_id]
+                if self._store:
+                    self._store.delete_job(job_id)
                 logger.info(f"Job {job_id} deleted")
                 return True
         return False
@@ -583,6 +626,10 @@ class JobManager:
 
         if expired_ids:
             logger.info(f"Cleaned up {len(expired_ids)} expired jobs")
+
+        if self._store:
+            hours = int(self.job_ttl.total_seconds() / 3600)
+            self._store.cleanup_expired(hours)
 
 
 # Global job manager instance
