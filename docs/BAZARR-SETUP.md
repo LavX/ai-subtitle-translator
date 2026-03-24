@@ -1,16 +1,16 @@
-# AI Subtitle Translator: Bazarr Setup Guide
+# AI Subtitle Translator: Bazarr+ Setup Guide
 
-Get AI-powered subtitle translation running alongside your existing Bazarr installation in under 2 minutes.
+Get AI-powered subtitle translation running alongside your existing Bazarr+ installation in under 2 minutes.
 
 ## Automatic install
 
-The install script detects your Bazarr container, picks the right networking, and prints the encryption key:
+The install script detects your Bazarr+ container, picks the right networking, and prints the encryption key:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/LavX/ai-subtitle-translator/main/install.sh | bash
 ```
 
-It auto-detects whether Bazarr uses host networking, a custom bridge, or default bridge, and configures accordingly. At the end it prints the service URL and encryption key to copy into Bazarr.
+It auto-detects whether Bazarr+ uses host networking, a custom bridge, or default bridge, and configures accordingly. At the end it prints the service URL and encryption key to copy into Bazarr+.
 
 ## Manual setup
 
@@ -27,7 +27,7 @@ docker run -d \
 
 That's it. The service starts on port 8765, generates an encryption key, and creates a persistent database automatically.
 
-If Bazarr and the translator are on the same Docker network (see [Networking options](#networking-options)), you can skip `-p 8765:8765` and use the container name instead.
+If Bazarr+ and the translator are on the same Docker network (see [Networking options](#networking-options)), you can skip `-p 8765:8765` and use the container name instead.
 
 ## Get your encryption key
 
@@ -35,11 +35,11 @@ If Bazarr and the translator are on the same Docker network (see [Networking opt
 docker exec ai-subtitle-translator cat /app/data/encryption.key
 ```
 
-Copy the 64-character hex string. You'll paste it into Bazarr next.
+Copy the 64-character hex string. You'll paste it into Bazarr+ next.
 
-## Configure Bazarr
+## Configure Bazarr+
 
-1. Open Bazarr Settings
+1. Open Bazarr+ Settings
 2. Go to the AI Subtitle Translator provider section
 3. Set the following:
    - **Translator URL**: `http://ai-subtitle-translator:8765` (if same Docker network) or `http://<host-ip>:8765`
@@ -108,22 +108,22 @@ volumes:
 
 ## Networking options
 
-**Same Docker Compose stack (most common):** Add the translator to your existing `docker-compose.yml` (see above). Bazarr connects to `http://ai-subtitle-translator:8765` using the container name.
+**Same Docker Compose stack (most common):** Add the translator to your existing `docker-compose.yml` (see above). Bazarr+ connects to `http://ai-subtitle-translator:8765` using the container name.
 
-**Separate containers, same machine:** Use `-p 8765:8765` (the default one-liner). Bazarr connects to `http://localhost:8765` or `http://<host-ip>:8765`.
+**Separate containers, same machine:** Use `-p 8765:8765` (the default one-liner). Bazarr+ connects to `http://localhost:8765` or `http://<host-ip>:8765`.
 
-**Same Docker network:** If Bazarr is on a custom bridge network, join it:
+**Same Docker network:** If Bazarr+ is on a custom bridge network, join it:
 
 ```bash
 docker run -d \
   --name ai-subtitle-translator \
   --restart unless-stopped \
-  --network <bazarr-network-name> \
+  --network <Bazarr-network-name> \
   -v ai-subtitle-translator-data:/app/data \
   ghcr.io/lavx/ai-subtitle-translator:latest
 ```
 
-Bazarr connects to `http://ai-subtitle-translator:8765`.
+Bazarr+ connects to `http://ai-subtitle-translator:8765`.
 
 **Host network:** If your setup uses `--network host`:
 
@@ -136,9 +136,9 @@ docker run -d \
   ghcr.io/lavx/ai-subtitle-translator:latest
 ```
 
-Bazarr connects to `http://localhost:8765`.
+Bazarr+ connects to `http://localhost:8765`.
 
-**Different machines:** Expose with `-p 8765:8765`. Bazarr connects to `http://<translator-ip>:8765`. Encryption is recommended in this case (enabled by default).
+**Different machines:** Expose with `-p 8765:8765`. Bazarr+ connects to `http://<translator-ip>:8765`. Encryption is recommended in this case (enabled by default).
 
 ## Disable encryption
 
@@ -154,7 +154,7 @@ docker run -d \
   ghcr.io/lavx/ai-subtitle-translator:latest
 ```
 
-Leave the encryption key field empty in Bazarr.
+Leave the encryption key field empty in Bazarr+.
 
 ## Troubleshooting
 
@@ -187,6 +187,6 @@ docker exec ai-subtitle-translator cat /app/data/encryption.key
 ## Links
 
 - [AI Subtitle Translator GitHub](https://github.com/LavX/ai-subtitle-translator)
-- [Bazarr+](https://github.com/LavX/bazarr)
+- [Bazarr++](https://github.com/LavX/Bazarr+)
 - [OpenRouter](https://openrouter.ai/) (get your API key here)
 - [Full API docs](http://localhost:8765/docs) (when service is running)
