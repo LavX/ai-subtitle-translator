@@ -21,6 +21,16 @@ LLM-powered subtitle translation API using [OpenRouter](https://openrouter.ai/).
 - Rate limit handling with exponential backoff, serialized retries, and staggered parallel requests
 - Per-request config overrides: model, temperature, API key, reasoning, parallel batch count
 
+## Bazarr setup
+
+Using this with Bazarr? One command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/LavX/ai-subtitle-translator/main/install.sh | bash
+```
+
+Auto-detects your Bazarr container, configures networking, and prints the encryption key. See the full [Bazarr Setup Guide](docs/BAZARR-SETUP.md) for details.
+
 ## Quick start
 
 ### Docker
