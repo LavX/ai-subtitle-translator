@@ -28,6 +28,42 @@ from subtitle_translator.config import get_settings, update_runtime_config
 from subtitle_translator.core.translator import SubtitleTranslator, get_translator
 from subtitle_translator.queue.job_manager import Job, JobStatus, JobType, job_manager
 
+# Crypto key set by main.py on startup (None = encryption disabled)
+_crypto_key: bytes | None = None
+
+
+def set_crypto_key(key: bytes | None) -> None:
+    """Set the encryption key for API key decryption."""
+    global _crypto_key
+    _crypto_key = key
+
+
+def _decrypt_api_key(api_key: str) -> str:
+    """Decrypt an API key if it has the enc: prefix."""
+    if not api_key.startswith("enc:"):
+        return api_key
+    if _crypto_key is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "encryption_disabled",
+                "message": "Received encrypted API key but encryption is disabled on this server",
+            },
+        )
+    from subtitle_translator.crypto import decrypt
+
+    try:
+        return decrypt(api_key, _crypto_key)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "decryption_failed",
+                "message": f"Failed to decrypt API key: {e}",
+            },
+        ) from e
+
+
 logger = logging.getLogger(__name__)
 
 # Create routers
@@ -421,7 +457,7 @@ async def submit_translate_content_job(
         request_data = request.model_dump()
         api_key_override = None
         if request_data.get("config") and request_data["config"].get("api_key"):
-            api_key_override = request_data["config"].pop("api_key")
+            api_key_override = _decrypt_api_key(request_data["config"].pop("api_key"))
 
         resolved_model = (
             (request.config.model if request.config and request.config.model else None)
@@ -525,7 +561,7 @@ async def submit_translate_file_job(
         request_data = request.model_dump()
         api_key_override = None
         if request_data.get("config") and request_data["config"].get("api_key"):
-            api_key_override = request_data["config"].pop("api_key")
+            api_key_override = _decrypt_api_key(request_data["config"].pop("api_key"))
 
         resolved_model = (
             (request.config.model if request.config and request.config.model else None)

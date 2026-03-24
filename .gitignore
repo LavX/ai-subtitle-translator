@@ -76,5 +76,7 @@ Thumbs.db
 
 # Project specific
 *.log
+docs/superpowers/
+data/
 
 .claude

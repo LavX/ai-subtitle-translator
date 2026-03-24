@@ -27,10 +27,14 @@ COPY src/ ./src/
 # Install the package itself (makes subtitle_translator importable)
 RUN pip install --no-cache-dir -e .
 
-# Create non-root user for security
+# Create data directory for persistence and non-root user
 RUN useradd --create-home --shell /bin/bash appuser && \
+    mkdir -p /app/data && \
     chown -R appuser:appuser /app
 USER appuser
+
+# Persistent data volume (encryption keys, job database)
+VOLUME ["/app/data"]
 
 # Expose port
 EXPOSE 8765

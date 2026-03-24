@@ -3,14 +3,23 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from subtitle_translator.api.routes import api_router, config_router, health_router, jobs_router
+from subtitle_translator.api.routes import (
+    api_router,
+    config_router,
+    health_router,
+    jobs_router,
+    set_crypto_key,
+)
 from subtitle_translator.config import get_settings
 from subtitle_translator.core.translator import close_translator
+from subtitle_translator.crypto import load_or_generate_key
 from subtitle_translator.queue.job_manager import job_manager
+from subtitle_translator.queue.job_store import JobStore
 from subtitle_translator.queue.worker import job_worker_handler
 
 # Configure logging - use LOG_LEVEL env var (default: INFO)
@@ -47,11 +56,34 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("OpenRouter API key is configured")
 
+    # Encryption setup
+    crypto_key = None
+    if settings.encryption_enabled:
+        try:
+            crypto_key = load_or_generate_key(settings.encryption_key, settings.encryption_key_file)
+            hex_key = crypto_key.hex()
+            logger.info(f"Encryption enabled. Key: {hex_key[:8]}...{hex_key[-8:]}")
+        except Exception:
+            logger.exception("Failed to initialize encryption")
+            crypto_key = None
+    else:
+        logger.info("Encryption disabled")
+    set_crypto_key(crypto_key)
+
+    # Job persistence setup
+    store = JobStore(db_path=settings.db_path, crypto_key=crypto_key)
+    job_manager.set_store(store)
+    job_manager.job_ttl = timedelta(hours=settings.job_retention_hours)
+
+    # Recover jobs from previous run
+    recovered = await job_manager.recover_jobs()
+    if recovered:
+        logger.info(f"Recovered {recovered} jobs from previous session")
+
     # Start job queue workers
     logger.info(f"Starting job queue with {settings.job_queue_max_concurrent} workers")
     job_manager.max_concurrent = settings.job_queue_max_concurrent
     job_manager.max_jobs = settings.job_queue_max_jobs
-    job_manager.job_ttl = settings.job_queue_ttl
     job_manager.set_worker_handler(job_worker_handler)
     await job_manager.start_workers()
 
@@ -60,6 +92,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down AI Subtitle Translator service")
     await job_manager.stop_workers()
+    store.close()
     await close_translator()
 
 
