@@ -17,6 +17,7 @@ LLM-powered subtitle translation API using [OpenRouter](https://openrouter.ai/).
 - Async job queue with real-time progress tracking, cost reporting, and per-batch status updates
 - Job persistence via SQLite. Jobs survive restarts, automatically recovered on startup
 - AES-256-GCM API key encryption between any client and this service (optional, enabled by default)
+- Request authentication via HMAC token derived from the encryption key (automatic when encryption is enabled)
 - Dynamic reasoning detection. Fetches model capabilities from OpenRouter API, no hardcoded lists
 - Rate limit handling with exponential backoff, serialized retries, and staggered parallel requests
 - Per-request config overrides: model, temperature, API key, reasoning, parallel batch count
@@ -60,27 +61,30 @@ cd src && uvicorn subtitle_translator.main:app --host 0.0.0.0 --port 8765
 
 Full interactive docs at `/docs` (Swagger) or `/redoc` when running.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/api/v1/models` | List available translation models |
-| `GET` | `/api/v1/status` | Service status and queue stats |
-| `GET` | `/api/v1/config` | Current configuration |
-| `PUT` | `/api/v1/config` | Update config at runtime |
-| `POST` | `/api/v1/translate/content` | Translate subtitle lines (synchronous) |
-| `POST` | `/api/v1/translate/file` | Translate SRT file (synchronous) |
-| `POST` | `/api/v1/jobs/translate/content` | Submit async translation job |
-| `POST` | `/api/v1/jobs/translate/file` | Submit async SRT translation job |
-| `GET` | `/api/v1/jobs` | List all jobs (filter by status) |
-| `GET` | `/api/v1/jobs/{id}` | Job status, progress, metrics, and result |
-| `DELETE` | `/api/v1/jobs/{id}` | Cancel or delete a job |
-| `POST` | `/api/v1/test` | Test encryption and API key validity |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/health` | | Health check |
+| `GET` | `/api/v1/models` | | List available translation models |
+| `GET` | `/api/v1/status` | | Service status and queue stats |
+| `GET` | `/api/v1/config` | | Current configuration |
+| `PUT` | `/api/v1/config` | token | Update config at runtime |
+| `POST` | `/api/v1/translate/content` | token | Translate subtitle lines (synchronous) |
+| `POST` | `/api/v1/translate/file` | token | Translate SRT file (synchronous) |
+| `POST` | `/api/v1/jobs/translate/content` | token | Submit async translation job |
+| `POST` | `/api/v1/jobs/translate/file` | token | Submit async SRT translation job |
+| `GET` | `/api/v1/jobs` | token | List all jobs (filter by status) |
+| `GET` | `/api/v1/jobs/{id}` | token | Job status, progress, metrics, and result |
+| `DELETE` | `/api/v1/jobs/{id}` | token | Cancel or delete a job |
+| `POST` | `/api/v1/test` | token | Test encryption and API key validity |
+
+Endpoints marked **token** require an `X-Auth-Token` header when encryption is enabled (see [Authentication](#authentication)).
 
 ### Translate subtitle content
 
 ```bash
 curl -X POST http://localhost:8765/api/v1/translate/content \
   -H "Content-Type: application/json" \
+  -H "X-Auth-Token: YOUR_AUTH_TOKEN" \
   -d '{
     "sourceLanguage": "en",
     "targetLanguage": "hu",
@@ -97,6 +101,7 @@ curl -X POST http://localhost:8765/api/v1/translate/content \
 ```bash
 curl -X POST http://localhost:8765/api/v1/jobs/translate/content \
   -H "Content-Type: application/json" \
+  -H "X-Auth-Token: YOUR_AUTH_TOKEN" \
   -d '{
     "sourceLanguage": "en",
     "targetLanguage": "hu",
@@ -205,6 +210,31 @@ The data directory contains:
 - `jobs.db` - SQLite database with all job history
 - `encryption.key` - auto-generated encryption key (chmod 600)
 
+## Authentication
+
+When encryption is enabled (the default), all mutating endpoints require an `X-Auth-Token` header. The token is derived from the same encryption key that Bazarr already has, so there is no extra secret to manage.
+
+### How the token is computed
+
+Both the client and server compute `HMAC-SHA256(encryption_key_bytes, "subtitle-translator-auth-v1")` and use the hex digest as the token. In Python:
+
+```python
+import hmac, hashlib
+token = hmac.new(bytes.fromhex(encryption_key_hex), b"subtitle-translator-auth-v1", hashlib.sha256).hexdigest()
+```
+
+### Using the token
+
+Pass it as a header on every request to a protected endpoint:
+
+```bash
+curl -H "X-Auth-Token: <token>" http://localhost:8765/api/v1/jobs
+```
+
+Read-only endpoints (`/health`, `/api/v1/models`, `/api/v1/status`, `GET /api/v1/config`) do not require authentication.
+
+When encryption is disabled (`ENCRYPTION_ENABLED=false`), auth is skipped entirely and all endpoints are open.
+
 ## API key encryption
 
 API keys sent between clients and the translator can be encrypted in transit using AES-256-GCM with a pre-shared key. This prevents API keys from being visible in plaintext on the network, even over HTTP.
@@ -216,6 +246,7 @@ API keys sent between clients and the translator can be encrypted in transit usi
 3. Paste the 64-character hex key into Bazarr's AI Subtitle Translator settings
 4. Bazarr encrypts the OpenRouter API key before sending it in requests
 5. The translator decrypts it on receipt
+6. The same key is used to derive the auth token (see [Authentication](#authentication))
 
 Encrypted API keys use the format `enc:base64data`. Plaintext keys are accepted by default. Set `ENCRYPTION_STRICT=true` to require encryption on all requests.
 
@@ -224,6 +255,7 @@ Encrypted API keys use the format `enc:base64data`. Plaintext keys are accepted 
 ```bash
 curl -X POST http://localhost:8765/api/v1/test \
   -H "Content-Type: application/json" \
+  -H "X-Auth-Token: YOUR_AUTH_TOKEN" \
   -d '{"apiKey": "enc:your-encrypted-key-here"}'
 ```
 
@@ -289,7 +321,7 @@ Full model list with metadata: `GET /api/v1/models`
 
 ```bash
 pip install -e ".[dev]"
-pytest                    # 234 tests
+pytest                    # 548 tests, 98% coverage
 ruff check src/ tests/    # lint
 ruff format src/ tests/   # format
 ```
