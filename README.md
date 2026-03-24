@@ -15,6 +15,8 @@ LLM-powered subtitle translation API using [OpenRouter](https://openrouter.ai/).
 - Automatic batch sizing per model. Adapts to model context windows and retries with smaller batches on failure
 - RTL language support (Arabic, Hebrew, Persian, Urdu, etc.)
 - Async job queue with real-time progress tracking, cost reporting, and per-batch status updates
+- Job persistence via SQLite. Jobs survive restarts, automatically recovered on startup
+- AES-256-GCM API key encryption between any client and this service (optional, enabled by default)
 - Dynamic reasoning detection. Fetches model capabilities from OpenRouter API, no hardcoded lists
 - Rate limit handling with exponential backoff, serialized retries, and staggered parallel requests
 - Per-request config overrides: model, temperature, API key, reasoning, parallel batch count
@@ -168,6 +170,68 @@ Set via environment variables or `.env` file:
 | `ADMIN_API_KEY` | *(empty)* | Required as `X-Admin-Key` header for PUT /config when set |
 | `HOST` | `0.0.0.0` | Server bind address |
 | `PORT` | `8765` | Server port |
+| `ENCRYPTION_ENABLED` | `true` | Enable AES-256-GCM API key encryption |
+| `ENCRYPTION_KEY` | *(auto-generated)* | 64-char hex AES-256 key. Overrides key file when set |
+| `ENCRYPTION_KEY_FILE` | `/app/data/encryption.key` | Path to persistent encryption key file |
+| `DB_PATH` | `/app/data/jobs.db` | SQLite database path for job persistence |
+| `JOB_RETENTION_HOURS` | `24` | Hours to keep completed/failed jobs before cleanup |
+
+## Job persistence
+
+Jobs are stored in SQLite and survive container restarts. On startup, any queued or in-progress jobs from the previous session are automatically recovered and re-queued.
+
+Mount a volume to `/app/data` to persist across container recreations:
+
+```bash
+docker run -d --name ai-subtitle-translator \
+  -v /path/to/data:/app/data \
+  -e OPENROUTER_API_KEY=sk-or-... \
+  ghcr.io/lavx/ai-subtitle-translator:latest
+```
+
+The data directory contains:
+- `jobs.db` - SQLite database with all job history
+- `encryption.key` - auto-generated encryption key (chmod 600)
+
+## API key encryption
+
+API keys sent between Bazarr and the translator can be encrypted in transit using AES-256-GCM with a pre-shared key. This prevents API keys from being visible in plaintext on the network, even over HTTP.
+
+### How it works
+
+1. On first startup, the translator generates an encryption key and prints it to the logs:
+
+```
+======================================================================
+NEW ENCRYPTION KEY GENERATED
+Key: e2c65e79252379c1da0874f9d0928c6194fbc5e5460e3ab4047860560a2aa597
+Copy this key to your Bazarr AI Subtitle Translator settings.
+Saved to: /app/data/encryption.key
+This key will only be shown in full once.
+======================================================================
+```
+
+2. Copy this key to Bazarr's AI Subtitle Translator provider settings
+3. Bazarr encrypts the OpenRouter API key before sending it in requests
+4. The translator decrypts it on receipt
+
+Encrypted API keys use the format `enc:base64data`. Plaintext keys are still accepted for backward compatibility.
+
+### Regenerate key
+
+```bash
+# Via CLI (inside container)
+docker exec ai-subtitle-translator python -m subtitle_translator.cli regenerate-key
+
+# Or set via environment variable (overrides key file)
+docker run -e ENCRYPTION_KEY=your64charhexkey... ...
+```
+
+### Disable encryption
+
+```bash
+docker run -e ENCRYPTION_ENABLED=false ...
+```
 
 ## Adaptive batch sizing
 
@@ -213,7 +277,7 @@ Full model list with metadata: `GET /api/v1/models`
 
 ```bash
 pip install -e ".[dev]"
-pytest                    # 206 tests
+pytest                    # 234 tests
 ruff check src/ tests/    # lint
 ruff format src/ tests/   # format
 ```
@@ -224,6 +288,8 @@ ruff format src/ tests/   # format
 src/subtitle_translator/
   main.py                 # FastAPI application
   config.py               # Settings from environment variables
+  crypto.py               # AES-256-GCM encryption and key management
+  cli.py                  # CLI commands (key regeneration)
   api/
     routes.py             # REST API endpoints
     models.py             # Pydantic request/response models
@@ -237,6 +303,7 @@ src/subtitle_translator/
     openrouter.py         # OpenRouter API implementation
   queue/
     job_manager.py        # Async job queue with progress tracking
+    job_store.py          # SQLite persistence layer
     worker.py             # Background job worker
 ```
 
