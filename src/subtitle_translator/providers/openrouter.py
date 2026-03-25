@@ -338,6 +338,7 @@ class OpenRouterProvider(TranslationProvider):
                 base_url=self.settings.openrouter_api_base,
                 headers=self.settings.openrouter_headers,
                 timeout=httpx.Timeout(self.settings.request_timeout),
+                follow_redirects=False,
             )
         return self._client
 
@@ -468,6 +469,7 @@ class OpenRouterProvider(TranslationProvider):
                 async with httpx.AsyncClient(
                     base_url=self.settings.openrouter_api_base,
                     timeout=httpx.Timeout(15.0),
+                    follow_redirects=False,
                 ) as plain_client:
                     response = await plain_client.get("/models")
                 if response.status_code == 200:
@@ -831,6 +833,7 @@ class OpenRouterProvider(TranslationProvider):
                     base_url=self.settings.openrouter_api_base,
                     headers=headers,
                     timeout=httpx.Timeout(self.settings.request_timeout),
+                    follow_redirects=False,
                 ) as client:
                     response = await client.post("/chat/completions", json=payload)
                     result = await self._process_response(response, model_to_use)

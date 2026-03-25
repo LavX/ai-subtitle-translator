@@ -155,7 +155,7 @@ class TestUpdateRuntimeConfig:
         assert s.batch_size == 50
 
     def test_invalid_key_raises_value_error(self):
-        with pytest.raises(ValueError, match="Invalid configuration key"):
+        with pytest.raises(ValueError, match="cannot be modified at runtime"):
             update_runtime_config("nonexistent_key", "value")
 
     def test_clears_cached_overridden_settings(self):
@@ -183,15 +183,12 @@ class TestGetRuntimeOverrides:
         overrides = get_runtime_overrides()
         assert overrides["openrouter_api_key"] is None
 
-    def test_masks_encryption_key(self):
-        update_runtime_config("encryption_key", "hex-key-value")
-        overrides = get_runtime_overrides()
-        assert overrides["encryption_key"] == "***"
-
-    def test_masks_admin_api_key(self):
-        update_runtime_config("admin_api_key", "admin-secret")
-        overrides = get_runtime_overrides()
-        assert overrides["admin_api_key"] == "***"
+    def test_rejects_immutable_keys(self):
+        """Keys like encryption_key and admin_api_key are blocked at runtime."""
+        with pytest.raises(ValueError, match="cannot be modified at runtime"):
+            update_runtime_config("encryption_key", "hex-key-value")
+        with pytest.raises(ValueError, match="cannot be modified at runtime"):
+            update_runtime_config("admin_api_key", "admin-secret")
 
     def test_returns_plain_value_for_non_sensitive(self):
         update_runtime_config("batch_size", 99)

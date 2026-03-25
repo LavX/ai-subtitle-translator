@@ -1,16 +1,35 @@
 """Pydantic request/response models for the API."""
 
+import re
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07")
+_DANGEROUS_CONTROL_CHARS = frozenset(
+    chr(c) for c in range(0x00, 0x20) if chr(c) not in ("\n", "\r", "\t")
+)
+
+
+def _sanitize_text(text: str) -> str:
+    """Strip null bytes, ANSI escapes, and dangerous control characters."""
+    text = _ANSI_RE.sub("", text)
+    return "".join(c for c in text if c not in _DANGEROUS_CONTROL_CHARS)
 
 
 class SubtitleLine(BaseModel):
     """A single subtitle line with position and text content."""
 
-    position: int = Field(..., description="Line position/index in the subtitle file")
-    line: str = Field(..., description="The subtitle text content")
+    position: int = Field(
+        ..., ge=0, le=100_000, description="Line position/index in the subtitle file"
+    )
+    line: str = Field(..., max_length=2000, description="The subtitle text content")
+
+    @field_validator("line")
+    @classmethod
+    def sanitize_line(cls, v: str) -> str:
+        return _sanitize_text(v)
 
 
 class ReasoningConfig(BaseModel):
@@ -40,6 +59,7 @@ class ProviderConfig(BaseModel):
 
     order: list[str] | None = Field(
         default=None,
+        max_length=20,
         description="List of provider slugs to try in order (e.g., ['exacto', 'deepinfra'])",
     )
     allow_fallbacks: bool | None = Field(
@@ -51,9 +71,11 @@ class ProviderConfig(BaseModel):
         default=None, description="Sort providers by: 'price', 'throughput', or 'latency'"
     )
     only: list[str] | None = Field(
-        default=None, description="List of provider slugs to allow exclusively"
+        default=None, max_length=20, description="List of provider slugs to allow exclusively"
     )
-    ignore: list[str] | None = Field(default=None, description="List of provider slugs to skip")
+    ignore: list[str] | None = Field(
+        default=None, max_length=20, description="List of provider slugs to skip"
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -110,18 +132,28 @@ class TranslateContentRequest(BaseModel):
         default=None, description="Media ID from Sonarr/Radarr (optional)"
     )
     title: str | None = Field(
-        default=None, description="Title of the media (helps translation context)"
+        default=None, max_length=500, description="Title of the media (helps translation context)"
     )
-    sourceLanguage: str = Field(..., description="Source language code (e.g., 'en', 'English')")
-    targetLanguage: str = Field(..., description="Target language code (e.g., 'es', 'Spanish')")
-    mediaType: str | None = Field(default=None, description="Type of media: 'Episode' or 'Movie'")
+    sourceLanguage: str = Field(
+        ..., max_length=50, description="Source language code (e.g., 'en', 'English')"
+    )
+    targetLanguage: str = Field(
+        ..., max_length=50, description="Target language code (e.g., 'es', 'Spanish')"
+    )
+    mediaType: str | None = Field(
+        default=None, max_length=50, description="Type of media: 'Episode' or 'Movie'"
+    )
     lines: list[SubtitleLine] = Field(
-        ..., max_length=50_000, description="List of subtitle lines to translate"
+        ..., max_length=10_000, description="List of subtitle lines to translate"
     )
-    fileName: str | None = Field(default=None, description="Original file name (informational)")
-    jobName: str | None = Field(default=None, description="User-provided label for the job")
+    fileName: str | None = Field(
+        default=None, max_length=500, description="Original file name (informational)"
+    )
+    jobName: str | None = Field(
+        default=None, max_length=200, description="User-provided label for the job"
+    )
     model: str | None = Field(
-        default=None, description="Override default LLM model for translation"
+        default=None, max_length=200, description="Override default LLM model for translation"
     )
     temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Override default temperature (0.0-2.0)"
@@ -129,6 +161,21 @@ class TranslateContentRequest(BaseModel):
     config: TranslationConfig | None = Field(
         default=None, description="Per-request configuration overrides"
     )
+
+    @field_validator(
+        "title",
+        "sourceLanguage",
+        "targetLanguage",
+        "mediaType",
+        "fileName",
+        "jobName",
+        mode="before",
+    )
+    @classmethod
+    def sanitize_metadata(cls, v):
+        if isinstance(v, str):
+            return _sanitize_text(v)
+        return v
 
 
 class TranslateContentResponse(BaseModel):
@@ -149,18 +196,24 @@ class TranslateFileRequest(BaseModel):
     """Request model for translating an entire SRT file."""
 
     content: str = Field(
-        ..., max_length=10_000_000, description="Complete SRT file content as string"
+        ..., max_length=2_000_000, description="Complete SRT file content as string"
     )
-    sourceLanguage: str = Field(..., description="Source language code")
-    targetLanguage: str = Field(..., description="Target language code")
+    sourceLanguage: str = Field(..., max_length=50, description="Source language code")
+    targetLanguage: str = Field(..., max_length=50, description="Target language code")
     title: str | None = Field(
-        default=None, description="Title of the media (helps translation context)"
+        default=None, max_length=500, description="Title of the media (helps translation context)"
     )
-    mediaType: str | None = Field(default=None, description="Type of media: 'Episode' or 'Movie'")
-    fileName: str | None = Field(default=None, description="Original file name (informational)")
-    jobName: str | None = Field(default=None, description="User-provided label for the job")
+    mediaType: str | None = Field(
+        default=None, max_length=50, description="Type of media: 'Episode' or 'Movie'"
+    )
+    fileName: str | None = Field(
+        default=None, max_length=500, description="Original file name (informational)"
+    )
+    jobName: str | None = Field(
+        default=None, max_length=200, description="User-provided label for the job"
+    )
     model: str | None = Field(
-        default=None, description="Override default LLM model for translation"
+        default=None, max_length=200, description="Override default LLM model for translation"
     )
     temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Override default temperature"
@@ -168,6 +221,26 @@ class TranslateFileRequest(BaseModel):
     config: TranslationConfig | None = Field(
         default=None, description="Per-request configuration overrides"
     )
+
+    @field_validator(
+        "title",
+        "sourceLanguage",
+        "targetLanguage",
+        "mediaType",
+        "fileName",
+        "jobName",
+        mode="before",
+    )
+    @classmethod
+    def sanitize_metadata(cls, v):
+        if isinstance(v, str):
+            return _sanitize_text(v)
+        return v
+
+    @field_validator("content")
+    @classmethod
+    def sanitize_content(cls, v: str) -> str:
+        return _sanitize_text(v)
 
 
 class TranslateFileResponse(BaseModel):
@@ -343,8 +416,10 @@ class ConfigResponse(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     """Request model for updating runtime configuration."""
 
-    apiKey: str | None = Field(default=None, description="OpenRouter API key")
-    model: str | None = Field(default=None, description="Default model for translation")
+    apiKey: str | None = Field(default=None, max_length=500, description="OpenRouter API key")
+    model: str | None = Field(
+        default=None, max_length=200, description="Default model for translation"
+    )
     temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Default temperature"
     )

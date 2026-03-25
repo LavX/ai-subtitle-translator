@@ -158,10 +158,28 @@ def update_runtime_config(key: str, value: Any) -> None:
     """
     global _runtime_overrides, _overridden_settings
 
-    # Validate that key is a valid Settings field
-    valid_keys = set(Settings.model_fields.keys())
-    if key not in valid_keys:
-        raise ValueError(f"Invalid configuration key: {key}. Valid keys: {valid_keys}")
+    # Only allow safe-to-modify keys at runtime. URL-type settings,
+    # file paths, and security-sensitive fields are immutable after startup.
+    RUNTIME_MUTABLE_KEYS = {
+        "openrouter_api_key",
+        "openrouter_default_model",
+        "openrouter_temperature",
+        "openrouter_max_tokens",
+        "batch_size",
+        "parallel_batches_per_job",
+        "max_retries",
+        "retry_delay",
+        "request_timeout",
+        "job_queue_max_concurrent",
+        "job_queue_max_jobs",
+        "job_queue_ttl_hours",
+        "log_level",
+    }
+    if key not in RUNTIME_MUTABLE_KEYS:
+        raise ValueError(
+            f"Configuration key '{key}' cannot be modified at runtime. "
+            f"Mutable keys: {sorted(RUNTIME_MUTABLE_KEYS)}"
+        )
 
     with _settings_lock:
         _runtime_overrides[key] = value

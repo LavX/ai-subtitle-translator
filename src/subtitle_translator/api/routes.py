@@ -1003,7 +1003,7 @@ async def test_connection(
 
     # Validate API key against OpenRouter
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
             resp = await client.get(
                 "https://openrouter.ai/api/v1/auth/key",
                 headers={"Authorization": f"Bearer {actual_key}"},
