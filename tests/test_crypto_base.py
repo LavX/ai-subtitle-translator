@@ -2,16 +2,14 @@
 
 import pytest
 
-from subtitle_translator.crypto import decrypt, derive_auth_token, generate_key, _parse_hex_key
+from subtitle_translator.crypto import _parse_hex_key, decrypt, derive_auth_token, generate_key
 from subtitle_translator.providers.base import (
-    TranslationProvider,
-    TranslationProviderError,
-    RateLimitError,
     AuthenticationError,
     InvalidResponseError,
-    TranslationBatch,
+    RateLimitError,
+    TranslationProvider,
+    TranslationProviderError,
 )
-
 
 # ---------------------------------------------------------------------------
 # crypto.py tests
@@ -170,9 +168,7 @@ class TestBuildSystemPrompt:
 
     def test_with_context_title_and_media_type(self):
         provider = ConcreteProvider()
-        prompt = provider.build_system_prompt(
-            "Hungarian", "English", "Breaking Bad", "Episode"
-        )
+        prompt = provider.build_system_prompt("Hungarian", "English", "Breaking Bad", "Episode")
         assert "Hungarian" in prompt
         assert "English" in prompt
         assert "Breaking Bad" in prompt

@@ -23,7 +23,6 @@ from subtitle_translator.providers.base import (
 from subtitle_translator.providers.openrouter import (
     EFFORT_REASONING_MODELS,
     ENABLED_REASONING_MODELS,
-    EXCELLENT_FREE_MODELS,
     EXCELLENT_MODELS,
     GOOD_MODELS,
     MAX_TOKENS_REASONING_MODELS,
@@ -33,10 +32,10 @@ from subtitle_translator.providers.openrouter import (
     OpenRouterProvider,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_settings(**overrides):
     """Build a mock Settings object with sensible defaults."""
@@ -174,7 +173,7 @@ class TestClientProperty:
 
     def test_recreates_closed_client(self):
         provider = OpenRouterProvider(settings=_make_settings())
-        c1 = provider.client
+        provider.client  # noqa: B018
         # Simulate closed client
         provider._client = MagicMock(is_closed=True)
         c2 = provider.client
@@ -251,9 +250,7 @@ class TestGetAvailableModels:
 
     async def test_default_model_first(self):
         default_id = EXCELLENT_MODELS[0]["id"]
-        provider = OpenRouterProvider(
-            settings=_make_settings(openrouter_default_model=default_id)
-        )
+        provider = OpenRouterProvider(settings=_make_settings(openrouter_default_model=default_id))
         models = await provider.get_available_models()
         assert models[0]["is_default"] is True
         assert models[0]["id"] == default_id
@@ -474,9 +471,7 @@ class TestTranslateBatch:
     async def test_client_error_400_non_retryable(self):
         provider = OpenRouterProvider(settings=_make_settings())
         batch = _make_batch()
-        mock_resp = _mock_response(
-            400, json_data={"error": {"message": "bad request"}}
-        )
+        mock_resp = _mock_response(400, json_data={"error": {"message": "bad request"}})
 
         mock_client = AsyncMock()
         mock_client.post.return_value = mock_resp
@@ -816,9 +811,7 @@ class TestBuildReasoningPayload:
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(effort="high"),
         )
-        model, params = await provider._build_reasoning_payload(
-            EFFORT_REASONING_MODELS[0], config
-        )
+        model, params = await provider._build_reasoning_payload(EFFORT_REASONING_MODELS[0], config)
         assert params == {"reasoning": {"effort": "high"}}
 
     async def test_effort_none_disables(self):
@@ -827,9 +820,7 @@ class TestBuildReasoningPayload:
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(effort="none"),
         )
-        model, params = await provider._build_reasoning_payload(
-            EFFORT_REASONING_MODELS[0], config
-        )
+        model, params = await provider._build_reasoning_payload(EFFORT_REASONING_MODELS[0], config)
         assert params == {}
 
     async def test_invalid_effort_ignored(self):
@@ -838,9 +829,7 @@ class TestBuildReasoningPayload:
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(effort="superduper"),
         )
-        model, params = await provider._build_reasoning_payload(
-            EFFORT_REASONING_MODELS[0], config
-        )
+        model, params = await provider._build_reasoning_payload(EFFORT_REASONING_MODELS[0], config)
         # Invalid effort should be warned and not included
         assert "effort" not in params.get("reasoning", {})
 
@@ -872,9 +861,7 @@ class TestBuildReasoningPayload:
             model=ENABLED_REASONING_MODELS[0],
             reasoning=ReasoningConfig(enabled=True),
         )
-        model, params = await provider._build_reasoning_payload(
-            ENABLED_REASONING_MODELS[0], config
-        )
+        model, params = await provider._build_reasoning_payload(ENABLED_REASONING_MODELS[0], config)
         assert params == {"reasoning": {"enabled": True}}
 
     async def test_enabled_reasoning_false(self):
@@ -883,9 +870,7 @@ class TestBuildReasoningPayload:
             model=ENABLED_REASONING_MODELS[0],
             reasoning=ReasoningConfig(enabled=False),
         )
-        model, params = await provider._build_reasoning_payload(
-            ENABLED_REASONING_MODELS[0], config
-        )
+        model, params = await provider._build_reasoning_payload(ENABLED_REASONING_MODELS[0], config)
         assert params == {"reasoning": {"enabled": False}}
 
     async def test_thinking_variant_via_use_thinking(self):
@@ -894,9 +879,7 @@ class TestBuildReasoningPayload:
             model=THINKING_VARIANT_MODELS[0],
             use_thinking_variant=True,
         )
-        model, params = await provider._build_reasoning_payload(
-            THINKING_VARIANT_MODELS[0], config
-        )
+        model, params = await provider._build_reasoning_payload(THINKING_VARIANT_MODELS[0], config)
         assert model == f"{THINKING_VARIANT_MODELS[0]}:thinking"
         assert params == {}
 
@@ -917,9 +900,7 @@ class TestBuildReasoningPayload:
             model=THINKING_VARIANT_MODELS[0],
             reasoning=ReasoningConfig(enabled=True),
         )
-        model, params = await provider._build_reasoning_payload(
-            THINKING_VARIANT_MODELS[0], config
-        )
+        model, params = await provider._build_reasoning_payload(THINKING_VARIANT_MODELS[0], config)
         assert model.endswith(":thinking")
 
     async def test_no_reasoning_support_warns(self, caplog):
@@ -944,9 +925,7 @@ class TestBuildReasoningPayload:
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(max_tokens=5000),
         )
-        model, params = await provider._build_reasoning_payload(
-            EFFORT_REASONING_MODELS[0], config
-        )
+        model, params = await provider._build_reasoning_payload(EFFORT_REASONING_MODELS[0], config)
         assert params["reasoning"]["effort"] == "high"
 
     async def test_effort_maps_max_tokens_medium(self):
@@ -955,9 +934,7 @@ class TestBuildReasoningPayload:
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(max_tokens=2500),
         )
-        _, params = await provider._build_reasoning_payload(
-            EFFORT_REASONING_MODELS[0], config
-        )
+        _, params = await provider._build_reasoning_payload(EFFORT_REASONING_MODELS[0], config)
         assert params["reasoning"]["effort"] == "medium"
 
     async def test_effort_maps_max_tokens_low(self):
@@ -966,9 +943,7 @@ class TestBuildReasoningPayload:
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(max_tokens=500),
         )
-        _, params = await provider._build_reasoning_payload(
-            EFFORT_REASONING_MODELS[0], config
-        )
+        _, params = await provider._build_reasoning_payload(EFFORT_REASONING_MODELS[0], config)
         assert params["reasoning"]["effort"] == "low"
 
     async def test_effort_enabled_default_medium(self):
@@ -978,9 +953,7 @@ class TestBuildReasoningPayload:
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(enabled=True),
         )
-        _, params = await provider._build_reasoning_payload(
-            EFFORT_REASONING_MODELS[0], config
-        )
+        _, params = await provider._build_reasoning_payload(EFFORT_REASONING_MODELS[0], config)
         assert params["reasoning"]["effort"] == "medium"
 
 
@@ -1162,8 +1135,10 @@ class TestGetReasoningType:
         # Not yet fetched
         assert provider._model_params_fetched is False
 
-        with patch.object(provider, "_ensure_model_params_cache", new_callable=AsyncMock) as mock_ensure:
-            result = await provider._get_reasoning_type("totally-unknown/model")
+        with patch.object(
+            provider, "_ensure_model_params_cache", new_callable=AsyncMock
+        ) as mock_ensure:
+            await provider._get_reasoning_type("totally-unknown/model")
             mock_ensure.assert_awaited_once()
 
 
@@ -1172,10 +1147,12 @@ class TestParseTranslations:
 
     def test_valid_array(self):
         provider = OpenRouterProvider(settings=_make_settings())
-        content = json.dumps([
-            {"index": "0", "content": "Szia"},
-            {"index": "1", "content": "Vilag"},
-        ])
+        content = json.dumps(
+            [
+                {"index": "0", "content": "Szia"},
+                {"index": "1", "content": "Vilag"},
+            ]
+        )
         result = provider._parse_translations(content)
         assert len(result) == 2
 
@@ -1217,11 +1194,13 @@ class TestParseTranslations:
 
     def test_skips_non_dict_items(self, caplog):
         provider = OpenRouterProvider(settings=_make_settings())
-        content = json.dumps([
-            {"index": "0", "content": "Szia"},
-            "not a dict",
-            {"index": "1", "content": "Vilag"},
-        ])
+        content = json.dumps(
+            [
+                {"index": "0", "content": "Szia"},
+                "not a dict",
+                {"index": "1", "content": "Vilag"},
+            ]
+        )
         with caplog.at_level(logging.WARNING):
             result = provider._parse_translations(content)
         assert len(result) == 2

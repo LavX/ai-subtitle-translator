@@ -4,11 +4,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from subtitle_translator.api.models import SubtitleLine, TranslationConfig
-from subtitle_translator.core.batch_processor import BatchProgress, BatchResult, BatchProcessingResult
+from subtitle_translator.api.models import SubtitleLine
+from subtitle_translator.core.batch_processor import (
+    BatchProgress,
+)
 from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
 from subtitle_translator.queue.worker import (
-    _extract_config_override,
     _extract_config_override_from_dict,
     process_content_translation_job,
     process_file_translation_job,
@@ -77,6 +78,7 @@ def _all_failed_result():
 # Content job: config override logging (lines 56-62)
 # ---------------------------------------------------------------------------
 
+
 class TestContentJobConfigLogging:
     """Tests that config with sensitive keys gets masked in logs."""
 
@@ -128,6 +130,7 @@ class TestContentJobConfigLogging:
 # ---------------------------------------------------------------------------
 # Content job: reasoning and provider config logging (lines 71-72, 82, 87)
 # ---------------------------------------------------------------------------
+
 
 class TestContentJobReasoningAndProviderLogging:
     """Tests for reasoning/provider config logging branches."""
@@ -243,6 +246,7 @@ class TestContentJobReasoningAndProviderLogging:
 # Content job: progress callback (lines 97-103)
 # ---------------------------------------------------------------------------
 
+
 class TestContentJobProgressCallback:
     """Tests that the progress callback updates the job manager."""
 
@@ -337,6 +341,7 @@ class TestContentJobProgressCallback:
 # Content job: partial failure (lines 133-141)
 # ---------------------------------------------------------------------------
 
+
 class TestContentJobPartialFailure:
     """Tests for partial translation results on content jobs."""
 
@@ -382,6 +387,7 @@ class TestContentJobPartialFailure:
 # File job: config override and logging (lines 222-236)
 # ---------------------------------------------------------------------------
 
+
 class TestFileJobConfigOverride:
     """Tests for file translation job config override paths."""
 
@@ -393,7 +399,9 @@ class TestFileJobConfigOverride:
         ]
         mock_translator._srt_parser.apply_translations.return_value = entries
         mock_translator._srt_parser.split_long_subtitles.return_value = entries
-        mock_translator._srt_parser.compose.return_value = "1\n00:00:01,000 --> 00:00:02,000\nHola\n\n"
+        mock_translator._srt_parser.compose.return_value = (
+            "1\n00:00:01,000 --> 00:00:02,000\nHola\n\n"
+        )
         return entries
 
     @pytest.mark.asyncio
@@ -524,6 +532,7 @@ class TestFileJobConfigOverride:
 # File job: RTL language (line 312 in partial path)
 # ---------------------------------------------------------------------------
 
+
 class TestFileJobRTL:
     """Tests for RTL language handling in file translation."""
 
@@ -572,6 +581,7 @@ class TestFileJobRTL:
 # ---------------------------------------------------------------------------
 # File job: partial failure (lines 308-336)
 # ---------------------------------------------------------------------------
+
 
 class TestFileJobPartialFailure:
     """Tests for partial failure in file translation jobs."""
@@ -653,6 +663,7 @@ class TestFileJobPartialFailure:
 # ---------------------------------------------------------------------------
 # File job: progress callback (lines 278-284)
 # ---------------------------------------------------------------------------
+
 
 class TestFileJobProgressCallback:
     """Tests for file job progress callback."""
@@ -753,6 +764,7 @@ class TestFileJobProgressCallback:
 # File job: split_long_subtitles (called on success path)
 # ---------------------------------------------------------------------------
 
+
 class TestFileJobSplitLongSubtitles:
     """Verify split_long_subtitles is invoked on the success path."""
 
@@ -799,6 +811,7 @@ class TestFileJobSplitLongSubtitles:
 # File job: exception handler (lines 362-364)
 # ---------------------------------------------------------------------------
 
+
 class TestFileJobExceptionHandler:
     """Tests for the outer exception handler in file translation."""
 
@@ -830,6 +843,7 @@ class TestFileJobExceptionHandler:
 # ---------------------------------------------------------------------------
 # Config extraction: parallelBatches key
 # ---------------------------------------------------------------------------
+
 
 class TestExtractConfigParallelBatches:
     """Test that parallelBatches is recognized by _extract_config_override_from_dict."""

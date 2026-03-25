@@ -1,13 +1,11 @@
 """Tests for main.py: create_app(), lifespan(), and CORS configuration."""
 
 import os
-from contextlib import asynccontextmanager
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -220,14 +218,10 @@ class TestLifespanEncryptionEnabled:
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
-            patch(
-                f"{MODULE}.load_or_generate_key", return_value=(fake_key, False)
-            ) as mock_load,
+            patch(f"{MODULE}.load_or_generate_key", return_value=(fake_key, False)) as mock_load,
             patch(f"{MODULE}.set_crypto_key", patches[f"{MODULE}.set_crypto_key"]) as mock_set_ck,
             patch(f"{MODULE}.set_auth_token", patches[f"{MODULE}.set_auth_token"]) as mock_set_at,
-            patch(
-                f"{MODULE}.derive_auth_token", return_value="tok123"
-            ) as mock_derive,
+            patch(f"{MODULE}.derive_auth_token", return_value="tok123") as mock_derive,
             patch(f"{MODULE}.JobStore", patches[f"{MODULE}.JobStore"]) as mock_store_cls,
             patch(f"{MODULE}.job_manager", patches[f"{MODULE}.job_manager"]),
             patch(f"{MODULE}.close_translator", patches[f"{MODULE}.close_translator"]),
@@ -320,7 +314,7 @@ class TestLifespanJobRecovery:
             async with lifespan(mock_app):
                 pass
             mock_jm.recover_jobs.assert_awaited_once()
-            mock_logger.info.assert_any_call("Recovered %s jobs from previous session" % 5)
+            mock_logger.info.assert_any_call(f"Recovered {5} jobs from previous session")
 
     async def test_worker_config_applied(self):
         """max_concurrent, max_jobs, and worker handler are set before start."""

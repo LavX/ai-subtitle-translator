@@ -70,8 +70,10 @@ class TestRegenerateKey:
 
 class TestMain:
     def test_regenerate_key_command(self):
-        with patch("subtitle_translator.cli.regenerate_key") as mock_regen, \
-             patch("sys.argv", ["cli", "regenerate-key"]):
+        with (
+            patch("subtitle_translator.cli.regenerate_key") as mock_regen,
+            patch("sys.argv", ["cli", "regenerate-key"]),
+        ):
             main()
             mock_regen.assert_called_once()
 

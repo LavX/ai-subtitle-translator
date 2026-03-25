@@ -80,7 +80,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Encryption disabled")
         if settings.encryption_strict:
-            logger.warning("ENCRYPTION_STRICT is set but encryption is disabled. Strict mode has no effect.")
+            logger.warning(
+                "ENCRYPTION_STRICT is set but encryption is disabled. Strict mode has no effect."
+            )
     set_crypto_key(crypto_key)
 
     # Auth token setup (derived from encryption key)

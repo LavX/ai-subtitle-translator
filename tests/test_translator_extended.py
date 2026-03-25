@@ -1,7 +1,8 @@
 """Extended tests for translator.py to cover missing lines."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from subtitle_translator.api.models import (
     SubtitleLine,
@@ -14,17 +15,15 @@ from subtitle_translator.core.batch_processor import (
     BatchResult,
 )
 from subtitle_translator.core.translator import (
-    ContentTranslationResult,
-    FileTranslationResult,
     SubtitleTranslator,
     close_translator,
     get_translator,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_settings(**overrides):
     settings = MagicMock()
@@ -73,16 +72,14 @@ How are you?
 # provider property: lazy creation (line 67)
 # ---------------------------------------------------------------------------
 
-class TestProviderLazyCreation:
 
+class TestProviderLazyCreation:
     def test_provider_creates_openrouter_when_none(self):
         """Accessing .provider without injecting one creates OpenRouterProvider."""
         settings = _make_settings()
         translator = SubtitleTranslator(provider=None, settings=settings)
 
-        with patch(
-            "subtitle_translator.core.translator.OpenRouterProvider"
-        ) as MockOR:
+        with patch("subtitle_translator.core.translator.OpenRouterProvider") as MockOR:
             mock_instance = MagicMock()
             MockOR.return_value = mock_instance
 
@@ -102,8 +99,8 @@ class TestProviderLazyCreation:
 # translate_content: partial failure WITH translations (lines 121-135)
 # ---------------------------------------------------------------------------
 
-class TestTranslateContentPartialFailure:
 
+class TestTranslateContentPartialFailure:
     @pytest.mark.asyncio
     async def test_partial_failure_with_translations(self):
         provider = _make_provider()
@@ -180,8 +177,8 @@ class TestTranslateContentPartialFailure:
 # translate_content: exception path (lines 156-158)
 # ---------------------------------------------------------------------------
 
-class TestTranslateContentException:
 
+class TestTranslateContentException:
     @pytest.mark.asyncio
     async def test_exception_returns_error_result(self):
         provider = _make_provider()
@@ -210,8 +207,8 @@ class TestTranslateContentException:
 # translate_file: model from config_override (line 192)
 # ---------------------------------------------------------------------------
 
-class TestTranslateFileConfigOverride:
 
+class TestTranslateFileConfigOverride:
     @pytest.mark.asyncio
     async def test_model_from_config_override(self):
         provider = _make_provider()
@@ -240,8 +237,8 @@ class TestTranslateFileConfigOverride:
 # translate_file: empty entries (line 200)
 # ---------------------------------------------------------------------------
 
-class TestTranslateFileEmptyEntries:
 
+class TestTranslateFileEmptyEntries:
     @pytest.mark.asyncio
     async def test_empty_srt_returns_early(self):
         provider = _make_provider()
@@ -265,8 +262,8 @@ class TestTranslateFileEmptyEntries:
 # translate_file: partial failure paths (lines 224-244)
 # ---------------------------------------------------------------------------
 
-class TestTranslateFilePartialFailure:
 
+class TestTranslateFilePartialFailure:
     @pytest.mark.asyncio
     async def test_partial_failure_with_translations(self):
         provider = _make_provider()
@@ -335,8 +332,8 @@ class TestTranslateFilePartialFailure:
 # _add_rtl_markers delegation (line 294)
 # ---------------------------------------------------------------------------
 
-class TestAddRtlMarkers:
 
+class TestAddRtlMarkers:
     def test_add_rtl_markers_delegates(self):
         translator = SubtitleTranslator(provider=_make_provider(), settings=_make_settings())
         result = translator._add_rtl_markers("some text")
@@ -348,8 +345,8 @@ class TestAddRtlMarkers:
 # get_available_models and health_check delegation (lines 298, 331)
 # ---------------------------------------------------------------------------
 
-class TestDelegationMethods:
 
+class TestDelegationMethods:
     @pytest.mark.asyncio
     async def test_get_available_models(self):
         provider = _make_provider()
@@ -375,8 +372,8 @@ class TestDelegationMethods:
 # close_translator global helper (lines 356-358)
 # ---------------------------------------------------------------------------
 
-class TestCloseTranslator:
 
+class TestCloseTranslator:
     @pytest.mark.asyncio
     async def test_close_translator_resets_instance(self):
         """close_translator() should close the provider and clear the global."""
@@ -407,8 +404,8 @@ class TestCloseTranslator:
 # map_translations_to_lines RTL branch (line 331)
 # ---------------------------------------------------------------------------
 
-class TestMapTranslationsRTL:
 
+class TestMapTranslationsRTL:
     @pytest.mark.asyncio
     async def test_content_translation_with_rtl_language(self):
         """translate_content with an RTL target language triggers add_rtl_markers."""
@@ -428,8 +425,9 @@ class TestMapTranslationsRTL:
             total_tokens=30,
             model_used="test-model",
             batch_results=[
-                _make_batch_result(success=True, batch_index=0,
-                                   translations=[{"index": "1", "content": "مرحبا"}]),
+                _make_batch_result(
+                    success=True, batch_index=0, translations=[{"index": "1", "content": "مرحبا"}]
+                ),
             ],
             progress=BatchProgress(total_batches=1, completed_batches=1),
         )
@@ -448,8 +446,8 @@ class TestMapTranslationsRTL:
 # get_translator global helper (lines 346-350)
 # ---------------------------------------------------------------------------
 
-class TestGetTranslator:
 
+class TestGetTranslator:
     @pytest.mark.asyncio
     async def test_get_translator_creates_instance(self):
         """get_translator() creates a SubtitleTranslator when none exists."""
@@ -457,9 +455,7 @@ class TestGetTranslator:
 
         mod._translator_instance = None
 
-        with patch(
-            "subtitle_translator.core.translator.SubtitleTranslator"
-        ) as MockST:
+        with patch("subtitle_translator.core.translator.SubtitleTranslator") as MockST:
             mock_inst = MagicMock()
             MockST.return_value = mock_inst
 

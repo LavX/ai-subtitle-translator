@@ -16,13 +16,13 @@ def manager():
 
 
 def _make_job(job_id="test-1", status=JobStatus.QUEUED, **kwargs):
-    defaults = dict(
-        id=job_id,
-        job_type=JobType.TRANSLATE_CONTENT,
-        status=status,
-        request_data={"sourceLanguage": "en", "targetLanguage": "hu", "lines": []},
-        created_at=datetime.now(UTC),
-    )
+    defaults = {
+        "id": job_id,
+        "job_type": JobType.TRANSLATE_CONTENT,
+        "status": status,
+        "request_data": {"sourceLanguage": "en", "targetLanguage": "hu", "lines": []},
+        "created_at": datetime.now(UTC),
+    }
     defaults.update(kwargs)
     return Job(**defaults)
 
@@ -243,7 +243,6 @@ class TestWorker:
 
         handler.assert_not_called()
 
-
     @pytest.mark.asyncio
     async def test_worker_unexpected_exception_in_queue_get(self, manager):
         """Unexpected error during queue.get triggers except block (lines 594-596)."""
@@ -253,7 +252,6 @@ class TestWorker:
         # Monkey-patch queue.get to raise a non-CancelledError exception once,
         # then raise CancelledError to stop the loop.
         call_count = 0
-        original_get = manager.queue.get
 
         async def exploding_get():
             nonlocal call_count
@@ -299,7 +297,6 @@ class TestCleanupLoopError:
         async def fast_sleep(seconds):
             await original_sleep(0.01)
 
-        import subtitle_translator.queue.job_manager as jm_module
         old_sleep = asyncio.sleep
         asyncio.sleep = fast_sleep
         try:

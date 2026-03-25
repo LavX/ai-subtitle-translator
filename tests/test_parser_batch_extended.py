@@ -1,43 +1,40 @@
 """Extended tests for srt_parser.py and batch_processor.py to cover missing lines."""
 
-import asyncio
-
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from subtitle_translator.config import Settings
+from subtitle_translator.core.batch_processor import (
+    BatchProcessor,
+    get_batch_processor,
+)
 from subtitle_translator.core.srt_parser import (
     SRTParser,
     SRTParserError,
     add_rtl_markers,
     get_srt_parser,
 )
-from subtitle_translator.core.batch_processor import (
-    BatchProcessor,
-    BatchProgress,
-    get_batch_processor,
-)
 from subtitle_translator.providers.base import (
     InvalidResponseError,
     TranslationBatch,
     TranslationResult,
-    TranslationProviderError,
 )
-from subtitle_translator.config import Settings
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_settings(**overrides) -> Settings:
-    defaults = dict(
-        openrouter_api_key="test-key",
-        batch_size=10,
-        max_retries=2,
-        retry_delay=0.01,
-        parallel_batches_per_job=1,
-        openrouter_default_model="test-model",
-    )
+    defaults = {
+        "openrouter_api_key": "test-key",
+        "batch_size": 10,
+        "max_retries": 2,
+        "retry_delay": 0.01,
+        "parallel_batches_per_job": 1,
+        "openrouter_default_model": "test-model",
+    }
     defaults.update(overrides)
     return Settings(**defaults)
 
@@ -191,9 +188,7 @@ class TestProcessBatchAdaptiveRetryCountMismatch:
             ]
         )
 
-        result = await processor.process_batch(
-            batch, batch_index=0, _is_adaptive_retry=True
-        )
+        result = await processor.process_batch(batch, batch_index=0, _is_adaptive_retry=True)
 
         assert result.success is False
         assert "Partial translations" in result.error
@@ -224,9 +219,7 @@ class TestProcessBatchInvalidResponseAtFloor:
         # Use _is_adaptive_retry=True so can_adaptive is False,
         # forcing the "at floor" retry path.
         batch = _make_batch()
-        result = await processor.process_batch(
-            batch, batch_index=0, _is_adaptive_retry=True
-        )
+        result = await processor.process_batch(batch, batch_index=0, _is_adaptive_retry=True)
 
         assert result.success is True
         assert call_count == 3
@@ -234,16 +227,12 @@ class TestProcessBatchInvalidResponseAtFloor:
     @pytest.mark.asyncio
     async def test_invalid_response_exhausts_retries_at_floor(self):
         """InvalidResponseError at floor exhausts retries and returns failure."""
-        provider = _mock_provider(
-            side_effect=InvalidResponseError("bad json", provider="test")
-        )
+        provider = _mock_provider(side_effect=InvalidResponseError("bad json", provider="test"))
         settings = _make_settings(max_retries=2, retry_delay=0.001)
         processor = BatchProcessor(provider, settings)
 
         batch = _make_batch()
-        result = await processor.process_batch(
-            batch, batch_index=0, _is_adaptive_retry=True
-        )
+        result = await processor.process_batch(batch, batch_index=0, _is_adaptive_retry=True)
 
         assert result.success is False
         assert result.error == "bad json"
@@ -308,9 +297,7 @@ class TestProcessAllBatchesEdgeCases:
         config = TranslationConfig(model="override-model", parallel_batches=2)
         lines = [{"index": "0", "content": "Hello"}]
 
-        result = await processor.process_all_batches(
-            lines, "en", "es", config_override=config
-        )
+        result = await processor.process_all_batches(lines, "en", "es", config_override=config)
 
         assert result.model_used == "override-model"
         assert result.success
@@ -326,7 +313,9 @@ class TestProcessAllBatchesEdgeCases:
         lines = [{"index": "0", "content": "Hello"}]
 
         await processor.process_all_batches(
-            lines, "en", "es",
+            lines,
+            "en",
+            "es",
             progress_callback=lambda p: progress_updates.append(p.percent_complete),
         )
 
@@ -342,9 +331,7 @@ class TestProcessAllBatchesEdgeCases:
 
         lines = [{"index": str(i), "content": f"Line {i}"} for i in range(3)]
         # Need 3 separate batches to trigger stagger
-        result = await processor.process_all_batches(
-            lines, "en", "es", batch_size=1
-        )
+        result = await processor.process_all_batches(lines, "en", "es", batch_size=1)
         assert result.success
 
     @pytest.mark.asyncio
@@ -396,9 +383,7 @@ class TestProcessBatchesStream:
 
         lines = [{"index": "0", "content": "Hello"}]
         results = []
-        async for batch_result, progress in processor.process_batches_stream(
-            lines, "en", "es"
-        ):
+        async for batch_result, progress in processor.process_batches_stream(lines, "en", "es"):
             results.append((batch_result, progress))
 
         assert len(results) == 1
@@ -418,9 +403,7 @@ class TestProcessBatchesStream:
         ]
 
         results = []
-        async for batch_result, progress in processor.process_batches_stream(
-            lines, "en", "es"
-        ):
+        async for batch_result, progress in processor.process_batches_stream(lines, "en", "es"):
             # Capture a snapshot since progress is mutated in place
             results.append((batch_result, progress.completed_batches))
 
@@ -454,9 +437,7 @@ class TestProcessBatchesStream:
         ]
 
         results = []
-        async for batch_result, progress in processor.process_batches_stream(
-            lines, "en", "es"
-        ):
+        async for batch_result, progress in processor.process_batches_stream(lines, "en", "es"):
             results.append((batch_result, progress))
 
         assert len(results) == 2

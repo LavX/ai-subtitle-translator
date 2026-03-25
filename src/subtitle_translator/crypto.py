@@ -75,8 +75,9 @@ def derive_auth_token(key: bytes) -> str:
     This lets clients authenticate without sending the raw encryption key
     as a header. Both sides compute the same HMAC over a fixed label.
     """
-    import hmac
     import hashlib
+    import hmac
+
     return hmac.new(key, _AUTH_LABEL, hashlib.sha256).hexdigest()
 
 
