@@ -138,6 +138,27 @@ class TestParseTranslationsFallbacks:
         result = provider._parse_translations(content)
         assert result == [{"index": "0", "content": "Szia"}]
 
+    def test_broken_unicode_escape_sanitized(self, provider):
+        """Models sometimes produce invalid \\uXXXX escapes that break json.loads."""
+        # Simulate the exact error from the logs: Invalid \uXXXX escape
+        content = '[{"index":"0","content":"Hello \\uZZZZ world"},{"index":"1","content":"Good"}]'
+        result = provider._parse_translations(content)
+        assert len(result) == 2
+        assert result[0]["index"] == "0"
+        assert result[1]["content"] == "Good"
+
+    def test_truncated_unicode_escape_sanitized(self, provider):
+        """Truncated \\u sequence at end of string."""
+        content = '[{"index":"0","content":"Test \\u00e"},{"index":"1","content":"OK"}]'
+        result = provider._parse_translations(content)
+        assert len(result) >= 1
+
+    def test_valid_unicode_escape_preserved(self, provider):
+        """Valid \\uXXXX escapes must not be stripped."""
+        content = '[{"index":"0","content":"caf\\u00e9"}]'
+        result = provider._parse_translations(content)
+        assert result[0]["content"] == "caf\u00e9"
+
     def test_invalid_json_raises_error(self, provider):
         from subtitle_translator.providers.base import InvalidResponseError
 

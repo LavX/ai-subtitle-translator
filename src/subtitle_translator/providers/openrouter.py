@@ -1044,6 +1044,16 @@ class OpenRouterProvider(TranslationProvider):
             InvalidResponseError: If JSON parsing fails
         """
         try:
+            # Sanitize broken Unicode escapes that some models produce.
+            # E.g. \uXXXX where XXXX is not valid hex, or truncated \u sequences.
+            import re
+
+            content = re.sub(
+                r"\\u(?![0-9a-fA-F]{4})[^\"]*",
+                "",
+                content,
+            )
+
             # Parse JSON, detecting duplicate keys that json.loads() would silently deduplicate.
             # Some models return {"index":"0","content":"...","index":"1","content":"..."} which is
             # valid JSON but json.loads() keeps only the last value per key, losing translations.
