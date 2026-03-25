@@ -597,20 +597,31 @@ class TestStorePersistence:
             request_data={},
             created_at=datetime.now(UTC),
         )
-        store.load_active_jobs.return_value = [queued_job, processing_job]
+        completed_job = Job(
+            id="job-completed",
+            job_type=JobType.TRANSLATE_CONTENT,
+            status=JobStatus.COMPLETED,
+            request_data={},
+            created_at=datetime.now(UTC),
+        )
+        store.load_all_jobs.return_value = [queued_job, processing_job, completed_job]
 
         manager.set_store(store)
         count = await manager.recover_jobs()
 
+        # Return value is the count of re-queued (active) jobs only
         assert count == 2
+        # All 3 jobs loaded into memory
         assert "job-queued" in manager.jobs
         assert "job-processing" in manager.jobs
+        assert "job-completed" in manager.jobs
         assert manager.jobs["job-queued"].status == JobStatus.QUEUED
         assert manager.jobs["job-processing"].status == JobStatus.QUEUED
+        assert manager.jobs["job-completed"].status == JobStatus.COMPLETED
         assert manager.jobs["job-queued"].message == "Recovered after restart"
         assert manager.jobs["job-processing"].message == "Recovered after restart"
         assert not manager.queue.empty()
-        # save_job called once per recovered job
+        # save_job called once per re-queued job (not for completed)
         assert store.save_job.call_count == 2
 
     @pytest.mark.asyncio

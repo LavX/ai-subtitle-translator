@@ -224,6 +224,14 @@ class JobStore:
             ).fetchall()
         return [_row_to_job(row, self._crypto_key) for row in rows]
 
+    def load_job(self, job_id: str) -> Job | None:
+        """Return a single job by ID, or None if not found."""
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if row is None:
+            return None
+        return _row_to_job(row, self._crypto_key)
+
     def load_all_jobs(self, limit: int = 100) -> list[Job]:
         """Return all jobs ordered by created_at descending."""
         with self._lock:

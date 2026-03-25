@@ -130,21 +130,36 @@ class JobManager:
         self._worker_handler = handler
 
     async def recover_jobs(self) -> int:
-        """Load active jobs from persistent store and re-queue them."""
+        """Load jobs from persistent store into memory.
+
+        Active jobs (queued/processing) are re-queued for processing.
+        Terminal jobs (completed/partial/failed/cancelled) are loaded into
+        the in-memory dict so they remain visible via the API after restarts.
+        """
         if not self._store:
             return 0
-        jobs = self._store.load_active_jobs()
-        count = 0
-        for job in jobs:
-            job.status = JobStatus.QUEUED
-            job.message = "Recovered after restart"
-            self.jobs[job.id] = job
-            await self.queue.put((job.id, job.job_type))
-            self._store.save_job(job)
-            count += 1
-        if count:
-            logger.info(f"Recovered {count} jobs from persistent store")
-        return count
+
+        # Load ALL non-expired jobs so completed results survive restarts
+        all_jobs = self._store.load_all_jobs(limit=self.max_jobs)
+        requeued = 0
+        restored = 0
+        for job in all_jobs:
+            if job.status in (JobStatus.QUEUED, JobStatus.PROCESSING):
+                job.status = JobStatus.QUEUED
+                job.message = "Recovered after restart"
+                self.jobs[job.id] = job
+                await self.queue.put((job.id, job.job_type))
+                self._store.save_job(job)
+                requeued += 1
+            else:
+                self.jobs[job.id] = job
+                restored += 1
+
+        if requeued:
+            logger.info(f"Re-queued {requeued} active jobs from previous session")
+        if restored:
+            logger.info(f"Restored {restored} completed jobs from previous session")
+        return requeued
 
     async def start_workers(self) -> None:
         """Start background workers to process jobs."""
@@ -255,13 +270,25 @@ class JobManager:
         """
         Get a job by ID.
 
+        Checks the in-memory dict first, then falls back to the persistent
+        store for jobs that were cleaned from memory but still on disk.
+
         Args:
             job_id: The job ID
 
         Returns:
             The job if found, None otherwise
         """
-        return self.jobs.get(job_id)
+        job = self.jobs.get(job_id)
+        if job is not None:
+            return job
+        # Fallback to persistent store (job may have been cleaned from memory)
+        if self._store:
+            job = self._store.load_job(job_id)
+            if job is not None:
+                self.jobs[job_id] = job
+                return job
+        return None
 
     def update_progress(
         self,
