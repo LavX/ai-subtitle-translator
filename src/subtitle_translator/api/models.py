@@ -86,6 +86,7 @@ class TranslationConfig(BaseModel):
     api_key: str | None = Field(
         default=None,
         alias="apiKey",
+        max_length=500,
         description="OpenRouter API key (overrides environment variable)",
     )
     model: str | None = Field(default=None, description="Model to use for translation")
@@ -442,7 +443,7 @@ class TestConnectionRequest(BaseModel):
     """Request model for testing encryption and API key validity."""
 
     apiKey: str = Field(
-        ..., min_length=1, description="API key to test (plaintext or enc: encrypted)"
+        ..., min_length=1, max_length=500, description="API key to test (plaintext or enc: encrypted)"
     )
 
 

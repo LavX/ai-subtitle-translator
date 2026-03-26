@@ -112,7 +112,7 @@ AuthDep = Depends(_verify_auth_token)
 health_router = APIRouter(tags=["Health"])
 api_router = APIRouter(prefix="/api/v1", tags=["Translation"])
 jobs_router = APIRouter(prefix="/api/v1/jobs", tags=["Jobs"], dependencies=[AuthDep])
-config_router = APIRouter(prefix="/api/v1", tags=["Configuration"])
+config_router = APIRouter(prefix="/api/v1", tags=["Configuration"], dependencies=[AuthDep])
 
 
 # Dependency for getting translator
@@ -258,6 +258,10 @@ async def translate_content(
             },
         )
 
+    # Decrypt API key if provided with enc: prefix
+    if request.config and request.config.api_key:
+        request.config.api_key = _decrypt_api_key(request.config.api_key)
+
     # Validate request
     if not request.lines:
         return TranslateContentResponse(
@@ -341,6 +345,10 @@ async def translate_file(
                 "message": "OpenRouter API key is not configured. Set OPENROUTER_API_KEY or pass apiKey in request config.",
             },
         )
+
+    # Decrypt API key if provided with enc: prefix
+    if request.config and request.config.api_key:
+        request.config.api_key = _decrypt_api_key(request.config.api_key)
 
     # Validate request
     if not request.content or not request.content.strip():

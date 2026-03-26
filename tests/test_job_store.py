@@ -245,21 +245,21 @@ class TestEncryption:
         assert jobs[0].api_key_override == "sk-supersecret-key"
 
     def test_works_without_encryption(self, tmp_path: Path) -> None:
-        """No crypto_key: api_key stored and retrieved as plaintext."""
+        """No crypto_key: api_key is NOT persisted (stored as NULL to avoid plaintext on disk)."""
         db_path = str(tmp_path / "test.db")
         store = JobStore(db_path)  # no crypto_key
 
         job = make_job(api_key_override="sk-plaintext-key")
         store.save_job(job)
 
-        # Raw DB value should be plaintext
+        # Raw DB value should be NULL (not stored in plaintext)
         conn = sqlite3.connect(db_path)
         row = conn.execute("SELECT api_key_override FROM jobs WHERE id = ?", (job.id,)).fetchone()
         conn.close()
 
-        assert row[0] == "sk-plaintext-key"
+        assert row[0] is None
 
-        # And loading should return it unchanged
+        # And loading should return None
         jobs = store.load_all_jobs()
         store.close()
-        assert jobs[0].api_key_override == "sk-plaintext-key"
+        assert jobs[0].api_key_override is None

@@ -1052,7 +1052,7 @@ class OpenRouterProvider(TranslationProvider):
             import re
 
             content = re.sub(
-                r"\\u(?![0-9a-fA-F]{4})[^\"]*",
+                r"\\u(?![0-9a-fA-F]{4})[0-9a-fA-F]{0,3}",
                 "",
                 content,
             )

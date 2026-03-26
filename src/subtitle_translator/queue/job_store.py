@@ -123,6 +123,7 @@ class JobStore:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL")
         self._lock = threading.Lock()
         self._init_schema()
         # Restrict DB file permissions (contains encrypted API keys)
@@ -158,8 +159,12 @@ class JobStore:
         The api_key_override field is encrypted when a crypto_key is set.
         """
         api_key = job.api_key_override
-        if api_key is not None and self._crypto_key is not None:
-            api_key = encrypt(api_key, self._crypto_key)
+        if api_key is not None:
+            if self._crypto_key is not None:
+                api_key = encrypt(api_key, self._crypto_key)
+            else:
+                # Don't persist plaintext API keys when encryption is disabled
+                api_key = None
 
         result_json = json.dumps(job.result) if job.result is not None else None
 
@@ -222,7 +227,13 @@ class JobStore:
                 "SELECT * FROM jobs WHERE status IN (?, ?) ORDER BY created_at ASC",
                 (JobStatus.QUEUED.value, JobStatus.PROCESSING.value),
             ).fetchall()
-        return [_row_to_job(row, self._crypto_key) for row in rows]
+        jobs = []
+        for row in rows:
+            try:
+                jobs.append(_row_to_job(row, self._crypto_key))
+            except Exception:
+                logger.error("Skipping corrupt job row id=%s", row["id"], exc_info=True)
+        return jobs
 
     def load_job(self, job_id: str) -> Job | None:
         """Return a single job by ID, or None if not found."""
@@ -230,7 +241,11 @@ class JobStore:
             row = self._conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         if row is None:
             return None
-        return _row_to_job(row, self._crypto_key)
+        try:
+            return _row_to_job(row, self._crypto_key)
+        except Exception:
+            logger.error("Failed to load corrupt job id=%s", job_id, exc_info=True)
+            return None
 
     def load_all_jobs(self, limit: int = 100) -> list[Job]:
         """Return all jobs ordered by created_at descending."""
@@ -239,7 +254,13 @@ class JobStore:
                 "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        return [_row_to_job(row, self._crypto_key) for row in rows]
+        jobs = []
+        for row in rows:
+            try:
+                jobs.append(_row_to_job(row, self._crypto_key))
+            except Exception:
+                logger.error("Skipping corrupt job row id=%s", row["id"], exc_info=True)
+        return jobs
 
     def delete_job(self, job_id: str) -> None:
         """Delete a job by ID."""

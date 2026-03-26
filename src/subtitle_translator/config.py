@@ -173,7 +173,6 @@ def update_runtime_config(key: str, value: Any) -> None:
         "job_queue_max_concurrent",
         "job_queue_max_jobs",
         "job_queue_ttl_hours",
-        "log_level",
     }
     if key not in RUNTIME_MUTABLE_KEYS:
         raise ValueError(
