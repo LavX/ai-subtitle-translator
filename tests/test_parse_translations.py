@@ -97,6 +97,37 @@ class TestParseTranslationsControlCharacters:
         assert result == [{"index": "0", "content": "Line1\nLine2"}]
 
 
+class TestParseTranslationsInvalidEscapes:
+    """Models escape characters JSON does not allow escaping, most often an apostrophe."""
+
+    def test_escaped_apostrophe_loses_the_backslash(self, provider):
+        content = '[{"index":"0","content":"Don\\\'t stop"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Don't stop"}]
+
+    def test_escaped_backslash_pair_is_preserved(self, provider):
+        content = '[{"index":"0","content":"C:\\\\path"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "C:\\path"}]
+
+    def test_valid_escapes_are_untouched(self, provider):
+        content = '[{"index":"0","content":"Line1\\nLine2 \\"quoted\\" a\\/b \\u00e9"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": 'Line1\nLine2 "quoted" a/b \u00e9'}]
+
+    def test_invalid_escape_with_raw_newline(self, provider):
+        content = '[{"index":"0","content":"Don\\\'t\nstop"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Don't\nstop"}]
+
+    def test_escaped_backslash_before_u_is_preserved(self, provider):
+        # An escaped backslash followed by a plain "u" is not a broken Unicode escape;
+        # reading its second half as one corrupted the text before.
+        content = '[{"index":"0","content":"C:\\\\users\\\\me"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "C:\\users\\me"}]
+
+
 class TestParseTranslationsDuplicateKeys:
     """Tests for malformed JSON with duplicate keys (the bug this PR fixes)."""
 

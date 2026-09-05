@@ -1047,21 +1047,20 @@ class OpenRouterProvider(TranslationProvider):
             InvalidResponseError: If JSON parsing fails
         """
         try:
-            # Sanitize broken Unicode escapes that some models produce.
-            # E.g. \uXXXX where XXXX is not valid hex, or truncated \u sequences.
+            # Models produce backslashes JSON cannot take: a \u escape without four hex
+            # digits (or truncated), and escaped characters JSON does not allow escaping,
+            # most often an apostrophe as \'. One pass handles both so that an escaped
+            # backslash pair is consumed first and its second half is never read as the
+            # start of another escape: the pair is kept, a broken Unicode escape is
+            # dropped, and the backslash of an invalid escape is dropped.
             import re
 
+            def _sanitize_escape(match):
+                return match.group(0) if match.group(0) == "\\\\" else ""
+
             content = re.sub(
-                r"\\u(?![0-9a-fA-F]{4})[0-9a-fA-F]{0,3}",
-                "",
-                content,
-            )
-            # Models also escape characters that JSON does not allow escaping, most often an
-            # apostrophe as \'. Drop that backslash instead of failing the batch; an escaped
-            # backslash pair is consumed first so it survives untouched.
-            content = re.sub(
-                r"\\\\|\\(?![\"\\/bfnrtu])",
-                lambda match: "" if match.group(0) == "\\" else match.group(0),
+                r"\\\\|\\u(?![0-9a-fA-F]{4})[0-9a-fA-F]{0,3}|\\(?![\"\\/bfnrtu])",
+                _sanitize_escape,
                 content,
             )
 
