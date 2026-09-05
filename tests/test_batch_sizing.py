@@ -201,6 +201,26 @@ class TestBatchSizeResolverRecordSuccess:
         self.resolver.record_success("model/a", 20)
         assert self.resolver.resolve("model/a") == 40
 
+    def test_floor_failure_resets_success_streak_without_changing_size(self):
+        self.resolver.record_failure("model/a", 80)
+        for _ in range(2):
+            self.resolver.record_success("model/a", 40)
+
+        self.resolver.record_floor_failure("model/a")
+        assert self.resolver.resolve("model/a") == 40
+        for _ in range(2):
+            self.resolver.record_success("model/a", 40)
+            assert self.resolver.resolve("model/a") == 40
+
+        self.resolver.record_success("model/a", 40)
+        assert "model/a" not in self.resolver._learned_sizes
+        assert self.resolver.resolve("model/a") == 100
+
+    def test_floor_failure_for_unknown_model_is_noop(self):
+        self.resolver.record_floor_failure("unknown/model")
+        assert self.resolver._learned_sizes == {}
+        assert self.resolver._success_counts == {}
+
     def test_success_for_unknown_model_is_noop(self):
         for _ in range(3):
             self.resolver.record_success("unknown/model", 100)
@@ -338,6 +358,30 @@ class TestAdaptiveRetry:
         assert result.success is True
         assert len(result.translations) == 10
         assert get_batch_size_resolver()._learned_sizes["test/model"] == 5
+
+    @pytest.mark.asyncio
+    async def test_invalid_response_at_floor_resets_success_streak(self):
+        """A failure that cannot be split any further must not count towards growth."""
+        resolver = get_batch_size_resolver()
+        resolver.record_failure("test/model", 10)
+        for _ in range(2):
+            resolver.record_success("test/model", 5)
+        assert resolver._success_counts["test/model"] == 2
+
+        async def mock_translate(batch, **kwargs):
+            raise InvalidResponseError("Truncated response")
+
+        self.provider.translate_batch = mock_translate
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+        batch = TranslationBatch(lines=lines, source_language="en", target_language="hu")
+        result = await self.processor.process_batch(batch, batch_index=0, model="test/model")
+
+        assert result.success is False
+        assert resolver.resolve("test/model") == 5
+        assert resolver._success_counts["test/model"] == 0
+
+        resolver.record_success("test/model", 5)
+        assert resolver.resolve("test/model") == 5
 
     @pytest.mark.asyncio
     async def test_count_mismatch_triggers_adaptive_retry(self):

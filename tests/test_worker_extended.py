@@ -349,7 +349,7 @@ class TestContentJobPartialFailure:
     async def test_partial_failure_sets_partial_status(self, manager, mock_translator):
         """Lines 133-150: partial results lead to PARTIAL status with correct error."""
         mock_result = _partial_result(
-            translations=[{"index": "0", "content": "Hola"}],
+            translations=[{"index": "1", "content": "Hola"}],
             tokens=80,
         )
 
@@ -383,16 +383,19 @@ class TestContentJobPartialFailure:
                 assert job.result["model_used"] == "test-model"
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("duplicate_index", [False, True])
+    @pytest.mark.parametrize("extra", [None, "duplicate", "hallucinated"])
     async def test_partial_failure_counts_distinct_translated_indices(
-        self, manager, mock_translator, duplicate_index
+        self, manager, mock_translator, extra
     ):
         translations = [
-            {"index": "0", "content": "Hola"},
-            {"index": "1", "content": "Mundo"},
+            {"index": "1", "content": "Hola"},
+            {"index": "2", "content": "Mundo"},
         ]
-        if duplicate_index:
-            translations.append({"index": "1", "content": "Mundo"})
+        if extra == "duplicate":
+            translations.append({"index": "2", "content": "Mundo"})
+        if extra == "hallucinated":
+            # A made-up index is not a translated line, whatever the model says.
+            translations.append({"index": "99", "content": "Nadie"})
         mock_result = _partial_result(translations=translations)
 
         with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:

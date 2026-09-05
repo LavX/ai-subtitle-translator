@@ -170,6 +170,16 @@ class BatchProcessor:
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
         # Rate limits get extra retries (3 more than normal errors)
         max_retries_with_rate_limit = self.settings.max_retries + 3
+        model_id = (
+            (config_override.model if config_override and config_override.model else None)
+            or model
+            or self.settings.openrouter_default_model
+        )
+
+        def _note_unsplittable_failure() -> None:
+            # Without a split there is no record_failure call, and a failure that leaves
+            # the size alone still has to interrupt the streak that grows it back.
+            get_batch_size_resolver().record_floor_failure(model_id)
 
         while retries < max_retries_with_rate_limit:
             try:
@@ -192,6 +202,7 @@ class BatchProcessor:
                             _rate_limit_lock,
                         )
                     # In sub-batch retry or at floor - treat as failure
+                    _note_unsplittable_failure()
                     return BatchResult(
                         batch_index=batch_index,
                         success=False,
@@ -199,11 +210,6 @@ class BatchProcessor:
                         retries=retries,
                     )
 
-                model_id = (
-                    (config_override.model if config_override and config_override.model else None)
-                    or model
-                    or self.settings.openrouter_default_model
-                )
                 get_batch_size_resolver().record_success(model_id, len(batch.lines))
 
                 return BatchResult(
@@ -226,6 +232,7 @@ class BatchProcessor:
                     last_error = e.message
                     await asyncio.sleep(self.settings.retry_delay * (2 ** (retries - 1)))
                 else:
+                    _note_unsplittable_failure()
                     return BatchResult(
                         batch_index=batch_index,
                         success=False,
@@ -273,6 +280,7 @@ class BatchProcessor:
 
             except Exception as e:
                 logger.error(f"Unexpected error on batch {batch_index}: {str(e)}")
+                _note_unsplittable_failure()
                 return BatchResult(
                     batch_index=batch_index,
                     success=False,
@@ -286,6 +294,7 @@ class BatchProcessor:
                 batch, batch_index, model, temperature, config_override, _rate_limit_lock
             )
 
+        _note_unsplittable_failure()
         return BatchResult(
             batch_index=batch_index,
             success=False,

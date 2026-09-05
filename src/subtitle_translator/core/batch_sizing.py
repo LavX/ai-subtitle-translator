@@ -54,6 +54,12 @@ class BatchSizeResolver:
         )
         return new_size
 
+    def record_floor_failure(self, model_id: str) -> None:
+        """A failure that could not be split any further keeps the learned size but
+        clears the success streak, so growing back still takes consecutive successes."""
+        if model_id in self._learned_sizes:
+            self._success_counts[model_id] = 0
+
     def record_success(self, model_id: str, batch_size: int) -> None:
         learned_size = self._learned_sizes.get(model_id)
         if learned_size is None or batch_size < learned_size:
