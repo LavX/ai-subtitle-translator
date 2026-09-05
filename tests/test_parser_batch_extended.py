@@ -350,6 +350,102 @@ class TestRetryWithSmallerBatchesSubBatchFailure:
         assert "Adaptive retry failed" in result.error
 
 
+class TestFailedBatchUsageIsCounted:
+    """Every attempt is billed, so a failed batch adds its usage to the job totals like a
+    successful one, and a failed adaptive retry keeps what its finished sub-batches spent."""
+
+    @staticmethod
+    def _partial_provider():
+        return _mock_provider(
+            translate_result=TranslationResult(
+                translations=[{"index": "0", "content": "Hola"}],
+                model_used="test",
+                total_tokens=5,
+                cost=0.001,
+            )
+        )
+
+    @pytest.mark.asyncio
+    async def test_exhausted_floor_batch_counts_in_process_all_batches(self):
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        get_batch_size_resolver().reset()
+        processor = BatchProcessor(
+            self._partial_provider(), _make_settings(batch_size=5, max_retries=1, retry_delay=0.001)
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+
+        result = await processor.process_all_batches(lines, "en", "es")
+
+        assert not result.success
+        assert result.progress.failed_batches == 1
+        assert result.progress.total_tokens == 10
+        assert result.progress.total_cost == pytest.approx(0.002)
+
+    @pytest.mark.asyncio
+    async def test_exhausted_floor_batch_counts_in_stream(self):
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        get_batch_size_resolver().reset()
+        processor = BatchProcessor(
+            self._partial_provider(), _make_settings(batch_size=5, max_retries=1, retry_delay=0.001)
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+
+        results = [
+            (batch_result, progress)
+            async for batch_result, progress in processor.process_batches_stream(lines, "en", "es")
+        ]
+
+        assert len(results) == 1
+        assert results[0][0].success is False
+        assert results[0][1].total_tokens == 10
+        assert results[0][1].total_cost == pytest.approx(0.002)
+
+    @pytest.mark.asyncio
+    async def test_failed_adaptive_retry_keeps_sub_batch_usage(self):
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        get_batch_size_resolver().reset()
+
+        async def _side_effect(batch, **kwargs):
+            if len(batch.lines) > 5:
+                raise InvalidResponseError("bad", provider="test")
+            if batch.lines[0]["index"] == "0":
+                return TranslationResult(
+                    translations=[
+                        {"index": line["index"], "content": f"T-{line['content']}"}
+                        for line in batch.lines
+                    ],
+                    model_used="test",
+                    total_tokens=7,
+                    cost=0.001,
+                )
+            return TranslationResult(
+                translations=[{"index": batch.lines[0]["index"], "content": "Hola"}],
+                model_used="test",
+                total_tokens=3,
+                cost=0.001,
+            )
+
+        provider = _mock_provider(side_effect=_side_effect)
+        processor = BatchProcessor(
+            provider, _make_settings(batch_size=20, max_retries=1, retry_delay=0.001)
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(10)]
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        # 10 lines fail, the retry runs two 5-line sub-batches: the first succeeds (7 tokens),
+        # the second answers one line twice (3 + 3 tokens) and fails the batch.
+        assert result.success is False
+        assert "Adaptive retry failed at size 5" in result.error
+        assert len(result.translations) == 5
+        assert result.tokens_used == 13
+        assert result.cost == pytest.approx(0.003)
+        assert result.retries == 1
+
+
 class TestProcessAllBatchesEdgeCases:
     """Lines 402, 410, 436, 453, 487-488, 493: process_all_batches edge cases."""
 

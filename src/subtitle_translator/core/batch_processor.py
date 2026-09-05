@@ -382,12 +382,15 @@ class BatchProcessor:
                 _rate_limit_lock=_rate_limit_lock,
             )
             if not sub_result.success:
+                # The finished sub-batches and the failed attempts were billed too.
                 return BatchResult(
                     batch_index=batch_index,
                     success=False,
                     translations=all_translations,
+                    tokens_used=total_tokens + sub_result.tokens_used,
+                    cost=total_cost + sub_result.cost,
                     error=f"Adaptive retry failed at size {new_size}: {sub_result.error}",
-                    retries=total_retries,
+                    retries=total_retries + sub_result.retries,
                 )
             all_translations.extend(sub_result.translations)
             total_tokens += sub_result.tokens_used
@@ -518,11 +521,12 @@ class BatchProcessor:
                 batch_index, batch_lines, result = await coro
                 batch_results.append(result)
 
+                # A failed batch was billed for its attempts as much as a successful one.
+                progress.total_tokens += result.tokens_used
+                progress.total_cost += result.cost
                 if result.success:
                     all_translations.extend(result.translations)
                     progress.completed_lines += len(batch_lines)
-                    progress.total_tokens += result.tokens_used
-                    progress.total_cost += result.cost
                 else:
                     progress.failed_batches += 1
                     logger.error(f"Batch {batch_index + 1} failed: {result.error}")
@@ -598,10 +602,10 @@ class BatchProcessor:
                 config_override=config_override,
             )
 
+            progress.total_tokens += result.tokens_used
+            progress.total_cost += result.cost
             if result.success:
                 progress.completed_lines += len(batch_lines)
-                progress.total_tokens += result.tokens_used
-                progress.total_cost += result.cost
             else:
                 progress.failed_batches += 1
 
