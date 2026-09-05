@@ -171,6 +171,13 @@ class BatchProcessor:
         # eventual result so the job totals stay honest.
         spent_tokens = 0
         spent_cost = 0.0
+
+        def _billed(outcome: BatchResult) -> BatchResult:
+            # Whatever the outcome, the attempts made before it were billed.
+            outcome.tokens_used += spent_tokens
+            outcome.cost += spent_cost
+            return outcome
+
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
         # Rate limits get extra retries (3 more than normal errors)
         max_retries_with_rate_limit = self.settings.max_retries + 3
@@ -209,14 +216,18 @@ class BatchProcessor:
                     logger.warning(
                         f"Batch {batch_index}: got {covered}/{len(requested)} translations"
                     )
+                    spent_tokens += result.total_tokens or 0
+                    spent_cost += result.cost or 0.0
                     if can_adaptive:
-                        return await self._retry_with_smaller_batches(
-                            batch,
-                            batch_index,
-                            model,
-                            temperature,
-                            config_override,
-                            _rate_limit_lock,
+                        return _billed(
+                            await self._retry_with_smaller_batches(
+                                batch,
+                                batch_index,
+                                model,
+                                temperature,
+                                config_override,
+                                _rate_limit_lock,
+                            )
                         )
                     # A sub-batch or a floor batch cannot split again. A partial reply
                     # is as transient as an unparsable one (a model that answers five
@@ -224,8 +235,6 @@ class BatchProcessor:
                     # it gets the same retries before it counts as a failure; a floor
                     # batch used to fail on the first partial reply, which turned one
                     # bad answer into "all 72 batches failed".
-                    spent_tokens += result.total_tokens or 0
-                    spent_cost += result.cost or 0.0
                     last_error = f"Partial translations: expected {len(requested)}, got {covered}"
                     if retries < self.settings.max_retries:
                         retries += 1
@@ -254,8 +263,15 @@ class BatchProcessor:
 
             except InvalidResponseError as e:
                 if can_adaptive:
-                    return await self._retry_with_smaller_batches(
-                        batch, batch_index, model, temperature, config_override, _rate_limit_lock
+                    return _billed(
+                        await self._retry_with_smaller_batches(
+                            batch,
+                            batch_index,
+                            model,
+                            temperature,
+                            config_override,
+                            _rate_limit_lock,
+                        )
                     )
                 # At floor or already in adaptive retry - use normal retry
                 if retries < self.settings.max_retries:
@@ -264,11 +280,13 @@ class BatchProcessor:
                     await asyncio.sleep(self.settings.retry_delay * (2 ** (retries - 1)))
                 else:
                     _note_unsplittable_failure(size_related=True)
-                    return BatchResult(
-                        batch_index=batch_index,
-                        success=False,
-                        error=e.message,
-                        retries=retries,
+                    return _billed(
+                        BatchResult(
+                            batch_index=batch_index,
+                            success=False,
+                            error=e.message,
+                            retries=retries,
+                        )
                     )
 
             except RateLimitError as e:
@@ -312,25 +330,31 @@ class BatchProcessor:
             except Exception as e:
                 logger.error(f"Unexpected error on batch {batch_index}: {str(e)}")
                 _note_unsplittable_failure(size_related=False)
-                return BatchResult(
-                    batch_index=batch_index,
-                    success=False,
-                    error=str(e),
-                    retries=retries,
+                return _billed(
+                    BatchResult(
+                        batch_index=batch_index,
+                        success=False,
+                        error=str(e),
+                        retries=retries,
+                    )
                 )
 
         # Max retries exceeded
         if is_timeout and can_adaptive:
-            return await self._retry_with_smaller_batches(
-                batch, batch_index, model, temperature, config_override, _rate_limit_lock
+            return _billed(
+                await self._retry_with_smaller_batches(
+                    batch, batch_index, model, temperature, config_override, _rate_limit_lock
+                )
             )
 
         _note_unsplittable_failure(size_related=is_timeout)
-        return BatchResult(
-            batch_index=batch_index,
-            success=False,
-            error=f"Max retries exceeded. Last error: {last_error}",
-            retries=retries,
+        return _billed(
+            BatchResult(
+                batch_index=batch_index,
+                success=False,
+                error=f"Max retries exceeded. Last error: {last_error}",
+                retries=retries,
+            )
         )
 
     async def _retry_with_smaller_batches(
