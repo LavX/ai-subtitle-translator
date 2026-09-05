@@ -115,6 +115,13 @@ def _ok_response_json(translations=None, model="meta-llama/llama-4-maverick"):
     }
 
 
+def _prompt_example(prompt):
+    """The JSON example the system prompt shows the model, parsed."""
+    start = prompt.index("{", prompt.index("STEP 1"))
+    example, _ = json.JSONDecoder().raw_decode(prompt, start)
+    return example
+
+
 def _mock_response(status_code=200, json_data=None, text="", headers=None):
     """Create a mock httpx.Response."""
     resp = MagicMock(spec=httpx.Response)
@@ -563,6 +570,20 @@ class TestTranslateBatch:
         call_kwargs = mock_client.post.call_args
         payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
         assert payload["response_format"] == {"type": "json_object"}
+        # JSON mode only allows an object at the top level, so the example the same
+        # request shows the model has to be that object: asked for a bare array under
+        # JSON mode, models answered with a single translated line per batch.
+        example = _prompt_example(payload["messages"][0]["content"])
+        assert isinstance(example, dict)
+        assert list(example) == ["translations"]
+
+    def test_prompt_example_is_what_the_parser_expects(self):
+        provider = OpenRouterProvider(settings=_make_settings())
+        example = _prompt_example(provider.build_system_prompt("Dutch", "English"))
+        assert [item["index"] for item in example["translations"]] == ["0", "1"]
+        parsed = provider._parse_translations(json.dumps(example))
+        assert [item["index"] for item in parsed] == ["0", "1"]
+        assert all(set(item) == {"index", "content"} for item in parsed)
 
     async def test_no_json_object_format_with_reasoning(self):
         provider = OpenRouterProvider(settings=_make_settings())

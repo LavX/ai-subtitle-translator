@@ -48,6 +48,30 @@ class TestParseTranslationsValidJSON:
         result = provider._parse_translations(content)
         assert result == [{"index": "0", "content": "Szia"}]
 
+    def test_wrapped_under_a_single_unknown_key(self, provider):
+        # JSON mode forces an object at the top level; a model that picks its own
+        # wrapper name still puts the array under one key.
+        content = '{"response":[{"index":"0","content":"Szia"},{"index":"1","content":"Világ"}]}'
+        result = provider._parse_translations(content)
+        assert [item["index"] for item in result] == ["0", "1"]
+
+    def test_single_list_next_to_scalar_keys(self, provider):
+        content = '{"note":"done","output":[{"index":"0","content":"Szia"}]}'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Szia"}]
+
+    def test_two_unknown_lists_are_ambiguous(self, provider):
+        from subtitle_translator.providers.base import InvalidResponseError
+
+        content = '{"a":[{"index":"0","content":"Szia"}],"b":[{"index":"0","content":"Hali"}]}'
+        with pytest.raises(InvalidResponseError, match="Unexpected response structure"):
+            provider._parse_translations(content)
+
+    def test_known_wrapper_wins_over_other_lists(self, provider):
+        content = '{"notes":[],"translations":[{"index":"0","content":"Szia"}]}'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Szia"}]
+
     def test_alternative_key_names(self, provider):
         content = '[{"idx":"0","text":"Szia"}]'
         result = provider._parse_translations(content)
