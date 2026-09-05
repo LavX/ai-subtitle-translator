@@ -301,7 +301,8 @@ Model reasoning capabilities are detected automatically from the OpenRouter `/mo
 - Models supporting `effort` get `{"reasoning": {"effort": "high"}}`
 - Models supporting `max_tokens` get `{"reasoning": {"max_tokens": N}}`
 - `effort: "none"` disables reasoning entirely
-- `response_format: json_object` is skipped when reasoning is active (prevents single-object response bugs with certain models)
+- `response_format: json_object` is sent when reasoning is off. JSON mode only allows an object at the top level, so the prompt asks for `{"translations": [...]}`; asking for a bare array under JSON mode made some models (DeepSeek V4 Flash among them) answer with a single translated line per batch. The parser also accepts a wrapper under any single list-valued key.
+- `response_format: json_object` is skipped when reasoning is active (some models misbehave with reasoning and JSON mode together)
 
 ## Tested models for subtitle translation
 

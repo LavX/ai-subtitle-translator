@@ -788,9 +788,11 @@ class OpenRouterProvider(TranslationProvider):
             "usage": {"include": True},
         }
 
-        # Only use json_object response format when reasoning is NOT enabled.
-        # Some models (e.g. mistral-small-2603) with reasoning + json_object
-        # return a single JSON object instead of an array, translating only 1 line.
+        # JSON mode constrains the reply to a JSON object at the top level, which is
+        # why the prompt asks for {"translations": [...]}: when it asked for a bare
+        # array, models resolved the conflict by answering with one translated line.
+        # It is still skipped when reasoning is on; some models (mistral-small-2603)
+        # misbehaved with reasoning and json_object together.
         if not reasoning_params:
             payload["response_format"] = {"type": "json_object"}
 
@@ -1093,23 +1095,29 @@ class OpenRouterProvider(TranslationProvider):
             content = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", content)
             parsed = json.loads(content, strict=False, object_pairs_hook=_handle_duplicate_keys)
 
-            # Handle case where response is wrapped in an object
+            # JSON mode only permits an object at the top level, so the reply is an
+            # object wrapping the array. The prompt asks for "translations"; a model
+            # that picks its own wrapper name still puts the array under one key.
             if isinstance(parsed, dict):
-                # Look for common wrapper keys
-                for key in ["translations", "results", "data", "lines", "subtitles"]:
-                    if key in parsed and isinstance(parsed[key], list):
-                        parsed = parsed[key]
-                        break
+                list_keys = [key for key, value in parsed.items() if isinstance(value, list)]
+                known = [
+                    key
+                    for key in ["translations", "results", "data", "lines", "subtitles"]
+                    if key in list_keys
+                ]
+                if known:
+                    parsed = parsed[known[0]]
+                elif "index" in parsed and "content" in parsed:
+                    # A single translation object; the caller notices when more were asked for
+                    parsed = [parsed]
+                elif len(list_keys) == 1:
+                    parsed = parsed[list_keys[0]]
                 else:
-                    # If no wrapper found but it's a single translation, wrap it
-                    if "index" in parsed and "content" in parsed:
-                        parsed = [parsed]
-                    else:
-                        raise InvalidResponseError(
-                            f"Unexpected response structure: {list(parsed.keys())}",
-                            provider=self.provider_name,
-                            raw_response=content[:1000],
-                        )
+                    raise InvalidResponseError(
+                        f"Unexpected response structure: {list(parsed.keys())}",
+                        provider=self.provider_name,
+                        raw_response=content[:1000],
+                    )
 
             if not isinstance(parsed, list):
                 raise InvalidResponseError(
