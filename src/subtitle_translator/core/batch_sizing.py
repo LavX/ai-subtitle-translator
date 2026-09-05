@@ -40,10 +40,10 @@ class BatchSizeResolver:
         return global_max
 
     def record_failure(self, model_id: str, failed_batch_size: int) -> int:
-        if model_id in self._learned_sizes:
-            base = self._learned_sizes[model_id]
-        else:
-            base = failed_batch_size
+        # Halve the smaller of the cached size and the size that actually failed: with
+        # parallel batches the cache can already have grown while an older, smaller
+        # batch was still in flight, and its retry must end up below the failed size.
+        base = min(self._learned_sizes.get(model_id, failed_batch_size), failed_batch_size)
         new_size = max(MIN_BATCH_SIZE, base // 2)
         self._learned_sizes[model_id] = new_size
         self._ceilings.setdefault(model_id, failed_batch_size)

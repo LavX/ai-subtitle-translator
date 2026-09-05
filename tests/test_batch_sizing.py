@@ -117,6 +117,28 @@ class TestBatchSizeResolverRecordFailure:
         assert self.resolver._learned_sizes == {}
 
 
+class TestBatchSizeResolverRecordFailureInFlight:
+    """A failure reported for a batch smaller than the cached size."""
+
+    @pytest.fixture(autouse=True)
+    def resolver(self):
+        self.resolver = BatchSizeResolver()
+        self.resolver._settings = MagicMock()
+        self.resolver._settings.batch_size = 100
+
+    def test_failure_of_a_smaller_in_flight_batch_halves_that_size(self):
+        # Three parallel successes at 25 grew the cache to 50 while a fourth batch,
+        # still 25 lines, was in flight; its failure has to retry below 25, not at 25.
+        self.resolver.record_failure("model/a", 100)
+        self.resolver.record_failure("model/a", 50)
+        for _ in range(3):
+            self.resolver.record_success("model/a", 25)
+        assert self.resolver.resolve("model/a") == 50
+
+        assert self.resolver.record_failure("model/a", 25) == 12
+        assert self.resolver.resolve("model/a") == 12
+
+
 class TestBatchSizeResolverRecordSuccess:
     """Tests for recovery after temporary batch failures."""
 

@@ -97,6 +97,20 @@ class TestParseTranslationsControlCharacters:
         assert result == [{"index": "0", "content": "Line1\nLine2"}]
 
 
+class TestParseTranslationsOtherControlCharacters:
+    """Permissive parsing is for line breaks and tabs, not for arbitrary control bytes."""
+
+    def test_other_control_characters_are_stripped(self, provider):
+        content = '[{"index":"0","content":"Sz\x00ia\x1b[0m \x08ok"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Szia[0m ok"}]
+
+    def test_carriage_return_is_preserved(self, provider):
+        content = '[{"index":"0","content":"Line1\r\nLine2"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Line1\r\nLine2"}]
+
+
 class TestParseTranslationsInvalidEscapes:
     """Models escape characters JSON does not allow escaping, most often an apostrophe."""
 

@@ -1087,7 +1087,10 @@ class OpenRouterProvider(TranslationProvider):
                     result.append(current)
                 return result
 
-            # Strict mode rejects valid cues if models use raw newlines/tabs in multi-line strings.
+            # Strict mode rejects valid cues if models use raw newlines/tabs in multi-line
+            # strings. Only those (and a carriage return) are worth keeping: any other raw
+            # control character would otherwise ride through into the SRT output.
+            content = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", content)
             parsed = json.loads(content, strict=False, object_pairs_hook=_handle_duplicate_keys)
 
             # Handle case where response is wrapped in an object
