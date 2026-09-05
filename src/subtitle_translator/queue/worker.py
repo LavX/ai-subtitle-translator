@@ -137,7 +137,9 @@ async def process_content_translation_job(
                     translator.settings,
                 )
                 total_lines = len(request.lines)
-                translated_count = len(translated_lines)
+                translated_count = len(
+                    {translation["index"] for translation in result.all_translations}
+                )
                 job_manager.set_job_partial(
                     job_id,
                     {

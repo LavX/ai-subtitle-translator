@@ -70,6 +70,33 @@ class TestParseTranslationsValidJSON:
         assert result[0]["content"] == "Héllo wörld"
 
 
+class TestParseTranslationsControlCharacters:
+    """Models can return unescaped control characters in multi-line cue text."""
+
+    def test_raw_newline_preserved(self, provider):
+        content = '[{"index":"0","content":"Line1\nLine2"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Line1\nLine2"}]
+
+    def test_raw_tab_preserved(self, provider):
+        content = '[{"index":"0","content":"Hello\tworld"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Hello\tworld"}]
+
+    def test_raw_newline_with_duplicate_keys(self, provider):
+        content = '{"index":"0","content":"Line1\nLine2","index":"1","content":"Line3"}'
+        result = provider._parse_translations(content)
+        assert result == [
+            {"index": "0", "content": "Line1\nLine2"},
+            {"index": "1", "content": "Line3"},
+        ]
+
+    def test_markdown_fence_with_raw_newline(self, provider):
+        content = '```json\n[{"index":"0","content":"Line1\nLine2"}]\n```'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Line1\nLine2"}]
+
+
 class TestParseTranslationsDuplicateKeys:
     """Tests for malformed JSON with duplicate keys (the bug this PR fixes)."""
 

@@ -1,6 +1,5 @@
 """End-to-end persistence tests: save jobs, destroy manager, reopen DB, verify recovery."""
 
-import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -131,7 +130,7 @@ class TestRestartSimulation:
         store2 = JobStore(db_path, crypto_key=key2)
         manager2 = JobManager()
         manager2.set_store(store2)
-        requeued = await manager2.recover_jobs()
+        await manager2.recover_jobs()
 
         # job-k1 should be skipped (decrypt fails), job-nokey should load fine
         assert manager2.get_job("job-nokey") is not None

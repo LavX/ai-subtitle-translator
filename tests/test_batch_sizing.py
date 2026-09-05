@@ -117,6 +117,138 @@ class TestBatchSizeResolverRecordFailure:
         assert self.resolver._learned_sizes == {}
 
 
+class TestBatchSizeResolverRecordSuccess:
+    """Tests for recovery after temporary batch failures."""
+
+    @pytest.fixture(autouse=True)
+    def resolver(self):
+        self.resolver = BatchSizeResolver()
+        self.resolver._settings = MagicMock()
+        self.resolver._settings.batch_size = 100
+
+    @pytest.mark.parametrize("batch_size", [20, 30])
+    def test_three_successes_double_learned_size(self, batch_size, caplog):
+        self.resolver.record_failure("model/a", 80)
+        self.resolver.record_failure("model/a", 40)
+
+        with caplog.at_level("INFO", logger="subtitle_translator.core.batch_sizing"):
+            for _ in range(3):
+                self.resolver.record_success("model/a", batch_size)
+
+        assert self.resolver.resolve("model/a") == 40
+        assert any(
+            record.levelname == "INFO"
+            and "model/a" in record.message
+            and "20" in record.message
+            and "40" in record.message
+            for record in caplog.records
+        )
+
+    def test_fewer_than_three_successes_do_not_grow(self):
+        self.resolver.record_failure("model/a", 80)
+        for _ in range(2):
+            self.resolver.record_success("model/a", 40)
+            assert self.resolver.resolve("model/a") == 40
+
+    def test_smaller_batches_do_not_advance_recovery(self):
+        self.resolver.record_failure("model/a", 80)
+        for _ in range(3):
+            self.resolver.record_success("model/a", 39)
+        self.resolver.record_success("model/a", 40)
+        assert self.resolver.resolve("model/a") == 40
+
+    @pytest.mark.parametrize(
+        ("metadata", "expected_size"),
+        [({"max_batch_size": 70}, 70), ({"context_length": 48000}, 60), ({}, 100)],
+    )
+    def test_growth_caps_at_first_failure_and_evicts_learned_size(
+        self, metadata, expected_size, caplog
+    ):
+        self.resolver.record_failure("model/a", 18)
+        self.resolver.record_failure("model/a", 9)
+
+        for _ in range(3):
+            self.resolver.record_success("model/a", MIN_BATCH_SIZE)
+        assert self.resolver.resolve("model/a", **metadata) == 10
+
+        for _ in range(2):
+            self.resolver.record_success("model/a", 10)
+            assert self.resolver.resolve("model/a", **metadata) == 10
+
+        with caplog.at_level("INFO", logger="subtitle_translator.core.batch_sizing"):
+            self.resolver.record_success("model/a", 10)
+
+        assert "model/a" not in self.resolver._learned_sizes
+        assert self.resolver.resolve("model/a", **metadata) == expected_size
+        assert any(
+            record.levelname == "INFO"
+            and "model/a" in record.message
+            and "10" in record.message
+            and "18" in record.message
+            for record in caplog.records
+        )
+
+    def test_failure_resets_success_streak(self):
+        self.resolver.record_failure("model/a", 80)
+        for _ in range(2):
+            self.resolver.record_success("model/a", 40)
+
+        self.resolver.record_failure("model/a", 40)
+        for _ in range(2):
+            self.resolver.record_success("model/a", 20)
+            assert self.resolver.resolve("model/a") == 20
+
+        self.resolver.record_success("model/a", 20)
+        assert self.resolver.resolve("model/a") == 40
+
+    def test_success_for_unknown_model_is_noop(self):
+        for _ in range(3):
+            self.resolver.record_success("unknown/model", 100)
+        assert self.resolver._learned_sizes == {}
+        assert self.resolver._ceilings == {}
+        assert self.resolver._success_counts == {}
+        assert self.resolver.resolve("unknown/model") == 100
+
+        self.resolver.record_failure("unknown/model", 80)
+        self.resolver.record_success("unknown/model", 40)
+        assert self.resolver.resolve("unknown/model") == 40
+
+    def test_first_failure_ceiling_survives_cache_eviction(self):
+        self.resolver.record_failure("model/a", 20)
+        for _ in range(3):
+            self.resolver.record_success("model/a", 10)
+        assert "model/a" not in self.resolver._learned_sizes
+
+        self.resolver.record_failure("model/a", 16)
+        for _ in range(3):
+            self.resolver.record_success("model/a", 8)
+        assert self.resolver.resolve("model/a") == 16
+
+        for _ in range(3):
+            self.resolver.record_success("model/a", 16)
+        assert "model/a" not in self.resolver._learned_sizes
+
+    def test_reset_clears_sizes_ceilings_and_success_streaks(self):
+        self.resolver.record_failure("model/a", 20)
+        for _ in range(2):
+            self.resolver.record_success("model/a", 10)
+
+        self.resolver.reset()
+        assert self.resolver._learned_sizes == {}
+        assert self.resolver._ceilings == {}
+        assert self.resolver._success_counts == {}
+        assert self.resolver.resolve("model/a") == 100
+
+        self.resolver.record_failure("model/a", 80)
+        self.resolver.record_failure("model/a", 40)
+        for _ in range(2):
+            self.resolver.record_success("model/a", 20)
+            assert self.resolver.resolve("model/a") == 20
+
+        self.resolver.record_success("model/a", 20)
+        assert self.resolver.resolve("model/a") == 40
+
+
 class TestBatchProcessorAdaptiveSizing:
     """Tests for adaptive batch sizing in BatchProcessor."""
 

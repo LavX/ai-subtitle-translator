@@ -15,6 +15,8 @@ class BatchSizeResolver:
 
     def __init__(self) -> None:
         self._learned_sizes: dict[str, int] = {}
+        self._ceilings: dict[str, int] = {}
+        self._success_counts: dict[str, int] = {}
         self._settings = get_settings()
 
     def resolve(
@@ -44,6 +46,8 @@ class BatchSizeResolver:
             base = failed_batch_size
         new_size = max(MIN_BATCH_SIZE, base // 2)
         self._learned_sizes[model_id] = new_size
+        self._ceilings.setdefault(model_id, failed_batch_size)
+        self._success_counts[model_id] = 0
         logger.warning(
             f"Adaptive batch sizing: {model_id} failed at size {failed_batch_size}, "
             f"learned safe size: {new_size}"
@@ -51,10 +55,30 @@ class BatchSizeResolver:
         return new_size
 
     def record_success(self, model_id: str, batch_size: int) -> None:
-        pass
+        learned_size = self._learned_sizes.get(model_id)
+        if learned_size is None or batch_size < learned_size:
+            return
+
+        self._success_counts[model_id] += 1
+        if self._success_counts[model_id] < 3:
+            return
+
+        ceiling = self._ceilings[model_id]
+        new_size = min(learned_size * 2, ceiling)
+        self._learned_sizes[model_id] = new_size
+        self._success_counts[model_id] = 0
+        logger.info(
+            f"Adaptive batch sizing: {model_id} grew from {learned_size} to {new_size} "
+            "after 3 consecutive successes"
+        )
+        if new_size >= ceiling:
+            del self._learned_sizes[model_id]
+            del self._success_counts[model_id]
 
     def reset(self) -> None:
         self._learned_sizes.clear()
+        self._ceilings.clear()
+        self._success_counts.clear()
 
 
 _resolver_instance: BatchSizeResolver | None = None

@@ -1056,6 +1056,14 @@ class OpenRouterProvider(TranslationProvider):
                 "",
                 content,
             )
+            # Models also escape characters that JSON does not allow escaping, most often an
+            # apostrophe as \'. Drop that backslash instead of failing the batch; an escaped
+            # backslash pair is consumed first so it survives untouched.
+            content = re.sub(
+                r"\\\\|\\(?![\"\\/bfnrtu])",
+                lambda match: "" if match.group(0) == "\\" else match.group(0),
+                content,
+            )
 
             # Parse JSON, detecting duplicate keys that json.loads() would silently deduplicate.
             # Some models return {"index":"0","content":"...","index":"1","content":"..."} which is
@@ -1080,7 +1088,8 @@ class OpenRouterProvider(TranslationProvider):
                     result.append(current)
                 return result
 
-            parsed = json.loads(content, object_pairs_hook=_handle_duplicate_keys)
+            # Strict mode rejects valid cues if models use raw newlines/tabs in multi-line strings.
+            parsed = json.loads(content, strict=False, object_pairs_hook=_handle_duplicate_keys)
 
             # Handle case where response is wrapped in an object
             if isinstance(parsed, dict):

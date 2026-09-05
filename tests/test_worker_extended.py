@@ -382,6 +382,53 @@ class TestContentJobPartialFailure:
                 assert job.result["tokens_used"] == 80
                 assert job.result["model_used"] == "test-model"
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("duplicate_index", [False, True])
+    async def test_partial_failure_counts_distinct_translated_indices(
+        self, manager, mock_translator, duplicate_index
+    ):
+        translations = [
+            {"index": "0", "content": "Hola"},
+            {"index": "1", "content": "Mundo"},
+        ]
+        if duplicate_index:
+            translations.append({"index": "1", "content": "Mundo"})
+        mock_result = _partial_result(translations=translations)
+
+        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+            processor = AsyncMock()
+            processor.process_all_batches = AsyncMock(return_value=mock_result)
+            MockBP.return_value = processor
+
+            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+                mock_map.return_value = [
+                    SubtitleLine(position=1, line="Hola"),
+                    SubtitleLine(position=2, line="Mundo"),
+                    SubtitleLine(position=3, line="Goodbye"),
+                ]
+
+                job_id = await manager.submit_job(
+                    request_data={
+                        "sourceLanguage": "en",
+                        "targetLanguage": "es",
+                        "lines": [
+                            {"position": 1, "line": "Hello"},
+                            {"position": 2, "line": "World"},
+                            {"position": 3, "line": "Goodbye"},
+                        ],
+                    },
+                    job_type=JobType.TRANSLATE_CONTENT,
+                )
+                manager.set_job_processing(job_id)
+                await process_content_translation_job(manager, job_id, mock_translator)
+
+                job = manager.get_job(job_id)
+                assert job.status == JobStatus.PARTIAL
+                assert job.error == (
+                    "2/3 lines translated. 1 of 2 batches failed: Batch 2 rate limited"
+                )
+                assert job.result["lines"] == [line.model_dump() for line in mock_map.return_value]
+
 
 # ---------------------------------------------------------------------------
 # File job: config override and logging (lines 222-236)
