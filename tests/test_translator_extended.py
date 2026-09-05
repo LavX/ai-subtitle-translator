@@ -152,9 +152,10 @@ class TestTranslateContentPartialFailure:
             lines=[SubtitleLine(position=1, line="Hello")],
         )
 
+        # The failed attempts were billed; the batch processor reports their usage.
         mock_result = BatchProcessingResult(
             all_translations=[],
-            total_tokens=0,
+            total_tokens=30,
             model_used="test-model",
             batch_results=[
                 _make_batch_result(success=False, batch_index=0, error="Total failure"),
@@ -169,7 +170,7 @@ class TestTranslateContentPartialFailure:
 
         assert result.success is False
         assert result.lines == []
-        assert result.tokens_used == 0
+        assert result.tokens_used == 30
         assert "Total failure" in result.error
 
 
@@ -306,7 +307,7 @@ class TestTranslateFilePartialFailure:
 
         mock_result = BatchProcessingResult(
             all_translations=[],
-            total_tokens=0,
+            total_tokens=30,
             model_used="test-model",
             batch_results=[
                 _make_batch_result(success=False, batch_index=0, error="catastrophic"),
@@ -324,6 +325,7 @@ class TestTranslateFilePartialFailure:
             )
 
         assert result.success is False
+        assert result.tokens_used == 30
         assert result.content == ""
         assert "catastrophic" in result.error
 
