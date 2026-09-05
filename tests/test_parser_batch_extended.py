@@ -166,11 +166,11 @@ def _make_batch(lines=None, src="en", tgt="es"):
 
 
 class TestProcessBatchAdaptiveRetryCountMismatch:
-    """Lines 195, 244-249: _is_adaptive_retry=True with count mismatch returns failure directly."""
+    """A sub-batch (or a floor batch) that keeps answering with too few lines fails after the
+    normal retries, the same way an unparsable reply does, instead of on the first reply."""
 
     @pytest.mark.asyncio
     async def test_adaptive_retry_count_mismatch_returns_failure(self):
-        """When _is_adaptive_retry=True and count mismatches, return failure instead of retrying."""
         provider = _mock_provider(
             translate_result=TranslationResult(
                 translations=[{"index": "0", "content": "Hola"}],  # only 1
@@ -178,7 +178,7 @@ class TestProcessBatchAdaptiveRetryCountMismatch:
                 total_tokens=5,
             )
         )
-        settings = _make_settings()
+        settings = _make_settings(max_retries=2, retry_delay=0.001)
         processor = BatchProcessor(provider, settings)
 
         batch = _make_batch(
@@ -191,7 +191,67 @@ class TestProcessBatchAdaptiveRetryCountMismatch:
         result = await processor.process_batch(batch, batch_index=0, _is_adaptive_retry=True)
 
         assert result.success is False
-        assert "Partial translations" in result.error
+        assert result.error == "Partial translations: expected 2, got 1"
+        assert result.retries == 2
+        assert provider.translate_batch.await_count == 3
+
+
+class TestProcessBatchPartialReplyAtFloor:
+    """A model that answers a floor batch with one line usually answers it in full on the
+    next attempt; one bad reply used to fail the batch outright (72 of 72 in a live run)."""
+
+    @pytest.mark.asyncio
+    async def test_partial_reply_at_floor_is_retried(self):
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+        call_count = 0
+
+        async def _side_effect(batch, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return TranslationResult(
+                    translations=[{"index": "0", "content": "Hola"}],
+                    model_used="test",
+                    total_tokens=5,
+                )
+            return TranslationResult(
+                translations=[
+                    {"index": line["index"], "content": f"T-{line['content']}"}
+                    for line in batch.lines
+                ],
+                model_used="test",
+                total_tokens=10,
+            )
+
+        provider = _mock_provider(side_effect=_side_effect)
+        settings = _make_settings(max_retries=2, retry_delay=0.001)
+        processor = BatchProcessor(provider, settings)
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        assert result.success is True
+        assert call_count == 2
+        assert result.retries == 1
+        assert [item["index"] for item in result.translations] == ["0", "1", "2", "3", "4"]
+
+    @pytest.mark.asyncio
+    async def test_partial_reply_at_floor_exhausts_retries(self):
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+        provider = _mock_provider(
+            translate_result=TranslationResult(
+                translations=[{"index": "0", "content": "Hola"}],
+                model_used="test",
+                total_tokens=5,
+            )
+        )
+        settings = _make_settings(max_retries=3, retry_delay=0.001)
+        processor = BatchProcessor(provider, settings)
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        assert result.success is False
+        assert result.error == "Partial translations: expected 5, got 1"
+        assert provider.translate_batch.await_count == 4
 
 
 class TestProcessBatchInvalidResponseAtFloor:

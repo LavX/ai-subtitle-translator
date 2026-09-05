@@ -214,12 +214,22 @@ class BatchProcessor:
                             config_override,
                             _rate_limit_lock,
                         )
-                    # In sub-batch retry or at floor - treat as failure
+                    # A sub-batch or a floor batch cannot split again. A partial reply
+                    # is as transient as an unparsable one (a model that answers five
+                    # lines with one usually answers all five on the next attempt), so
+                    # it gets the same retries before it counts as a failure; a floor
+                    # batch used to fail on the first partial reply, which turned one
+                    # bad answer into "all 72 batches failed".
+                    last_error = f"Partial translations: expected {len(requested)}, got {covered}"
+                    if retries < self.settings.max_retries:
+                        retries += 1
+                        await asyncio.sleep(self.settings.retry_delay * (2 ** (retries - 1)))
+                        continue
                     _note_unsplittable_failure(size_related=True)
                     return BatchResult(
                         batch_index=batch_index,
                         success=False,
-                        error=f"Partial translations: expected {len(requested)}, got {covered}",
+                        error=last_error,
                         retries=retries,
                     )
 
