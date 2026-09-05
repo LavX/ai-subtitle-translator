@@ -18,6 +18,7 @@ from subtitle_translator.core.srt_parser import (
 from subtitle_translator.providers.base import (
     InvalidResponseError,
     TranslationBatch,
+    TranslationProviderError,
     TranslationResult,
 )
 
@@ -166,11 +167,11 @@ def _make_batch(lines=None, src="en", tgt="es"):
 
 
 class TestProcessBatchAdaptiveRetryCountMismatch:
-    """Lines 195, 244-249: _is_adaptive_retry=True with count mismatch returns failure directly."""
+    """A sub-batch (or a floor batch) that keeps answering with too few lines fails after the
+    normal retries, the same way an unparsable reply does, instead of on the first reply."""
 
     @pytest.mark.asyncio
     async def test_adaptive_retry_count_mismatch_returns_failure(self):
-        """When _is_adaptive_retry=True and count mismatches, return failure instead of retrying."""
         provider = _mock_provider(
             translate_result=TranslationResult(
                 translations=[{"index": "0", "content": "Hola"}],  # only 1
@@ -178,7 +179,7 @@ class TestProcessBatchAdaptiveRetryCountMismatch:
                 total_tokens=5,
             )
         )
-        settings = _make_settings()
+        settings = _make_settings(max_retries=2, retry_delay=0.001)
         processor = BatchProcessor(provider, settings)
 
         batch = _make_batch(
@@ -191,7 +192,75 @@ class TestProcessBatchAdaptiveRetryCountMismatch:
         result = await processor.process_batch(batch, batch_index=0, _is_adaptive_retry=True)
 
         assert result.success is False
-        assert "Partial translations" in result.error
+        assert result.error == "Partial translations: expected 2, got 1"
+        assert result.retries == 2
+        assert provider.translate_batch.await_count == 3
+
+
+class TestProcessBatchPartialReplyAtFloor:
+    """A model that answers a floor batch with one line usually answers it in full on the
+    next attempt; one bad reply used to fail the batch outright (72 of 72 in a live run)."""
+
+    @pytest.mark.asyncio
+    async def test_partial_reply_at_floor_is_retried(self):
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+        call_count = 0
+
+        async def _side_effect(batch, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return TranslationResult(
+                    translations=[{"index": "0", "content": "Hola"}],
+                    model_used="test",
+                    total_tokens=5,
+                    cost=0.001,
+                )
+            return TranslationResult(
+                translations=[
+                    {"index": line["index"], "content": f"T-{line['content']}"}
+                    for line in batch.lines
+                ],
+                model_used="test",
+                total_tokens=10,
+                cost=0.002,
+            )
+
+        provider = _mock_provider(side_effect=_side_effect)
+        settings = _make_settings(max_retries=2, retry_delay=0.001)
+        processor = BatchProcessor(provider, settings)
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        assert result.success is True
+        assert call_count == 2
+        assert result.retries == 1
+        assert [item["index"] for item in result.translations] == ["0", "1", "2", "3", "4"]
+        # The discarded attempt was billed too.
+        assert result.tokens_used == 15
+        assert result.cost == pytest.approx(0.003)
+
+    @pytest.mark.asyncio
+    async def test_partial_reply_at_floor_exhausts_retries(self):
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+        provider = _mock_provider(
+            translate_result=TranslationResult(
+                translations=[{"index": "0", "content": "Hola"}],
+                model_used="test",
+                total_tokens=5,
+                cost=0.001,
+            )
+        )
+        settings = _make_settings(max_retries=3, retry_delay=0.001)
+        processor = BatchProcessor(provider, settings)
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        assert result.success is False
+        assert result.error == "Partial translations: expected 5, got 1"
+        assert provider.translate_batch.await_count == 4
+        assert result.tokens_used == 20
+        assert result.cost == pytest.approx(0.004)
 
 
 class TestProcessBatchInvalidResponseAtFloor:
@@ -280,6 +349,223 @@ class TestRetryWithSmallerBatchesSubBatchFailure:
 
         assert result.success is False
         assert "Adaptive retry failed" in result.error
+
+
+class TestFailedBatchUsageIsCounted:
+    """Every attempt is billed, so a failed batch adds its usage to the job totals like a
+    successful one, and a failed adaptive retry keeps what its finished sub-batches spent."""
+
+    @staticmethod
+    def _partial_provider():
+        return _mock_provider(
+            translate_result=TranslationResult(
+                translations=[{"index": "0", "content": "Hola"}],
+                model_used="test",
+                total_tokens=5,
+                cost=0.001,
+            )
+        )
+
+    @pytest.mark.asyncio
+    async def test_exhausted_floor_batch_counts_in_process_all_batches(self):
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        get_batch_size_resolver().reset()
+        processor = BatchProcessor(
+            self._partial_provider(), _make_settings(batch_size=5, max_retries=1, retry_delay=0.001)
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+
+        result = await processor.process_all_batches(lines, "en", "es")
+
+        assert not result.success
+        assert result.progress.failed_batches == 1
+        assert result.progress.total_tokens == 10
+        assert result.progress.total_cost == pytest.approx(0.002)
+
+    @pytest.mark.asyncio
+    async def test_exhausted_floor_batch_counts_in_stream(self):
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        get_batch_size_resolver().reset()
+        processor = BatchProcessor(
+            self._partial_provider(), _make_settings(batch_size=5, max_retries=1, retry_delay=0.001)
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+
+        results = [
+            (batch_result, progress)
+            async for batch_result, progress in processor.process_batches_stream(lines, "en", "es")
+        ]
+
+        assert len(results) == 1
+        assert results[0][0].success is False
+        assert results[0][1].total_tokens == 10
+        assert results[0][1].total_cost == pytest.approx(0.002)
+
+    @pytest.mark.asyncio
+    async def test_failed_adaptive_retry_keeps_sub_batch_usage(self):
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        get_batch_size_resolver().reset()
+
+        async def _side_effect(batch, **kwargs):
+            if len(batch.lines) > 5:
+                raise InvalidResponseError("bad", provider="test")
+            if batch.lines[0]["index"] == "0":
+                return TranslationResult(
+                    translations=[
+                        {"index": line["index"], "content": f"T-{line['content']}"}
+                        for line in batch.lines
+                    ],
+                    model_used="test",
+                    total_tokens=7,
+                    cost=0.001,
+                )
+            return TranslationResult(
+                translations=[{"index": batch.lines[0]["index"], "content": "Hola"}],
+                model_used="test",
+                total_tokens=3,
+                cost=0.001,
+            )
+
+        provider = _mock_provider(side_effect=_side_effect)
+        processor = BatchProcessor(
+            provider, _make_settings(batch_size=20, max_retries=1, retry_delay=0.001)
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(10)]
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        # 10 lines fail, the retry runs two 5-line sub-batches: the first succeeds (7 tokens),
+        # the second answers one line twice (3 + 3 tokens) and fails the batch.
+        assert result.success is False
+        assert "Adaptive retry failed at size 5" in result.error
+        assert len(result.translations) == 5
+        assert result.tokens_used == 13
+        assert result.cost == pytest.approx(0.003)
+        assert result.retries == 1
+
+
+class TestUsageSurvivesMixedOutcomes:
+    """A billed partial attempt keeps counting when a later attempt raises or when it
+    triggers an adaptive split."""
+
+    @staticmethod
+    def _partial(batch, tokens=5):
+        return TranslationResult(
+            translations=[{"index": batch.lines[0]["index"], "content": "Hola"}],
+            model_used="test",
+            total_tokens=tokens,
+            cost=0.001,
+        )
+
+    @staticmethod
+    def _full(batch, tokens=4):
+        return TranslationResult(
+            translations=[
+                {"index": line["index"], "content": f"T-{line['content']}"} for line in batch.lines
+            ],
+            model_used="test",
+            total_tokens=tokens,
+            cost=0.001,
+        )
+
+    @pytest.mark.asyncio
+    async def test_partial_then_invalid_reply(self):
+        calls = 0
+
+        async def _side_effect(batch, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return self._partial(batch)
+            raise InvalidResponseError("bad json", provider="test")
+
+        processor = BatchProcessor(
+            _mock_provider(side_effect=_side_effect),
+            _make_settings(max_retries=1, retry_delay=0.001),
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        assert result.success is False
+        assert result.error == "bad json"
+        assert result.tokens_used == 5
+        assert result.cost == pytest.approx(0.001)
+
+    @pytest.mark.asyncio
+    async def test_partial_then_unexpected_error(self):
+        calls = 0
+
+        async def _side_effect(batch, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return self._partial(batch)
+            raise RuntimeError("kaboom")
+
+        processor = BatchProcessor(
+            _mock_provider(side_effect=_side_effect),
+            _make_settings(max_retries=2, retry_delay=0.001),
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        assert result.success is False
+        assert "kaboom" in result.error
+        assert result.tokens_used == 5
+
+    @pytest.mark.asyncio
+    async def test_partial_then_non_retryable_provider_error(self):
+        calls = 0
+
+        async def _side_effect(batch, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return self._partial(batch)
+            raise TranslationProviderError("Invalid API key", provider="test", retryable=False)
+
+        processor = BatchProcessor(
+            _mock_provider(side_effect=_side_effect),
+            _make_settings(max_retries=2, retry_delay=0.001),
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        assert result.success is False
+        assert "Max retries exceeded" in result.error
+        assert result.tokens_used == 5
+
+    @pytest.mark.asyncio
+    async def test_partial_top_level_reply_counts_after_the_adaptive_split(self):
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        get_batch_size_resolver().reset()
+
+        async def _side_effect(batch, **kwargs):
+            if len(batch.lines) > 5:
+                return self._partial(batch, tokens=9)
+            return self._full(batch)
+
+        processor = BatchProcessor(
+            _mock_provider(side_effect=_side_effect),
+            _make_settings(batch_size=20, max_retries=1, retry_delay=0.001),
+        )
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(10)]
+
+        result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
+
+        # The 10-line attempt (9 tokens) answered one line and was split into two 5-line
+        # sub-batches (4 tokens each); all three calls were billed.
+        assert result.success is True
+        assert len(result.translations) == 10
+        assert result.tokens_used == 17
+        assert result.cost == pytest.approx(0.003)
 
 
 class TestProcessAllBatchesEdgeCases:

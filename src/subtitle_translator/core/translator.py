@@ -134,10 +134,11 @@ class SubtitleTranslator:
                         error=f"Partial failure: {error_msg}",
                     )
                 else:
+                    # Nothing came back, but every attempt was billed.
                     return ContentTranslationResult(
                         lines=[],
                         model_used=result.model_used,
-                        tokens_used=0,
+                        tokens_used=result.total_tokens,
                         success=False,
                         error=error_msg,
                     )
@@ -244,6 +245,7 @@ class SubtitleTranslator:
                     return FileTranslationResult(
                         content="",
                         model_used=result.model_used,
+                        tokens_used=result.total_tokens,
                         success=False,
                         error=error_msg,
                     )

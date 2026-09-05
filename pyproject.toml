@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-subtitle-translator"
-version = "1.3.2"
+version = "1.3.3"
 description = "LLM-powered subtitle translation microservice by LavX"
 readme = "README.md"
 license = {text = "MIT"}
