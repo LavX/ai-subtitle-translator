@@ -70,6 +70,78 @@ class TestParseTranslationsValidJSON:
         assert result[0]["content"] == "Héllo wörld"
 
 
+class TestParseTranslationsControlCharacters:
+    """Models can return unescaped control characters in multi-line cue text."""
+
+    def test_raw_newline_preserved(self, provider):
+        content = '[{"index":"0","content":"Line1\nLine2"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Line1\nLine2"}]
+
+    def test_raw_tab_preserved(self, provider):
+        content = '[{"index":"0","content":"Hello\tworld"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Hello\tworld"}]
+
+    def test_raw_newline_with_duplicate_keys(self, provider):
+        content = '{"index":"0","content":"Line1\nLine2","index":"1","content":"Line3"}'
+        result = provider._parse_translations(content)
+        assert result == [
+            {"index": "0", "content": "Line1\nLine2"},
+            {"index": "1", "content": "Line3"},
+        ]
+
+    def test_markdown_fence_with_raw_newline(self, provider):
+        content = '```json\n[{"index":"0","content":"Line1\nLine2"}]\n```'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Line1\nLine2"}]
+
+
+class TestParseTranslationsOtherControlCharacters:
+    """Permissive parsing is for line breaks and tabs, not for arbitrary control bytes."""
+
+    def test_other_control_characters_are_stripped(self, provider):
+        content = '[{"index":"0","content":"Sz\x00ia\x1b[0m \x08ok"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Szia[0m ok"}]
+
+    def test_carriage_return_is_preserved(self, provider):
+        content = '[{"index":"0","content":"Line1\r\nLine2"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Line1\r\nLine2"}]
+
+
+class TestParseTranslationsInvalidEscapes:
+    """Models escape characters JSON does not allow escaping, most often an apostrophe."""
+
+    def test_escaped_apostrophe_loses_the_backslash(self, provider):
+        content = '[{"index":"0","content":"Don\\\'t stop"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Don't stop"}]
+
+    def test_escaped_backslash_pair_is_preserved(self, provider):
+        content = '[{"index":"0","content":"C:\\\\path"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "C:\\path"}]
+
+    def test_valid_escapes_are_untouched(self, provider):
+        content = '[{"index":"0","content":"Line1\\nLine2 \\"quoted\\" a\\/b \\u00e9"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": 'Line1\nLine2 "quoted" a/b \u00e9'}]
+
+    def test_invalid_escape_with_raw_newline(self, provider):
+        content = '[{"index":"0","content":"Don\\\'t\nstop"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "Don't\nstop"}]
+
+    def test_escaped_backslash_before_u_is_preserved(self, provider):
+        # An escaped backslash followed by a plain "u" is not a broken Unicode escape;
+        # reading its second half as one corrupted the text before.
+        content = '[{"index":"0","content":"C:\\\\users\\\\me"}]'
+        result = provider._parse_translations(content)
+        assert result == [{"index": "0", "content": "C:\\users\\me"}]
+
+
 class TestParseTranslationsDuplicateKeys:
     """Tests for malformed JSON with duplicate keys (the bug this PR fixes)."""
 

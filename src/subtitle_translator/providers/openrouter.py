@@ -1047,13 +1047,20 @@ class OpenRouterProvider(TranslationProvider):
             InvalidResponseError: If JSON parsing fails
         """
         try:
-            # Sanitize broken Unicode escapes that some models produce.
-            # E.g. \uXXXX where XXXX is not valid hex, or truncated \u sequences.
+            # Models produce backslashes JSON cannot take: a \u escape without four hex
+            # digits (or truncated), and escaped characters JSON does not allow escaping,
+            # most often an apostrophe as \'. One pass handles both so that an escaped
+            # backslash pair is consumed first and its second half is never read as the
+            # start of another escape: the pair is kept, a broken Unicode escape is
+            # dropped, and the backslash of an invalid escape is dropped.
             import re
 
+            def _sanitize_escape(match):
+                return match.group(0) if match.group(0) == "\\\\" else ""
+
             content = re.sub(
-                r"\\u(?![0-9a-fA-F]{4})[0-9a-fA-F]{0,3}",
-                "",
+                r"\\\\|\\u(?![0-9a-fA-F]{4})[0-9a-fA-F]{0,3}|\\(?![\"\\/bfnrtu])",
+                _sanitize_escape,
                 content,
             )
 
@@ -1080,7 +1087,11 @@ class OpenRouterProvider(TranslationProvider):
                     result.append(current)
                 return result
 
-            parsed = json.loads(content, object_pairs_hook=_handle_duplicate_keys)
+            # Strict mode rejects valid cues if models use raw newlines/tabs in multi-line
+            # strings. Only those (and a carriage return) are worth keeping: any other raw
+            # control character would otherwise ride through into the SRT output.
+            content = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", content)
+            parsed = json.loads(content, strict=False, object_pairs_hook=_handle_duplicate_keys)
 
             # Handle case where response is wrapped in an object
             if isinstance(parsed, dict):

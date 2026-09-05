@@ -325,7 +325,17 @@ class TestProcessAllBatchesEdgeCases:
     @pytest.mark.asyncio
     async def test_stagger_delay_for_parallel_batches(self):
         """Line 453: stagger > 0 triggers asyncio.sleep in _run_batch."""
-        provider = _mock_provider()
+
+        async def _echo(batch, **kwargs):
+            # Each 1-line batch has its own index; a success has to return that index.
+            return TranslationResult(
+                translations=[{"index": line["index"], "content": "Hola"} for line in batch.lines],
+                model_used="test",
+                total_tokens=10,
+                cost=0.001,
+            )
+
+        provider = _mock_provider(side_effect=_echo)
         settings = _make_settings(parallel_batches_per_job=3)
         processor = BatchProcessor(provider, settings)
 

@@ -76,7 +76,21 @@ class TestCreateApp:
         from subtitle_translator.main import create_app
 
         app = create_app()
-        paths = [route.path for route in app.routes]
+
+        # Newer FastAPI keeps an included router as a single entry that carries its
+        # own routes instead of flattening them into app.routes, so walk both shapes
+        # and back it with the OpenAPI schema, which is stable across versions.
+        def _paths(routes):
+            for route in routes:
+                path = getattr(route, "path", None)
+                if path is not None:
+                    yield path
+                nested = getattr(route, "routes", None)
+                if nested is None:
+                    nested = getattr(getattr(route, "router", None), "routes", None)
+                yield from _paths(nested or [])
+
+        paths = list(_paths(app.routes)) + list(app.openapi().get("paths", {}))
         # health, api, jobs, and config routers should each contribute routes
         assert "/health" in paths or any("/health" in p for p in paths)
 

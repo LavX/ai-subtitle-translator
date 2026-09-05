@@ -349,7 +349,7 @@ class TestContentJobPartialFailure:
     async def test_partial_failure_sets_partial_status(self, manager, mock_translator):
         """Lines 133-150: partial results lead to PARTIAL status with correct error."""
         mock_result = _partial_result(
-            translations=[{"index": "0", "content": "Hola"}],
+            translations=[{"index": "1", "content": "Hola"}],
             tokens=80,
         )
 
@@ -381,6 +381,99 @@ class TestContentJobPartialFailure:
                 assert "1 of 2 batches failed" in job.error
                 assert job.result["tokens_used"] == 80
                 assert job.result["model_used"] == "test-model"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("extra", [None, "duplicate", "hallucinated"])
+    async def test_partial_failure_counts_distinct_translated_indices(
+        self, manager, mock_translator, extra
+    ):
+        translations = [
+            {"index": "1", "content": "Hola"},
+            {"index": "2", "content": "Mundo"},
+        ]
+        if extra == "duplicate":
+            translations.append({"index": "2", "content": "Mundo"})
+        if extra == "hallucinated":
+            # A made-up index is not a translated line, whatever the model says.
+            translations.append({"index": "99", "content": "Nadie"})
+        mock_result = _partial_result(translations=translations)
+
+        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+            processor = AsyncMock()
+            processor.process_all_batches = AsyncMock(return_value=mock_result)
+            MockBP.return_value = processor
+
+            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+                mock_map.return_value = [
+                    SubtitleLine(position=1, line="Hola"),
+                    SubtitleLine(position=2, line="Mundo"),
+                    SubtitleLine(position=3, line="Goodbye"),
+                ]
+
+                job_id = await manager.submit_job(
+                    request_data={
+                        "sourceLanguage": "en",
+                        "targetLanguage": "es",
+                        "lines": [
+                            {"position": 1, "line": "Hello"},
+                            {"position": 2, "line": "World"},
+                            {"position": 3, "line": "Goodbye"},
+                        ],
+                    },
+                    job_type=JobType.TRANSLATE_CONTENT,
+                )
+                manager.set_job_processing(job_id)
+                await process_content_translation_job(manager, job_id, mock_translator)
+
+                job = manager.get_job(job_id)
+                assert job.status == JobStatus.PARTIAL
+                assert job.error == (
+                    "2/3 lines translated. 1 of 2 batches failed: Batch 2 rate limited"
+                )
+                assert job.result["lines"] == [line.model_dump() for line in mock_map.return_value]
+
+    @pytest.mark.asyncio
+    async def test_partial_failure_counts_repeated_positions_as_lines(
+        self, manager, mock_translator
+    ):
+        """Two request lines sharing a position are two translated lines, not one."""
+        mock_result = _partial_result(
+            translations=[
+                {"index": "1", "content": "Hola"},
+                {"index": "2", "content": "Mundo"},
+            ]
+        )
+
+        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+            processor = AsyncMock()
+            processor.process_all_batches = AsyncMock(return_value=mock_result)
+            MockBP.return_value = processor
+
+            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+                mock_map.return_value = [
+                    SubtitleLine(position=1, line="Hola"),
+                    SubtitleLine(position=1, line="Hola"),
+                    SubtitleLine(position=2, line="Mundo"),
+                ]
+
+                job_id = await manager.submit_job(
+                    request_data={
+                        "sourceLanguage": "en",
+                        "targetLanguage": "es",
+                        "lines": [
+                            {"position": 1, "line": "Hello"},
+                            {"position": 1, "line": "Hello again"},
+                            {"position": 2, "line": "World"},
+                        ],
+                    },
+                    job_type=JobType.TRANSLATE_CONTENT,
+                )
+                manager.set_job_processing(job_id)
+                await process_content_translation_job(manager, job_id, mock_translator)
+
+                job = manager.get_job(job_id)
+                assert job.status == JobStatus.PARTIAL
+                assert job.error.startswith("3/3 lines translated.")
 
 
 # ---------------------------------------------------------------------------
