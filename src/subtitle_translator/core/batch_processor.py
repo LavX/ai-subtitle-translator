@@ -177,9 +177,15 @@ class BatchProcessor:
         )
 
         def _note_unsplittable_failure() -> None:
-            # Without a split there is no record_failure call, and a failure that leaves
-            # the size alone still has to interrupt the streak that grows it back.
-            get_batch_size_resolver().record_floor_failure(model_id)
+            # Without a split there is no record_failure call. A sub-batch of an adaptive
+            # retry above the floor still failed at its size, and the cache may already
+            # have grown past it on earlier sub-batches, so it is recorded like any other
+            # failure; anything else only interrupts the streak that grows the size back.
+            resolver = get_batch_size_resolver()
+            if _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE:
+                resolver.record_failure(model_id, len(batch.lines))
+            else:
+                resolver.record_floor_failure(model_id)
 
         while retries < max_retries_with_rate_limit:
             try:

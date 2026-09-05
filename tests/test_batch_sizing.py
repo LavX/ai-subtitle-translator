@@ -406,6 +406,42 @@ class TestAdaptiveRetry:
         assert resolver.resolve("test/model") == 5
 
     @pytest.mark.asyncio
+    async def test_failed_adaptive_sub_batch_pulls_the_cache_below_its_size(self):
+        """Three sub-batch successes grow the cache; a later sub-batch failure must not leave it there."""
+        resolver = get_batch_size_resolver()
+        resolver.record_failure("test/model", 48)
+        resolver.record_failure("test/model", 24)
+        assert resolver.resolve("test/model") == 12
+
+        small_calls = 0
+
+        async def mock_translate(batch, **kwargs):
+            nonlocal small_calls
+            if len(batch.lines) > 6:
+                raise InvalidResponseError("Truncated response")
+            small_calls += 1
+            if small_calls > 3:
+                raise InvalidResponseError("Truncated response")
+            return TranslationResult(
+                translations=[
+                    {"index": line["index"], "content": f"T-{line['content']}"}
+                    for line in batch.lines
+                ],
+                model_used="test/model",
+                total_tokens=10,
+            )
+
+        self.provider.translate_batch = mock_translate
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(48)]
+        batch = TranslationBatch(lines=lines, source_language="en", target_language="hu")
+        result = await self.processor.process_batch(batch, batch_index=0, model="test/model")
+
+        # The 48-line failure halves 12 to 6; three 6-line successes grow it to 12; the
+        # fourth 6-line sub-batch fails and the cache has to end below 6, at the floor.
+        assert result.success is False
+        assert resolver.resolve("test/model") == 5
+
+    @pytest.mark.asyncio
     async def test_count_mismatch_triggers_adaptive_retry(self):
         """When model returns fewer translations than input, trigger adaptive retry."""
         lines = [{"index": str(i), "content": f"Line {i}"} for i in range(10)]
