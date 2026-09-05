@@ -78,8 +78,11 @@ class BatchSizeResolver:
             "after 3 consecutive successes"
         )
         if new_size >= ceiling:
+            # The ceiling belonged to this recovery cycle. A later failure at the restored
+            # size starts a new one and must set its own, or it would be capped below it.
             del self._learned_sizes[model_id]
             del self._success_counts[model_id]
+            self._ceilings.pop(model_id, None)
 
     def reset(self) -> None:
         self._learned_sizes.clear()

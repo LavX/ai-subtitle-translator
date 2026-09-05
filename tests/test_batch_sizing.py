@@ -243,6 +243,21 @@ class TestBatchSizeResolverRecordSuccess:
         assert self.resolver._learned_sizes == {}
         assert self.resolver._success_counts == {}
 
+    def test_eviction_clears_the_ceiling_for_the_next_cycle(self):
+        self.resolver.record_failure("model/a", 20)
+        for _ in range(3):
+            self.resolver.record_success("model/a", 10)
+        assert "model/a" not in self.resolver._learned_sizes
+        assert "model/a" not in self.resolver._ceilings
+
+        # A failure at the restored size starts a new cycle with its own ceiling.
+        self.resolver.record_failure("model/a", 100)
+        assert self.resolver.resolve("model/a") == 50
+        for _ in range(3):
+            self.resolver.record_success("model/a", 50)
+        assert "model/a" not in self.resolver._learned_sizes
+        assert self.resolver.resolve("model/a") == 100
+
     def test_success_for_unknown_model_is_noop(self):
         for _ in range(3):
             self.resolver.record_success("unknown/model", 100)
@@ -255,20 +270,19 @@ class TestBatchSizeResolverRecordSuccess:
         self.resolver.record_success("unknown/model", 40)
         assert self.resolver.resolve("unknown/model") == 40
 
-    def test_first_failure_ceiling_survives_cache_eviction(self):
+    def test_a_new_cycle_after_eviction_gets_its_own_ceiling(self):
         self.resolver.record_failure("model/a", 20)
         for _ in range(3):
             self.resolver.record_success("model/a", 10)
         assert "model/a" not in self.resolver._learned_sizes
 
+        # The next failure sets a fresh ceiling of 16, so this cycle ends there, not at 20.
         self.resolver.record_failure("model/a", 16)
+        assert self.resolver._ceilings["model/a"] == 16
         for _ in range(3):
             self.resolver.record_success("model/a", 8)
-        assert self.resolver.resolve("model/a") == 16
-
-        for _ in range(3):
-            self.resolver.record_success("model/a", 16)
         assert "model/a" not in self.resolver._learned_sizes
+        assert self.resolver.resolve("model/a") == 100
 
     def test_reset_clears_sizes_ceilings_and_success_streaks(self):
         self.resolver.record_failure("model/a", 20)
@@ -440,6 +454,54 @@ class TestAdaptiveRetry:
         # fourth 6-line sub-batch fails and the cache has to end below 6, at the floor.
         assert result.success is False
         assert resolver.resolve("test/model") == 5
+
+    @pytest.mark.asyncio
+    async def test_substituted_index_is_not_a_success(self):
+        """The right number of entries with a made-up index leaves a line untranslated."""
+        resolver = get_batch_size_resolver()
+        resolver.record_failure("test/model", 10)
+        assert resolver.resolve("test/model") == 5
+
+        async def mock_translate(batch, **kwargs):
+            translations = [
+                {"index": line["index"], "content": f"T-{line['content']}"}
+                for line in batch.lines[:-1]
+            ]
+            translations.append({"index": "99", "content": "Nadie"})
+            return TranslationResult(
+                translations=translations, model_used="test/model", total_tokens=10
+            )
+
+        self.provider.translate_batch = mock_translate
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(5)]
+        batch = TranslationBatch(lines=lines, source_language="en", target_language="hu")
+        result = await self.processor.process_batch(batch, batch_index=0, model="test/model")
+
+        assert result.success is False
+        assert result.error == "Partial translations: expected 5, got 4"
+        assert resolver._success_counts["test/model"] == 0
+
+    @pytest.mark.asyncio
+    async def test_unrelated_error_on_a_sub_batch_does_not_shrink_the_size(self):
+        """An authentication error says nothing about the batch size."""
+        resolver = get_batch_size_resolver()
+        resolver.record_failure("test/model", 24)
+        resolver.record_success("test/model", 12)
+        assert resolver.resolve("test/model") == 12
+
+        async def mock_translate(batch, **kwargs):
+            raise TranslationProviderError("Invalid API key", retryable=False)
+
+        self.provider.translate_batch = mock_translate
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(12)]
+        batch = TranslationBatch(lines=lines, source_language="en", target_language="hu")
+        result = await self.processor.process_batch(
+            batch, batch_index=0, model="test/model", _is_adaptive_retry=True
+        )
+
+        assert result.success is False
+        assert resolver.resolve("test/model") == 12
+        assert resolver._success_counts["test/model"] == 0
 
     @pytest.mark.asyncio
     async def test_count_mismatch_triggers_adaptive_retry(self):
