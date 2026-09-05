@@ -167,6 +167,10 @@ class BatchProcessor:
         retries = 0
         last_error: str | None = None
         is_timeout = False
+        # Usage of an attempt that is retried is still billed; it is carried into the
+        # eventual result so the job totals stay honest.
+        spent_tokens = 0
+        spent_cost = 0.0
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
         # Rate limits get extra retries (3 more than normal errors)
         max_retries_with_rate_limit = self.settings.max_retries + 3
@@ -220,6 +224,8 @@ class BatchProcessor:
                     # it gets the same retries before it counts as a failure; a floor
                     # batch used to fail on the first partial reply, which turned one
                     # bad answer into "all 72 batches failed".
+                    spent_tokens += result.total_tokens or 0
+                    spent_cost += result.cost or 0.0
                     last_error = f"Partial translations: expected {len(requested)}, got {covered}"
                     if retries < self.settings.max_retries:
                         retries += 1
@@ -229,6 +235,8 @@ class BatchProcessor:
                     return BatchResult(
                         batch_index=batch_index,
                         success=False,
+                        tokens_used=spent_tokens,
+                        cost=spent_cost,
                         error=last_error,
                         retries=retries,
                     )
@@ -239,8 +247,8 @@ class BatchProcessor:
                     batch_index=batch_index,
                     success=True,
                     translations=result.translations,
-                    tokens_used=result.total_tokens or 0,
-                    cost=result.cost or 0.0,
+                    tokens_used=spent_tokens + (result.total_tokens or 0),
+                    cost=spent_cost + (result.cost or 0.0),
                     retries=retries,
                 )
 

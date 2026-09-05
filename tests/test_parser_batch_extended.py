@@ -213,6 +213,7 @@ class TestProcessBatchPartialReplyAtFloor:
                     translations=[{"index": "0", "content": "Hola"}],
                     model_used="test",
                     total_tokens=5,
+                    cost=0.001,
                 )
             return TranslationResult(
                 translations=[
@@ -221,6 +222,7 @@ class TestProcessBatchPartialReplyAtFloor:
                 ],
                 model_used="test",
                 total_tokens=10,
+                cost=0.002,
             )
 
         provider = _mock_provider(side_effect=_side_effect)
@@ -233,6 +235,9 @@ class TestProcessBatchPartialReplyAtFloor:
         assert call_count == 2
         assert result.retries == 1
         assert [item["index"] for item in result.translations] == ["0", "1", "2", "3", "4"]
+        # The discarded attempt was billed too.
+        assert result.tokens_used == 15
+        assert result.cost == pytest.approx(0.003)
 
     @pytest.mark.asyncio
     async def test_partial_reply_at_floor_exhausts_retries(self):
@@ -242,6 +247,7 @@ class TestProcessBatchPartialReplyAtFloor:
                 translations=[{"index": "0", "content": "Hola"}],
                 model_used="test",
                 total_tokens=5,
+                cost=0.001,
             )
         )
         settings = _make_settings(max_retries=3, retry_delay=0.001)
@@ -252,6 +258,8 @@ class TestProcessBatchPartialReplyAtFloor:
         assert result.success is False
         assert result.error == "Partial translations: expected 5, got 1"
         assert provider.translate_batch.await_count == 4
+        assert result.tokens_used == 20
+        assert result.cost == pytest.approx(0.004)
 
 
 class TestProcessBatchInvalidResponseAtFloor:
