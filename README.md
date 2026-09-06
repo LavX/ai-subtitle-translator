@@ -161,12 +161,26 @@ Every translate endpoint accepts an optional `config` block to override defaults
     "model": "anthropic/claude-haiku-4.5",
     "temperature": 0.5,
     "parallelBatches": 2,
-    "reasoning": {"effort": "high"}
+    "reasoning": {"effort": "high"},
+    "provider": {"sort": "floor"}
   }
 }
 ```
 
 Reasoning effort levels: `xhigh`, `high`, `medium`, `low`, `minimal`, `none` (disables reasoning).
+
+Provider routing (`provider.sort`) decides which OpenRouter provider serves the model:
+
+| Value | What is sent | Effect |
+| --- | --- | --- |
+| `throughput` (default when nothing is sent) | `provider.sort: throughput` | Fastest provider first |
+| `price` | `provider.sort: price` | Cheapest provider first |
+| `latency` | `provider.sort: latency` | Lowest latency first |
+| `nitro` | `model:nitro` slug shortcut | Fastest, and priority-tier endpoints become eligible |
+| `floor` | `model:floor` slug shortcut | Cheapest, and flex-tier endpoints become eligible |
+| `default` | nothing | OpenRouter's own load balancing |
+
+`nitro` and `floor` are supersets of the matching sort. OpenRouter does not stack slug variants, so on a slug that already carries one (`:thinking`, `:free`, ...) they fall back to the plain `throughput`/`price` sort. A `:nitro` or `:floor` typed straight into the model id is honoured as-is and no competing sort is sent. `provider.order`, `only`, `ignore` and `allowFallbacks` are passed through unchanged.
 
 ## Configuration
 

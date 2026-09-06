@@ -26,6 +26,33 @@ logger = logging.getLogger(__name__)
 # Debug logger for detailed request/response logging
 debug_logger = logging.getLogger(f"{__name__}.debug")
 
+# OpenRouter routing shortcuts that can be appended to a model slug. ":nitro" sorts the
+# providers by throughput and makes priority-tier endpoints eligible, ":floor" sorts by
+# price and makes flex-tier endpoints eligible. Each is a superset of the matching
+# provider.sort value, and OpenRouter does not stack them with other variants.
+ROUTING_SUFFIXES = ("nitro", "floor")
+ROUTING_SUFFIX_SORT = {"nitro": "throughput", "floor": "price"}
+
+
+def split_routing_suffix(model_id: str) -> tuple[str, str | None]:
+    """Split a ":nitro"/":floor" routing shortcut off a model slug.
+
+    Returns the slug without the shortcut and the shortcut name, or the slug
+    unchanged and None when it carries no routing shortcut. Other variants such
+    as ":thinking" or ":free" are part of the model and are left alone.
+    """
+    for suffix in ROUTING_SUFFIXES:
+        marker = f":{suffix}"
+        if model_id.endswith(marker):
+            return model_id[: -len(marker)], suffix
+    return model_id, None
+
+
+def _has_variant_suffix(model_id: str) -> bool:
+    """True when the slug already carries a variant (":thinking", ":free", ...)."""
+    return ":" in model_id.rsplit("/", 1)[-1]
+
+
 # Recommended models for subtitle translation - Updated based on testing
 # Models marked as working after comprehensive testing (Dec 2025)
 
@@ -405,7 +432,7 @@ class OpenRouterProvider(TranslationProvider):
             for model_list in [EXCELLENT_MODELS, EXCELLENT_FREE_MODELS, GOOD_MODELS, POOR_MODELS]:
                 for model in model_list:
                     self._model_metadata_cache[model["id"]] = model
-        return self._model_metadata_cache.get(model_id)
+        return self._model_metadata_cache.get(split_routing_suffix(model_id)[0])
 
     def get_best_model_for_language(self, target_language: str) -> str | None:
         """
@@ -504,7 +531,7 @@ class OpenRouterProvider(TranslationProvider):
         Returns:
             Reasoning type: 'thinking_variant', 'effort', 'max_tokens', 'enabled', or None
         """
-        base_model = model_id.replace(":thinking", "")
+        base_model, _ = split_routing_suffix(model_id.replace(":thinking", ""))
 
         # Hardcoded overrides for models with specific reasoning styles
         if base_model in THINKING_VARIANT_MODELS:
@@ -641,47 +668,72 @@ class OpenRouterProvider(TranslationProvider):
     def _build_provider_payload(
         self,
         config_override: Optional["TranslationConfig"],
-    ) -> dict[str, Any]:
+        model_id: str,
+        typed_routing: str | None = None,
+    ) -> tuple[str, dict[str, Any]]:
         """
-        Build provider routing configuration for OpenRouter.
+        Resolve the provider routing for a request.
+
+        The routing comes from a ":nitro"/":floor" shortcut typed into the model slug
+        (or passed as ``typed_routing`` when it was split off earlier), else from the
+        configured provider sort, else it defaults to throughput. "nitro" and "floor"
+        go out as the slug shortcut, which also unlocks the priority/flex tiers, unless
+        the slug already carries another variant such as ":thinking", in which case
+        they fall back to the plain provider sort because OpenRouter does not stack
+        variants. "default" sends no sort and leaves OpenRouter's load balancing on.
 
         Args:
             config_override: Optional config with provider settings
+            model_id: The model slug the request is going to use
+            typed_routing: A shortcut that was already split off the slug
 
         Returns:
-            Provider configuration dict for the payload
+            Tuple of (final model slug, provider payload dict or {})
         """
+        provider_config = config_override.provider if config_override else None
         provider_params: dict[str, Any] = {}
 
-        if not config_override or not config_override.provider:
-            # Default: prioritize throughput for fastest response
-            return {"provider": {"sort": "throughput"}}
+        if provider_config:
+            if provider_config.order:
+                provider_params["order"] = provider_config.order
+            if provider_config.allow_fallbacks is False:
+                # True is OpenRouter's default, so only the opt-out is sent.
+                provider_params["allow_fallbacks"] = False
+            if provider_config.only:
+                provider_params["only"] = provider_config.only
+            if provider_config.ignore:
+                provider_params["ignore"] = provider_config.ignore
 
-        provider_config = config_override.provider
+        slug, typed_shortcut = split_routing_suffix(model_id)
+        typed_shortcut = typed_shortcut or typed_routing
+        if typed_shortcut:
+            # The slug says how to route; a competing provider.sort is never sent.
+            routing = typed_shortcut
+        elif provider_config and provider_config.sort:
+            routing = provider_config.sort
+        elif provider_config and provider_config.order:
+            # An explicit provider order is a routing choice of its own.
+            routing = None
+        else:
+            routing = "throughput"
 
-        if provider_config.order:
-            provider_params["order"] = provider_config.order
-
-        if provider_config.allow_fallbacks is not None:
-            provider_params["allow_fallbacks"] = provider_config.allow_fallbacks
-
-        if provider_config.sort:
-            provider_params["sort"] = provider_config.sort
-        elif not provider_config.order:
-            # Default to throughput sorting if no order specified
-            provider_params["sort"] = "throughput"
-
-        if provider_config.only:
-            provider_params["only"] = provider_config.only
-
-        if provider_config.ignore:
-            provider_params["ignore"] = provider_config.ignore
+        final_model_id = slug
+        if routing in ROUTING_SUFFIXES:
+            if _has_variant_suffix(slug):
+                provider_params["sort"] = ROUTING_SUFFIX_SORT[routing]
+                logger.info(
+                    f"{slug} already carries a variant, using provider sort "
+                    f"{provider_params['sort']} instead of :{routing}"
+                )
+            else:
+                final_model_id = f"{slug}:{routing}"
+        elif routing and routing != "default":
+            provider_params["sort"] = routing
 
         if provider_params:
             logger.debug(f"Provider routing params: {provider_params}")
-            return {"provider": provider_params}
-
-        return {}
+            return final_model_id, {"provider": provider_params}
+        return final_model_id, {}
 
     async def translate_batch(
         self,
@@ -735,9 +787,11 @@ class OpenRouterProvider(TranslationProvider):
                 retryable=False,
             )
 
-        # Build reasoning configuration
+        # Build reasoning configuration on the bare slug; a typed routing shortcut is
+        # re-applied by the provider routing step below.
+        bare_model, typed_routing = split_routing_suffix(model_to_use)
         model_to_use, reasoning_params = await self._build_reasoning_payload(
-            model_to_use, config_override
+            bare_model, config_override
         )
 
         # Build messages
@@ -749,8 +803,10 @@ class OpenRouterProvider(TranslationProvider):
         )
         user_content = self.format_input_for_translation(batch.lines)
 
-        # Build provider routing configuration
-        provider_params = self._build_provider_payload(config_override)
+        # Build provider routing configuration (may append :nitro/:floor to the slug)
+        model_to_use, provider_params = self._build_provider_payload(
+            config_override, model_to_use, typed_routing
+        )
 
         # Build messages with cache_control for Anthropic models
         is_anthropic = any(model_to_use.startswith(prefix) for prefix in ["anthropic/"])
