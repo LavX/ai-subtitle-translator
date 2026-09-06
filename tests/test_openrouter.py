@@ -981,13 +981,13 @@ class TestBuildReasoningPayload:
 class TestBuildProviderPayload:
     def test_default_no_config(self):
         provider = OpenRouterProvider(settings=_make_settings())
-        result = provider._build_provider_payload(None)
+        _, result = provider._build_provider_payload(None, "some/model")
         assert result == {"provider": {"sort": "throughput"}}
 
     def test_default_no_provider_in_config(self):
         provider = OpenRouterProvider(settings=_make_settings())
         config = TranslationConfig(model="some/model")
-        result = provider._build_provider_payload(config)
+        _, result = provider._build_provider_payload(config, "some/model")
         assert result == {"provider": {"sort": "throughput"}}
 
     def test_custom_sort(self):
@@ -995,7 +995,7 @@ class TestBuildProviderPayload:
         config = TranslationConfig(
             provider=ProviderConfig(sort="price"),
         )
-        result = provider._build_provider_payload(config)
+        _, result = provider._build_provider_payload(config, "some/model")
         assert result["provider"]["sort"] == "price"
 
     def test_order(self):
@@ -1003,7 +1003,7 @@ class TestBuildProviderPayload:
         config = TranslationConfig(
             provider=ProviderConfig(order=["deepinfra", "together"]),
         )
-        result = provider._build_provider_payload(config)
+        _, result = provider._build_provider_payload(config, "some/model")
         assert result["provider"]["order"] == ["deepinfra", "together"]
 
     def test_allow_fallbacks(self):
@@ -1011,7 +1011,7 @@ class TestBuildProviderPayload:
         config = TranslationConfig(
             provider=ProviderConfig(allow_fallbacks=False),
         )
-        result = provider._build_provider_payload(config)
+        _, result = provider._build_provider_payload(config, "some/model")
         assert result["provider"]["allow_fallbacks"] is False
 
     def test_only_and_ignore(self):
@@ -1019,7 +1019,7 @@ class TestBuildProviderPayload:
         config = TranslationConfig(
             provider=ProviderConfig(only=["deepinfra"], ignore=["together"]),
         )
-        result = provider._build_provider_payload(config)
+        _, result = provider._build_provider_payload(config, "some/model")
         assert result["provider"]["only"] == ["deepinfra"]
         assert result["provider"]["ignore"] == ["together"]
 
@@ -1029,7 +1029,7 @@ class TestBuildProviderPayload:
         config = TranslationConfig(
             provider=ProviderConfig(order=["deepinfra"]),
         )
-        result = provider._build_provider_payload(config)
+        _, result = provider._build_provider_payload(config, "some/model")
         assert "sort" not in result["provider"]
 
 

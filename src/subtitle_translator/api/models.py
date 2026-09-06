@@ -54,6 +54,9 @@ class ReasoningConfig(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+PROVIDER_SORT_VALUES = ("default", "throughput", "price", "latency", "nitro", "floor")
+
+
 class ProviderConfig(BaseModel):
     """Configuration for OpenRouter provider routing."""
 
@@ -68,7 +71,12 @@ class ProviderConfig(BaseModel):
         description="Whether to allow fallbacks to other providers",
     )
     sort: str | None = Field(
-        default=None, description="Sort providers by: 'price', 'throughput', or 'latency'"
+        default=None,
+        description=(
+            "Provider routing: 'throughput', 'price' or 'latency' set provider.sort; "
+            "'nitro' and 'floor' use the OpenRouter slug shortcuts (which also unlock "
+            "the priority/flex tiers); 'default' keeps OpenRouter's load balancing"
+        ),
     )
     only: list[str] | None = Field(
         default=None, max_length=20, description="List of provider slugs to allow exclusively"
@@ -78,6 +86,20 @@ class ProviderConfig(BaseModel):
     )
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("sort", mode="before")
+    @classmethod
+    def _normalise_sort(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalised = str(value).strip().lower()
+        if normalised == "":
+            return None
+        if normalised not in PROVIDER_SORT_VALUES:
+            raise ValueError(
+                f"sort must be one of {', '.join(PROVIDER_SORT_VALUES)}, got '{value}'"
+            )
+        return normalised
 
 
 class TranslationConfig(BaseModel):

@@ -46,6 +46,7 @@ Copy the 64-character hex string. You'll paste it into Bazarr+ next.
    - **OpenRouter API Key**: Your key from [openrouter.ai/keys](https://openrouter.ai/keys)
    - **Encryption Key**: Run `docker exec ai-subtitle-translator cat /app/data/encryption.key` and paste the 64-character hex string
    - **Model**: Pick a model (see recommendations below)
+   - **Provider Routing**: Fastest (the default) picks the highest-throughput OpenRouter provider; Cheapest picks the lowest price. The `:nitro` and `:floor` variants also unlock OpenRouter's priority and flex tiers. The routing decides which provider bills the request, so the price per episode moves with it
 4. Click **Test** to verify everything works
 5. Save
 
