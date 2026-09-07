@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="720" viewBox="0 0 600 720" role="img" aria-labelledby="title desc">
+  <title id="title">AI Subtitle Translator for Bazarr+</title>
+  <desc id="desc">Cinematic subtitle frames show Don't look back. in English and Ne nézz hátra. in Hungarian.</desc>
+  <defs>
+    <linearGradient id="backdrop" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111e2c"/><stop offset="1" stop-color="#071014"/></linearGradient>
+    <linearGradient id="scene" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#293e43"/><stop offset="1" stop-color="#091418"/></linearGradient>
+    <clipPath id="rounded"><rect width="600" height="720" rx="24"/></clipPath>
+    <style>text { font-family: Inter, 'Segoe UI', Arial, sans-serif; } .mono { font-family: 'SFMono-Regular', Consolas, monospace; }</style>
+  </defs>
+  <g clip-path="url(#rounded)">
+    <rect width="600" height="720" fill="url(#backdrop)"/>
+    <path d="M34 41H64" stroke="#89f2ce" stroke-width="5"/>
+    <text x="79" y="49" font-size="22" font-weight="700" letter-spacing="2" fill="#89f2ce">FOR BAZARR+</text>
+    <text x="32" y="129" font-size="65" font-weight="800" letter-spacing="-2.5" fill="#f5f7f1">AI SUBTITLE</text>
+    <text x="32" y="198" font-size="65" font-weight="800" letter-spacing="-2.5" fill="#f5f7f1">TRANSLATOR</text>
+    <text x="35" y="245" font-size="26" fill="#c7d2d6">Keep the scene.</text>
+    <text x="35" y="279" font-size="26" fill="#c7d2d6">Change the language.</text>
+    <g transform="translate(34 309)">
+      <rect width="532" height="145" rx="10" fill="url(#scene)" stroke="#4e626a"/>
+      <path d="M1 1H176L340 144H1Z" fill="#89f2ce" opacity=".07"/>
+      <path d="M337 1V144M359 1V144M449 1V144" stroke="#6c8383" opacity=".18"/>
+      <rect x="20" y="16" width="128" height="34" rx="4" fill="#89f2ce"/>
+      <text x="84" y="40" class="mono" font-size="20" font-weight="700" text-anchor="middle" fill="#10231e">ENGLISH</text>
+      <rect x="37" y="78" width="458" height="50" rx="5" fill="#060d12" fill-opacity=".84"/>
+      <text x="266" y="114" font-size="35" font-weight="600" text-anchor="middle" fill="#ffffff">Don't look back.</text>
+      <path d="M266 156V173M258 168L266 176L274 168" fill="none" stroke="#89f2ce" stroke-width="3"/>
+      <rect y="188" width="532" height="145" rx="10" fill="url(#scene)" stroke="#4e626a"/>
+      <path d="M1 189H176L340 332H1Z" fill="#89f2ce" opacity=".07"/>
+      <path d="M337 189V332M359 189V332M449 189V332" stroke="#6c8383" opacity=".18"/>
+      <rect x="20" y="204" width="150" height="34" rx="4" fill="#ffd08a"/>
+      <text x="95" y="228" class="mono" font-size="20" font-weight="700" text-anchor="middle" fill="#34230b">HUNGARIAN</text>
+      <rect x="37" y="266" width="458" height="50" rx="5" fill="#060d12" fill-opacity=".84"/>
+      <text x="266" y="302" font-size="35" font-weight="600" text-anchor="middle" fill="#ffffff">Ne nézz hátra.</text>
+    </g>
+    <path d="M34 665H566" stroke="#34434b"/>
+    <text x="300" y="696" class="mono" font-size="19" text-anchor="middle" letter-spacing="1" fill="#a7b7be">SELF-HOSTED / OPEN SOURCE</text>
+  </g>
+</svg>
