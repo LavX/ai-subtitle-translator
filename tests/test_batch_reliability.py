@@ -708,3 +708,43 @@ async def test_recovery_requests_only_the_cues_the_reply_left_out():
         assert sorted(int(t["index"]) for t in result.translations) == list(range(1, 21))
     finally:
         await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_a_repeated_position_split_across_children_still_completes():
+    """Index 10 appears twice; the first child answers it, the second leaves it out.
+
+    The second child fails on its own count, but every requested position has
+    a translation, so the batch is a success.
+    """
+    calls = []
+
+    async def send(request):
+        lines = json.loads(json.loads(request.content)["messages"][-1]["content"])
+        first, size = lines[0]["index"], len(lines)
+        calls.append((first, size))
+        if size == 20:
+            chosen = lines[:6]
+        elif first == "17":
+            chosen = [x for x in lines if x["index"] != "10"]
+        else:
+            chosen = lines
+        return response([{**x, "content": "translated"} for x in chosen])
+
+    provider = OpenRouterProvider(settings())
+    provider._client = httpx.AsyncClient(
+        transport=httpx.MockTransport(send), base_url="https://fake"
+    )
+    provider._model_params_fetched = True
+    lines = [{"index": str(i), "content": "source"} for i in range(1, 20)]
+    lines.append({"index": "10", "content": "source again"})
+    try:
+        result = await BatchProcessor(provider, provider.settings).process_batch(
+            TranslationBatch(lines, "en", "hu"), 0, model="test/duplicate-position"
+        )
+        assert calls == [("1", 20), ("7", 10), ("17", 4), ("17", 4)]
+        assert result.success
+        assert result.error is None
+        assert sorted(int(t["index"]) for t in result.translations) == list(range(1, 20))
+    finally:
+        await provider.close()

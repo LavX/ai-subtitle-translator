@@ -198,3 +198,34 @@ class TestSanitizedReasons:
             "Check the key and its permissions."
         )
         assert "raw provider detail" not in value["error"]
+
+    @pytest.mark.asyncio
+    async def test_forbidden_is_named_without_blaming_the_key_alone(self, manager):
+        job_id = await manager.submit_job(REQUEST, JobType.TRANSLATE_FILE)
+        manager.set_job_failed(job_id, "All 1 batches failed: OpenRouter API error 403: Forbidden")
+        value = gui.metadata(manager.get_job(job_id))
+        assert value["error"] == (
+            "All 1 batches failed: OpenRouter refused the request (403). "
+            "Check the key's permissions and the model's content policy."
+        )
+
+
+class TestPersistedHistoryWindow:
+    @pytest.mark.asyncio
+    async def test_store_window_keeps_the_job_that_finished_last(self, manager):
+        from datetime import UTC, datetime, timedelta
+
+        base = datetime(2026, 1, 1, tzinfo=UTC)
+        ids = [await manager.submit_job(REQUEST, JobType.TRANSLATE_FILE) for _ in range(3)]
+        for offset, job_id in enumerate(ids):
+            manager.set_job_completed(job_id, {"content": "done"})
+            job = manager.get_job(job_id)
+            job.created_at = base + timedelta(minutes=offset)
+            job.completed_at = base + timedelta(minutes=offset + 1)
+        early = manager.get_job(ids[0])
+        early.completed_at = base + timedelta(days=1)
+        for job_id in ids:
+            manager._store.save_job(manager.get_job(job_id))
+
+        window = manager._store.load_all_jobs(limit=2, terminal_only=True)
+        assert [job.id for job in window] == [ids[0], ids[2]]

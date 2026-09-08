@@ -554,6 +554,18 @@ class OpenRouterProvider(TranslationProvider):
             "testing_reference": TESTING_REFERENCE,
         }
 
+    @staticmethod
+    def _capability(cache: dict[str, Any], model_id: str) -> Any:
+        """Look a model up in a catalog cache, falling back to its base model.
+
+        A variant such as ":thinking" or ":free" may have no catalog entry of its
+        own; the base model's capabilities still apply to it.
+        """
+        value = cache.get(model_id)
+        if value is None and _has_variant_suffix(model_id):
+            value = cache.get(model_id.rsplit(":", 1)[0])
+        return value
+
     async def _ensure_model_params_cache(self) -> None:
         """Fetch and cache supported_parameters for all models from OpenRouter API.
 
@@ -646,7 +658,7 @@ class OpenRouterProvider(TranslationProvider):
 
         # Dynamic lookup: check OpenRouter API's supported_parameters
         await self._ensure_model_params_cache()
-        params = self._model_params_cache.get(base_model, [])
+        params = self._capability(self._model_params_cache, base_model) or []
         if "reasoning" in params:
             return "effort"
 
@@ -684,7 +696,7 @@ class OpenRouterProvider(TranslationProvider):
             # list alone does not mean that disabling reasoning is impossible.
             await self._ensure_model_params_cache()
             base_model, _ = split_routing_suffix(model_id)
-            capabilities = self._model_reasoning_cache.get(base_model, {})
+            capabilities = self._capability(self._model_reasoning_cache, base_model) or {}
             if capabilities.get("mandatory") is True:
                 raise TranslationProviderError(
                     f"Reasoning is mandatory for {model_id} and cannot be disabled.",
@@ -705,7 +717,9 @@ class OpenRouterProvider(TranslationProvider):
         if reasoning_config and reasoning_config.effort:
             await self._ensure_model_params_cache()
             base_model, _ = split_routing_suffix(model_id)
-            efforts = self._model_reasoning_cache.get(base_model, {}).get("supported_efforts")
+            efforts = (self._capability(self._model_reasoning_cache, base_model) or {}).get(
+                "supported_efforts"
+            )
             if isinstance(efforts, list):
                 effort = reasoning_config.effort.lower()
                 if effort not in efforts:
@@ -975,11 +989,7 @@ class OpenRouterProvider(TranslationProvider):
         # The catalog decides whether the model takes a temperature at all; make
         # sure it is loaded even when no reasoning config has fetched it yet.
         await self._ensure_model_params_cache()
-        supported = self._model_params_cache.get(bare_model)
-        if supported is None and _has_variant_suffix(bare_model):
-            # A variant such as ":thinking" may not have its own catalog entry;
-            # the base model's capabilities still apply to it.
-            supported = self._model_params_cache.get(bare_model.rsplit(":", 1)[0])
+        supported = self._capability(self._model_params_cache, bare_model)
         if supported is not None and "temperature" not in supported:
             payload.pop("temperature", None)
 
@@ -1127,8 +1137,13 @@ class OpenRouterProvider(TranslationProvider):
             else:
                 message = detail.get("message") if isinstance(detail, dict) else None
                 message = message if isinstance(message, str) else "Provider returned an error"
+                # The status travels in the message: it is all the persisted job
+                # error keeps, and the GUI's guidance is keyed on it.
+                labelled = (
+                    f"OpenRouter API error {code}" if code is not None else "OpenRouter API error"
+                )
                 error = TranslationProviderError(
-                    f"OpenRouter API error: {message[:500]}",
+                    f"{labelled}: {message[:500]}",
                     provider=self.provider_name,
                     retryable=code is None,
                     status_code=code,

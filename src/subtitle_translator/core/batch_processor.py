@@ -237,6 +237,13 @@ class BatchProcessor:
                 {str(t["index"]): t for t in outcome.translations if str(t["index"]) in requested}
             )
             outcome.translations = list(merged.values())
+            if not outcome.success and requested <= merged.keys():
+                # A position that a request repeats can land in two children; when
+                # the first answers it and the second leaves it out, the second
+                # fails although every requested line now has a translation.
+                outcome.success = True
+                outcome.error = None
+                outcome.timed_out = False
             return outcome
 
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE

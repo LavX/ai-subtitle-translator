@@ -51,6 +51,9 @@ async def test_error_code_and_usage_survive_http_envelope(http_status, code, exp
     assert type(error) is expected
     assert error.status_code == code and error.retryable is retryable
     assert error.tokens_used == 7 and error.cost == pytest.approx(0.007)
+    if expected is TranslationProviderError:
+        # The persisted job error is only this message; the status must be in it.
+        assert str(code) in error.message
 
 
 @pytest.mark.asyncio

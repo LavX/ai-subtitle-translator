@@ -83,7 +83,12 @@ def metadata(job: Job) -> dict:
             reason = "Provider rate limit reached."
         elif re.search(r"402|insufficient credit", error, re.IGNORECASE):
             reason = "OpenRouter reported insufficient credit."
-        elif re.search(r"\b40[13]\b|api key|authenticat|unauthori[sz]ed", error, re.IGNORECASE):
+        elif re.search(r"\b403\b", error):
+            reason = (
+                "OpenRouter refused the request (403). "
+                "Check the key's permissions and the model's content policy."
+            )
+        elif re.search(r"\b401\b|api key|authenticat|unauthori[sz]ed", error, re.IGNORECASE):
             reason = (
                 "OpenRouter rejected the API key for this job. Check the key and its permissions."
             )

@@ -445,3 +445,47 @@ async def test_job_start_persists_effective_model_before_provider_request(
         await api.aclose()
         store.close()
         config.reset_settings()
+
+
+@pytest.mark.asyncio
+async def test_mandatory_reasoning_is_found_through_a_variant_slug(monkeypatch):
+    """The catalog lists the base model; the request names its ':free' variant."""
+    paid_requests = []
+    client_class = httpx.AsyncClient
+
+    async def send(request):
+        if request.url.path.endswith("/models"):
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "id": "future/mandatory",
+                            "supported_parameters": ["reasoning"],
+                            "reasoning": {"mandatory": True},
+                        }
+                    ]
+                },
+            )
+        paid_requests.append(request)
+        return response([{"index": "1", "content": "translated"}])
+
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda **kwargs: client_class(**kwargs, transport=httpx.MockTransport(send)),
+    )
+    provider = OpenRouterProvider(settings())
+    try:
+        result = await BatchProcessor(provider, provider.settings).process_all_batches(
+            [{"index": "1", "content": "source"}],
+            "en",
+            "hu",
+            model="future/mandatory:free",
+            config_override=TranslationConfig(reasoning=ReasoningConfig(enabled=False)),
+        )
+        assert not result.success
+        assert "mandatory" in result.batch_results[0].error.lower()
+        assert not paid_requests
+    finally:
+        await provider.close()
