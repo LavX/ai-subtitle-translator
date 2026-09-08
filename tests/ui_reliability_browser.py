@@ -112,10 +112,12 @@ def run(base, artifacts, case):
                 json.loads(line)
                 for line in (artifacts / "http-events.jsonl").read_text().splitlines()
             ]
-            assert [entry["serviceTier"] for entry in trace[3:]] == ["default"] * 4
+            # Setup calls, then: error, timeout, one same-size retry, and the split.
+            assert [entry["serviceTier"] for entry in trace[3:]] == ["default"] * 5
             assert all(entry["provider"]["only"] == ["azure"] for entry in trace[3:])
             assert [entry["outcome"] for entry in trace[3:]] == [
                 "retryable-error",
+                "timeout",
                 "timeout",
                 "success",
                 "success",
@@ -148,13 +150,15 @@ def run(base, artifacts, case):
                 json.loads(line)
                 for line in (artifacts / "http-events.jsonl").read_text().splitlines()
             ]
+            # One same-size retry follows the timeout before the split.
             assert [entry["outcome"] for entry in trace] == [
                 "retryable-error",
+                "timeout",
                 "timeout",
                 "success",
                 "success",
             ]
-            assert [entry["lineCount"] for entry in trace] == [10, 10, 5, 5]
+            assert [entry["lineCount"] for entry in trace] == [10, 10, 10, 5, 5]
 
         elif case == "counts":
             upload(page, "Complete.srt", "Complete cue")

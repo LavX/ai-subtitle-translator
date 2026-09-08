@@ -66,8 +66,6 @@ async def test_retry_resize_preserves_partial_usage_and_consumed_retry_budget(
         lines = json.loads(json.loads(request.content)["messages"][-1]["content"])
         first, size = int(lines[0]["index"]), len(lines)
         calls.append((first, size, resolver.limit_planned_size(model, 100)))
-        if first >= 1000:
-            raise httpx.ReadTimeout("synthetic timeout", request=request)
         if first == 0 and size == 25:
             billed_tokens.append(3)
             return response(lines[:1], tokens=3)
@@ -104,15 +102,11 @@ async def test_retry_resize_preserves_partial_usage_and_consumed_retry_budget(
     )
     try:
         await asyncio.wait_for(waiting.wait(), 1)
-        await processor.process_batch(
-            TranslationBatch(
-                [{"index": str(i), "content": "synthetic"} for i in range(1000, 1020)],
-                "en",
-                "hu",
-            ),
-            1,
-            model=model,
-        )
+        # Another batch lowers the shared cap through size failures while this one
+        # waits out its retry delay. Recorded directly so the lowering is complete
+        # before this batch re-plans; a stalled request no longer lowers the cap.
+        resolver.record_failure(model, 20)
+        resolver.record_failure(model, 10)
         assert resolver.limit_planned_size(model, 100) == 5
         result = await asyncio.wait_for(task, 2)
         assert result.success is not resized_request_fails
@@ -133,7 +127,10 @@ async def test_retry_resize_preserves_partial_usage_and_consumed_retry_budget(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("parallel_batches", [1, 2])
-async def test_undispatched_roots_use_limit_learned_during_timeout_recovery(parallel_batches):
+async def test_undispatched_roots_do_not_inherit_a_limit_from_a_timeout(parallel_batches):
+    """A stall is not size evidence: measured live, a 5-line request timed out
+    after 600s in the same window a 100-line request finished in 28s. One
+    stalled root used to cap every undispatched root at half size for nothing."""
     calls = []
     completed = []
     resolver = get_batch_size_resolver()
@@ -171,7 +168,7 @@ async def test_undispatched_roots_use_limit_learned_during_timeout_recovery(para
         )
         second_root = next(call for call in calls if call[0] == "100")
         assert second_root[1] <= second_root[2], calls
-        assert [size for _, size, _ in calls] == [100, 50, 50, 50, 50]
+        assert [size for _, size, _ in calls] == [100, 100, 50, 50, 100, 100, 50, 50]
         assert result.success
         assert len(result.all_translations) == 200
         assert {line["index"] for line in result.all_translations} == {str(i) for i in range(200)}
@@ -191,7 +188,8 @@ async def test_successful_smaller_requests_allow_later_roots_to_grow():
         lines = json.loads(json.loads(request.content)["messages"][-1]["content"])
         calls.append(len(lines))
         if len(calls) == 1:
-            raise httpx.ReadTimeout("synthetic timeout", request=request)
+            # A size failure teaches the resolver; a stall deliberately does not.
+            return response(lines[:1], tokens=0)
         return response([{**line, "content": "translated"} for line in lines])
 
     provider = provider_with_transport(send)
@@ -251,7 +249,8 @@ async def test_pending_children_observe_a_limit_lowered_by_another_batch():
         first = int(lines[0]["index"])
         calls.append((first, len(lines), resolver.resolve(model)))
         if first >= 1000:
-            raise httpx.ReadTimeout("synthetic timeout", request=request)
+            # Lowers the shared cap through a size failure; a stall would not.
+            return response(lines[:1], tokens=0)
         if first == 0:
             first_entered.set()
             await release_first.wait()
@@ -284,7 +283,8 @@ async def test_pending_children_observe_a_limit_lowered_by_another_batch():
         release_first.set()
         result = await task
         assert not other.success
-        assert [size for first, size, _ in calls if first >= 1000] == [20, 10]
+        # 20 splits to two children of 10; each short count then records the floor.
+        assert [size for first, size, _ in calls if first >= 1000] == [20, 10, 10]
         main_calls = [call for call in calls if call[0] < 1000]
         assert main_calls[0] == (0, 50, 50)
         assert main_calls[1] == (50, 5, 5)
@@ -382,8 +382,9 @@ async def test_preemptive_children_and_recovery_share_the_root_timeout_budget():
             ),
             0.5,
         )
-        assert asyncio.get_running_loop().time() - start < 0.28
-        assert calls == [50, 50, 25]
+        # Three request windows: attempt, one same-size retry, then the split.
+        assert asyncio.get_running_loop().time() - start < 0.38
+        assert calls == [50, 50, 50, 25]
         assert not result.success
         assert result.progress.completed_lines == 50
         assert result.total_tokens == 10

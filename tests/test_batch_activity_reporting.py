@@ -172,3 +172,73 @@ class TestTransportFailureReporting:
 
         assert str(caught.value).rstrip() != "Network error:"
         assert "ReadError" in str(caught.value)
+
+
+class TestTimeoutRecoveryPolicy:
+    """A timeout says nothing about batch size, so it must not shrink the batch.
+
+    Measured against the live deployment: requests to the provider intermittently
+    never return, at any size. A 5-cue request timed out after 600s in the same
+    window a 100-cue request succeeded in 28s. Shrinking chases a variable that is
+    not involved, and each rung costs another full request budget.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        from unittest.mock import MagicMock
+
+        self.provider = MagicMock()
+        self.provider.get_model_metadata.return_value = None
+        self.settings = MagicMock()
+        self.settings.request_timeout = 120.0
+        self.settings.batch_size = 100
+        self.settings.max_retries = 2
+        self.settings.retry_delay = 0.01
+        self.settings.openrouter_default_model = "test/model"
+        self.processor = BatchProcessor(self.provider, self.settings)
+        get_batch_size_resolver().reset()
+        get_batch_size_resolver()._settings = self.settings
+
+    @pytest.mark.asyncio
+    async def test_transient_timeout_retries_at_the_same_size(self):
+        """One stall, then the same request succeeds unchanged."""
+        sizes = []
+
+        async def mock_translate(batch, **kwargs):
+            sizes.append(len(batch.lines))
+            if len(sizes) == 1:
+                raise ProviderTimeoutError("Request timeout")
+            return TranslationResult(
+                translations=[
+                    {"index": line["index"], "content": f"T-{line['content']}"}
+                    for line in batch.lines
+                ],
+                model_used="test/model",
+                total_tokens=10,
+            )
+
+        self.provider.translate_batch = mock_translate
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(50)]
+        batch = TranslationBatch(lines=lines, source_language="en", target_language="hu")
+
+        result = await self.processor.process_batch(batch, batch_index=0, model="test/model")
+
+        assert result.success is True
+        assert len(result.translations) == 50
+        assert sizes == [50, 50], f"the batch was resized after a timeout: {sizes}"
+
+    @pytest.mark.asyncio
+    async def test_timeout_does_not_teach_a_smaller_safe_size(self):
+        """A stall must not poison the learned size for every later batch."""
+
+        async def always_timeout(batch, **kwargs):
+            raise ProviderTimeoutError("Request timeout")
+
+        self.provider.translate_batch = always_timeout
+        lines = [{"index": str(i), "content": f"Line {i}"} for i in range(50)]
+        batch = TranslationBatch(lines=lines, source_language="en", target_language="hu")
+
+        await self.processor.process_batch(batch, batch_index=0, model="test/model")
+
+        planned = get_batch_size_resolver().limit_planned_size("test/model", 50)
+        assert planned == 50, f"a timeout taught the resolver a smaller size: {planned}"

@@ -138,7 +138,7 @@ async def test_actual_provider_timeout_splits_and_floor_is_bounded():
             progress_callback=lambda progress: activity.append(progress.message),
         )
         assert result.success
-        assert calls == [10, 5, 5]
+        assert calls == [10, 10, 5, 5]
         assert any(
             "recovering after timeout" in message and "5 lines" in message for message in activity
         )
@@ -275,7 +275,8 @@ async def test_adaptive_timeout_budget_preserves_finished_subbatch_and_cleans_re
         )
         elapsed = asyncio.get_running_loop().time() - start
         assert elapsed < 0.2
-        assert calls == [10, 5, 5]
+        # One same-size retry precedes the split; the split still keeps its own window.
+        assert calls == [10, 10, 5, 5]
         assert not result.success
         assert len(result.all_translations) == 5
         assert result.total_tokens == 10
@@ -519,10 +520,10 @@ async def test_terminal_timeout_summary_preserves_unattempted_work_and_stop_reas
             output = persisted.result["content"] if file_job else str(persisted.result["lines"])
             assert "translated" in output
             assert "source 101" in output
-            assert calls == [("1", 100), ("101", 100), ("101", 50)]
+            assert calls == [("1", 100), ("101", 100), ("101", 100), ("101", 50)]
         else:
             assert state["status"] == "failed"
-            assert calls == [("1", 100), ("1", 50)]
+            assert calls == [("1", 100), ("1", 100), ("1", 50)]
     finally:
         await manager.stop_workers()
         await translator.close()
