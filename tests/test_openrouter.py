@@ -1166,6 +1166,21 @@ class TestEnsureModelParamsCache:
             MockClient.assert_not_called()
         assert provider._model_params_cache == {}
 
+    async def test_empty_catalog_body_does_not_seal_the_cache(self):
+        """A 200 with no records is not a catalog; it is retried after the pause."""
+        provider = OpenRouterProvider(settings=_make_settings())
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"data": []}
+        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+            mock_ctx = AsyncMock()
+            mock_ctx.get.return_value = mock_resp
+            MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
+            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            await provider._ensure_model_params_cache()
+        assert provider._model_params_fetched is False
+        assert provider._model_params_retry_at > 0
+
     async def test_retries_after_the_pause_and_then_applies_capabilities(self):
         """One failed fetch at startup must not send temperature to Luna forever."""
         provider = OpenRouterProvider(settings=_make_settings())

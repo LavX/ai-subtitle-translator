@@ -270,6 +270,52 @@ def run(base, artifacts, case):
             page.locator("#restore-jobs").click()
             expect(page.locator("#files .job-error")).to_contain_text("2 not attempted")
 
+        elif case == "uploads":
+
+            def drop(files):
+                page.evaluate(
+                    """files => {
+                    const transfer = new DataTransfer();
+                    for (const [name, content, modified] of files) {
+                        transfer.items.add(new File([content], name, {
+                            type: 'application/x-subrip', lastModified: modified,
+                        }));
+                    }
+                    document.querySelector('#upload-panel').dispatchEvent(new DragEvent('drop', {
+                        bubbles: true, cancelable: true, dataTransfer: transfer,
+                    }));
+                }""",
+                    files,
+                )
+
+            cue = "1\n00:00:01,000 --> 00:00:02,000\n{}\n\n"
+            # Two files sharing a name, size and time but not content are both kept;
+            # an exact repeat of a listed file is not added again.
+            drop(
+                [
+                    ["Same.srt", cue.format("Alpha line"), 1000],
+                    ["Same.srt", cue.format("Bravo line"), 1000],
+                ]
+            )
+            expect(page.locator("#files > li")).to_have_count(2)
+            drop([["Same.srt", cue.format("Alpha line"), 1000]])
+            page.wait_for_timeout(300)
+            expect(page.locator("#files > li")).to_have_count(2)
+            # The 100-file limit applies to files awaiting translation only.
+            drop([[f"Bulk-{i:03d}.srt", cue.format(f"Bulk line {i}"), 2000 + i] for i in range(98)])
+            expect(page.locator("#files > li")).to_have_count(100)
+            drop([["Over.srt", cue.format("Over the limit"), 5000]])
+            expect(page.locator("#notice")).to_contain_text("limited to 100 files")
+            expect(page.locator("#files > li")).to_have_count(100)
+            page.locator("#translate").click()
+            expect(page.get_by_role("button", name="Download SRT", exact=True)).to_have_count(
+                100, timeout=180000
+            )
+            assert len(submissions) == 100
+            drop([["After.srt", cue.format("After the batch"), 6000]])
+            expect(page.locator("#files > li")).to_have_count(101)
+            expect(page.locator("#notice")).to_contain_text("Files added")
+
         elif case == "cues":
             content = (Path(__file__).parent / "ui" / "blank-lines.srt").read_bytes()
             page.evaluate(
@@ -377,6 +423,7 @@ def main():
             "tier",
             "rate_limit",
             "controls",
+            "uploads",
         ],
         required=True,
     )

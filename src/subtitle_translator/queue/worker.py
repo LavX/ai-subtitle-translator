@@ -334,10 +334,13 @@ async def process_file_translation_job(
                     entries, result.all_translations, is_rtl=is_rtl
                 )
                 translated_content = translator._srt_parser.compose(translated_entries)
-                requested_indices = {str(line["index"]) for line in lines}
+                # Count entries, not distinct cue numbers: a file may repeat a number
+                # and the translation is applied to every entry carrying it.
                 returned_indices = {str(t["index"]) for t in result.all_translations}
-                translated_count = len(requested_indices & returned_indices)
-                total_count = len(requested_indices)
+                translated_count = sum(
+                    1 for line in lines if str(line["index"]) in returned_indices
+                )
+                total_count = len(lines)
 
                 job_manager.set_job_partial(
                     job_id,

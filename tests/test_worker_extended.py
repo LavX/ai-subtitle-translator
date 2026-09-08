@@ -727,6 +727,39 @@ class TestFileJobPartialFailure:
             assert job.result["tokens_used"] == 60
 
     @pytest.mark.asyncio
+    async def test_file_partial_counts_repeated_cue_numbers_as_entries(
+        self, manager, mock_translator
+    ):
+        """Two entries numbered 1 plus an untranslated entry 2 read 2/3, not 1/2."""
+        mock_translator._srt_parser.parse.return_value = [MagicMock(), MagicMock(), MagicMock()]
+        mock_translator._srt_parser.extract_lines_for_translation.return_value = [
+            {"index": "1", "content": "Hello"},
+            {"index": "1", "content": "Hello again"},
+            {"index": "2", "content": "World"},
+        ]
+        mock_translator._srt_parser.compose.return_value = "partial translated content"
+        mock_result = _partial_result(translations=[{"index": "1", "content": "Hola"}])
+
+        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+            processor = AsyncMock()
+            processor.process_all_batches = AsyncMock(return_value=mock_result)
+            MockBP.return_value = processor
+            job_id = await manager.submit_job(
+                request_data={
+                    "content": "1\n00:00:01,000 --> 00:00:02,000\nHello\n\n",
+                    "sourceLanguage": "en",
+                    "targetLanguage": "es",
+                },
+                job_type=JobType.TRANSLATE_FILE,
+            )
+            manager.set_job_processing(job_id)
+            await process_file_translation_job(manager, job_id, mock_translator)
+
+        job = manager.get_job(job_id)
+        assert job.status == JobStatus.PARTIAL
+        assert job.error.startswith("2/3 lines translated.")
+
+    @pytest.mark.asyncio
     async def test_file_all_batches_failed(self, manager, mock_translator):
         """Lines 331-335: all batches failed sets FAILED status."""
         entries = [MagicMock()]

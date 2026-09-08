@@ -204,15 +204,18 @@ async function addFiles(files) {
  const errors = [];
  try {
   for (const file of files) {
-   const signature = `${file.name}\0${file.size}\0${file.lastModified}`;
-   if (rows.some(row => row.signature === signature)) continue;
-   if (rows.length >= 100) { errors.push('The queue is limited to 100 files.'); break; }
-   if (rows.reduce((total, row) => total + row.size, 0) + file.size > 20000000) { errors.push('The queue is limited to 20 MB.'); break; }
+   // The limits apply to files awaiting submission; finished and restored jobs stay listed but do not use them up.
+   const pending = rows.filter(row => row.state === 'ready');
+   if (pending.length >= 100) { errors.push('The queue is limited to 100 files awaiting translation.'); break; }
+   if (pending.reduce((total, row) => total + row.size, 0) + file.size > 20000000) { errors.push('The queue is limited to 20 MB awaiting translation.'); break; }
    if (!/\.srt$/i.test(file.name) || !file.size) { errors.push(`${safeName(file.name)}: choose a nonempty .srt file.`); continue; }
    if (file.size > 8000000) { errors.push(`${safeName(file.name)}: file is too large.`); continue; }
    try {
     const content = new TextDecoder('utf-8', {fatal: true}).decode(await file.arrayBuffer());
     if (!content.trim() || content.length > 2000000) { errors.push(`${safeName(file.name)}: file must contain 1 to 2,000,000 characters.`); continue; }
+    // A repeat of a file already listed is skipped; two files that merely share a name, size and time are both kept.
+    const signature = `${file.name}\0${file.size}\0${file.lastModified}`;
+    if (rows.some(row => row.signature === signature && row.content === content)) continue;
     rows.push({key: ++rowSequence, name: safeName(file.name), size: file.size, signature, content, state: 'ready', addedAt: Date.now()});
    } catch { errors.push(`${safeName(file.name)}: could not read UTF-8 text.`); }
   }

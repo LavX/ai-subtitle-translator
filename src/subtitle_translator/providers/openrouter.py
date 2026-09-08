@@ -545,9 +545,10 @@ class OpenRouterProvider(TranslationProvider):
                     follow_redirects=False,
                 ) as plain_client:
                     response = await plain_client.get("/models")
-                if response.status_code == 200:
-                    data = response.json()
-                    for model in data.get("data", []):
+                data = response.json() if response.status_code == 200 else None
+                records = data.get("data") if isinstance(data, dict) else None
+                if isinstance(records, list) and records:
+                    for model in records:
                         model_id = model.get("id", "")
                         params = model.get("supported_parameters", [])
                         if model_id and params:
@@ -561,8 +562,11 @@ class OpenRouterProvider(TranslationProvider):
                     )
                     self._model_params_fetched = True
                 else:
+                    # An empty or malformed catalog is not a catalog; keep retrying.
                     logger.warning(
-                        f"Failed to fetch models from OpenRouter API: {response.status_code}"
+                        f"Failed to fetch models from OpenRouter API: "
+                        f"status {response.status_code}, records "
+                        f"{len(records) if isinstance(records, list) else 'missing'}"
                     )
             except Exception as e:
                 logger.warning(f"Failed to fetch model params from OpenRouter API: {e}")
