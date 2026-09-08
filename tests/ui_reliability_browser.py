@@ -176,15 +176,28 @@ def run(base, artifacts, case):
             expect(page.locator("#files h3").first).to_have_text("Newer.srt")
             # A running job sits above finished ones and can be cancelled mid-request.
             step[0] = "upload-running"
-            upload(page, "Running.srt", *(f"RECOVER slow cue {i}" for i in range(5)))
+            upload(page, "Running.srt", *(f"RECOVER slow cue {i}" for i in range(10)))
             page.locator("#translate").click()
             expect(page.locator("#files .job-message").first).to_contain_text("request in progress")
             expect(page.locator("#files h3").first).to_have_text("Running.srt")
+            # The fixture runs one job at a time, so Quick queues behind Running and is the
+            # newest row by creation. Cancelling Running must still lift it to the top:
+            # the latest event wins, not the creation order.
+            upload(page, "Quick.srt", *(f"RECOVER quick cue {i}" for i in range(5)))
+            expect(page.locator("#files h3").first).to_have_text("Quick.srt")
+            page.locator("#translate").click()
+            expect(page.locator("#files h3").first).to_have_text("Quick.srt")
             step[0] = "cancel"
             page.get_by_role("button", name="Cancel", exact=True).click()
             expect(page.locator("#files .state").filter(has_text="Cancelled")).to_have_count(
                 1, timeout=10000
             )
+            # The freed worker starts Quick at once, which is a newer event than the
+            # cancellation, so Quick leads while it runs and after it finishes.
+            expect(page.locator("#files h3").first).to_have_text("Quick.srt")
+            expect(page.locator("#files h3").nth(1)).to_have_text("Running.srt")
+            expect(page.get_by_role("button", name="Download SRT", exact=True)).to_have_count(3)
+            expect(page.locator("#files h3").first).to_have_text("Quick.srt")
             jobs = page.request.get(base + "/ui/api/jobs", headers=HEADERS).json()["jobs"]
             running = [
                 job
@@ -198,13 +211,14 @@ def run(base, artifacts, case):
             ).click()
             expect(page.locator("#files li").filter(has_text="Running.srt")).to_have_count(0)
             jobs = page.request.get(base + "/ui/api/jobs", headers=HEADERS).json()["jobs"]
-            assert len(jobs) == 2 and all(
+            assert len(jobs) == 3 and all(
                 "Running" not in (job.get("fileName") or job.get("jobName") or "") for job in jobs
             ), jobs
             step[0] = "reconnect-restore"
             connect(page, base)
             page.locator("#restore-jobs").click()
-            expect(page.locator("#files li")).to_have_count(2)
+            expect(page.locator("#files li")).to_have_count(3)
+            expect(page.locator("#files h3").first).to_have_text("Quick.srt")
             # Choosing a cue in the browser moves the preview and never opens the file picker.
             page.locator("#files li").filter(has_text="Newer.srt").get_by_role(
                 "button", name="Preview"

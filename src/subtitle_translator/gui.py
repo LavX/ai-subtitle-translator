@@ -46,6 +46,7 @@ def metadata(job: Job) -> dict:
         "totalCost": job.total_cost or None,
         "startedAt": job.started_at.isoformat() if job.started_at else None,
         "createdAt": job.created_at.isoformat() if job.created_at else None,
+        "completedAt": job.completed_at.isoformat() if job.completed_at else None,
     }
     for public, private in (
         ("fileName", "file_name"),

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { crc32, safeName, uniqueName, floorModel, routeModel, zip } from '../../src/subtitle_translator/static/archive.mjs';
+import { crc32, safeName, uniqueName, floorModel, routeModel, zip, latestFirst } from '../../src/subtitle_translator/static/archive.mjs';
 test('selected routing overrides pasted shortcuts and preserves model variants', () => {
  assert.equal(routeModel('foo/bar:floor','nitro'), 'foo/bar:nitro');
  assert.equal(routeModel('foo/bar:nitro','default'), 'foo/bar');
@@ -68,4 +68,17 @@ test('blank lines around timestamps retain exact backend-accepted captions and a
  const matches = new Map(translated.map(cue => [cue.key, cue.text]));
  assert.equal(matches.get(cues[1].key), '<i>Second caption</i>\nSecond line');
  assert.equal(matches.get(cues[2].key), 'Third caption <script>literal</script>');
+});
+
+test('queue order puts the latest event on top, not the newest creation', () => {
+ const long = {key: 1, createdAt: '2026-09-08T10:00:00+00:00', startedAt: '2026-09-08T10:00:01+00:00', completedAt: '2026-09-08T10:00:30+00:00'};
+ const short = {key: 2, createdAt: '2026-09-08T10:00:05+00:00', startedAt: '2026-09-08T10:00:06+00:00', completedAt: '2026-09-08T10:00:08+00:00'};
+ const running = {key: 3, createdAt: '2026-09-08T10:00:10+00:00', startedAt: '2026-09-08T10:00:11+00:00'};
+ // The earlier job finished last, so it leads; the running job started before that finish.
+ assert.deepEqual(latestFirst([long, short, running]).map(r => r.key), [1, 3, 2]);
+ // A file just added is the newest event of all.
+ const added = {key: 4, addedAt: Date.parse('2026-09-08T10:00:40+00:00')};
+ assert.deepEqual(latestFirst([long, short, running, added]).map(r => r.key), [4, 1, 3, 2]);
+ // Equal stamps fall back to the row key, newest first.
+ assert.deepEqual(latestFirst([{key: 5}, {key: 6}]).map(r => r.key), [6, 5]);
 });

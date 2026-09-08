@@ -1,5 +1,5 @@
 import { GuiSession } from './session.mjs';
-import { safeName, uniqueName, routeModel, zip, parseCues } from './archive.mjs';
+import { safeName, uniqueName, routeModel, zip, parseCues, latestFirst } from './archive.mjs';
 
 const $ = (id) => document.getElementById(id);
 const sessionUrl = new URL('./session', window.location.href);
@@ -124,12 +124,7 @@ function noBatchFeedback(row) {
  const reportedActivity = /\b(request|retry|backoff|recover|timeout|rate.limit)/i.test(row.message || '');
  return `${prolonged ? 'No batch has completed for at least 2 minutes. Provider output is still unconfirmed.' : 'No completed batch yet.'}${reportedActivity ? '' : ' The server has not reported request activity.'}`;
 }
-function ordered() {
- // Files awaiting submission first, then running jobs, then finished ones; newest first within each.
- const rank = row => row.state === 'ready' ? 0 : ['submitting', 'queued', 'processing', 'finishing'].includes(row.state) ? 1 : 2;
- const when = row => Date.parse((row.createdAt || row.startedAt || '').replace(/([+-]\d\d:\d\d)Z$/, '$1')) || 0;
- return [...rows].sort((a, b) => rank(a) - rank(b) || when(b) - when(a) || b.key - a.key);
-}
+function ordered() { return latestFirst(rows); }
 function render() {
  const focusedAction = document.activeElement?.dataset?.action;
  $('files').replaceChildren();
@@ -218,7 +213,7 @@ async function addFiles(files) {
    try {
     const content = new TextDecoder('utf-8', {fatal: true}).decode(await file.arrayBuffer());
     if (!content.trim() || content.length > 2000000) { errors.push(`${safeName(file.name)}: file must contain 1 to 2,000,000 characters.`); continue; }
-    rows.push({key: ++rowSequence, name: safeName(file.name), size: file.size, signature, content, state: 'ready'});
+    rows.push({key: ++rowSequence, name: safeName(file.name), size: file.size, signature, content, state: 'ready', addedAt: Date.now()});
    } catch { errors.push(`${safeName(file.name)}: could not read UTF-8 text.`); }
   }
  } finally { reading = false; render(); }
@@ -323,7 +318,7 @@ function failureReason(row) {
 function applyJob(row, result) {
  row.revision = (row.revision || 0) + 1;
  row.state = result.status; row.progress = result.progress;
- row.startedAt = result.startedAt; row.createdAt = result.createdAt; row.totalBatches = result.totalBatches; row.completedBatches = result.completedBatches;
+ row.startedAt = result.startedAt; row.createdAt = result.createdAt; row.completedAt = result.completedAt; row.totalBatches = result.totalBatches; row.completedBatches = result.completedBatches;
  row.totalLines = result.totalLines; row.completedLines = result.completedLines; row.error = result.error;
  row.message = typeof result.message === 'string' ? result.message : '';
  row.cost = result.totalCost;

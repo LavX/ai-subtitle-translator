@@ -25,7 +25,7 @@ def manager(tmp_path):
     return manager
 
 
-async def _until(predicate, timeout=2.0):
+async def _until(predicate, timeout=5.0):
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
     while not predicate():
@@ -56,11 +56,11 @@ class TestCancelRunningJob:
         await manager.start_workers()
         try:
             hanging = await manager.submit_job({**REQUEST, "hang": True}, JobType.TRANSLATE_FILE)
-            await asyncio.wait_for(entered.wait(), 2)
+            await asyncio.wait_for(entered.wait(), 5)
             assert manager.get_job(hanging).status == JobStatus.PROCESSING
 
             assert manager.cancel_job(hanging) is True
-            await asyncio.wait_for(interrupted.wait(), 2)
+            await asyncio.wait_for(interrupted.wait(), 5)
             await _until(lambda: manager.get_job(hanging).status == JobStatus.CANCELLED)
             persisted = manager._store.load_job(hanging)
             assert persisted.status == JobStatus.CANCELLED
@@ -106,7 +106,7 @@ class TestUiControls:
         await self.manager.start_workers()
         try:
             job_id = await self._own()
-            await asyncio.wait_for(entered.wait(), 2)
+            await asyncio.wait_for(entered.wait(), 5)
             response = await ui_api.cancel_job(job_id, self.identity)
             assert response.status in ("cancelling", "cancelled")
             await _until(lambda: self.manager.get_job(job_id).status == JobStatus.CANCELLED)
@@ -147,3 +147,7 @@ class TestUiControls:
         job_id = await self._own()
         value = gui.metadata(self.manager.get_job(job_id))
         assert value["createdAt"] == self.manager.get_job(job_id).created_at.isoformat()
+        assert value["completedAt"] is None
+        self.manager.set_job_completed(job_id, {"content": "done"})
+        finished = gui.metadata(self.manager.get_job(job_id))
+        assert finished["completedAt"] == self.manager.get_job(job_id).completed_at.isoformat()

@@ -24,3 +24,6 @@ main{padding-top:22px}.masthead{padding-block:14px}.intro{align-items:center;gap
 #live-state { font-size: .75rem; color: var(--muted); }
 #live-state[data-state=live] { color: #b3e4cf; }
 #live-state[data-state=reconnecting] { color: #ffd190; }
+
+/* Footer: brand, project links and the Bazarr+ pointer, wrapping cleanly on narrow screens. */
+footer{flex-wrap:wrap;align-items:baseline;row-gap:10px}.footer-brand{font-weight:600;color:var(--ink)}.footer-brand small{font-weight:400;color:var(--muted);margin-left:8px}.footer-links{display:flex;gap:18px;flex-wrap:wrap}.footer-links a,.footer-pitch a{color:#365574;text-decoration:underline}.footer-pitch{flex-basis:100%;line-height:1.6;max-width:720px}@media(max-width:420px){footer>span:last-child{max-width:none;text-align:left}}

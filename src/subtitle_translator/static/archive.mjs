@@ -77,3 +77,12 @@ export function parseCues(content) {
  }
  return cues;
 }
+
+// Queue order: whatever happened most recently sits on top. A file just added, a job
+// just submitted or started, a job that just finished or was cancelled. Creation order
+// is only the tie-break, so a long job created earlier still rises when it finishes.
+export function latestFirst(rows) {
+ const stamp = value => Date.parse((value || '').replace(/([+-]\d\d:\d\d)Z$/, '$1')) || 0;
+ const when = row => Math.max(row.addedAt || 0, stamp(row.createdAt), stamp(row.startedAt), stamp(row.completedAt));
+ return [...rows].sort((a, b) => when(b) - when(a) || (b.key || 0) - (a.key || 0));
+}
