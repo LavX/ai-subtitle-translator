@@ -173,6 +173,7 @@ class BatchProcessor:
         _activity_callback: Callable[[str], None] | None = None,
         _check_learned_size: bool = True,
         _prior_retries: int = 0,
+        _prior_attempts: int = 0,
     ) -> BatchResult:
         """
         Process a single batch with retry logic.
@@ -286,11 +287,18 @@ class BatchProcessor:
                             _activity_callback,
                             _is_adaptive_retry=_is_adaptive_retry,
                             _prior_retries=_prior_retries + retries,
+                            _prior_attempts=_prior_attempts + retries,
                         ),
                         add_retries=True,
                     )
             # Publish only service-generated activity, without provider response text.
-            activity(f"request in progress for {len(batch.lines)} lines (attempt {retries + 1})")
+            # Recovery keeps working on the same batch, so the attempt number carries the
+            # attempts already spent on it. Reporting the local counter restarted at one on
+            # every shrink and hid batches that had already burnt several request budgets.
+            activity(
+                f"request in progress for {len(batch.lines)} lines "
+                f"(attempt {_prior_attempts + retries + 1})"
+            )
             try:
                 try:
                     async with asyncio.timeout_at(_deadline):
@@ -318,7 +326,7 @@ class BatchProcessor:
                 if covered < len(requested):
                     non_timeout_failure = True
                     logger.warning(
-                        f"Batch {batch_index}: got {covered}/{len(requested)} translations"
+                        f"Batch {batch_index + 1}: got {covered}/{len(requested)} translations"
                     )
                     spent_tokens += result.total_tokens or 0
                     spent_cost += result.cost or 0.0
@@ -334,6 +342,7 @@ class BatchProcessor:
                                 _deadline,
                                 _activity_callback,
                                 _prior_retries=_prior_retries + retries,
+                                _prior_attempts=_prior_attempts + retries + 1,
                             ),
                             add_retries=True,
                         )
@@ -386,6 +395,7 @@ class BatchProcessor:
                             _deadline,
                             _activity_callback,
                             _prior_retries=_prior_retries + retries,
+                            _prior_attempts=_prior_attempts + retries + 1,
                         ),
                         add_retries=True,
                     )
@@ -462,6 +472,7 @@ class BatchProcessor:
                             _deadline,
                             recovery_activity,
                             _prior_retries=_prior_retries + retries,
+                            _prior_attempts=_prior_attempts + retries + 1,
                         ),
                         add_retries=True,
                     )
@@ -532,6 +543,7 @@ class BatchProcessor:
         _deadline: float | None = None,
         _activity_callback: Callable[[str], None] | None = None,
         _prior_retries: int = 0,
+        _prior_attempts: int = 0,
     ) -> BatchResult:
         """Retry a failed batch by splitting it into smaller sub-batches."""
         from subtitle_translator.core.batch_sizing import get_batch_size_resolver
@@ -545,7 +557,7 @@ class BatchProcessor:
         new_size = resolver.record_failure(model_id, len(batch.lines))
 
         logger.warning(
-            f"Batch {batch_index}: adaptive retry with size {new_size} (was {len(batch.lines)})"
+            f"Batch {batch_index + 1}: adaptive retry with size {new_size} (was {len(batch.lines)})"
         )
 
         if _activity_callback:
@@ -565,6 +577,7 @@ class BatchProcessor:
             _activity_callback,
             _is_adaptive_retry=True,
             _prior_retries=_prior_retries,
+            _prior_attempts=_prior_attempts,
         )
 
     async def _process_sub_batches(
@@ -580,6 +593,7 @@ class BatchProcessor:
         _activity_callback: Callable[[str], None] | None = None,
         _is_adaptive_retry: bool = False,
         _prior_retries: int = 0,
+        _prior_attempts: int = 0,
     ) -> BatchResult:
         """Dispatch smaller requests within the original root's budget and result."""
         from subtitle_translator.core.batch_sizing import get_batch_size_resolver
@@ -623,6 +637,7 @@ class BatchProcessor:
                 # failure, but cannot recursively split just to apply a learned cap.
                 _check_learned_size=False,
                 _prior_retries=_prior_retries,
+                _prior_attempts=_prior_attempts,
             )
             if not sub_result.success:
                 # The finished sub-batches and the failed attempts were billed too.

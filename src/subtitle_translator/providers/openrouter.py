@@ -979,8 +979,12 @@ class OpenRouterProvider(TranslationProvider):
                 provider=self.provider_name,
             ) from e
         except httpx.RequestError as e:
+            # httpx.ReadError and friends carry an empty str(), which logged the
+            # transport failures this deployment actually hits as "Network error: "
+            # with nothing after it. Name the class when the message is empty.
+            detail = str(e) or type(e).__name__
             raise TranslationProviderError(
-                f"Network error: {str(e)}",
+                f"Network error: {detail}",
                 provider=self.provider_name,
                 retryable=True,
             ) from e
