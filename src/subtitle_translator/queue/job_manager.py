@@ -662,6 +662,11 @@ class JobManager:
                             handler.cancel()
                             raise
                         self._record_cancelled(job_id)
+                        if asyncio.current_task().cancelling():
+                            # stop_workers() cancelled this worker while the handler was
+                            # already being cancelled for the user; the worker must still
+                            # go down, or shutdown waits on it forever.
+                            raise
                     except Exception as e:
                         logger.exception(f"Worker {worker_id}: Job {job_id} failed: {e}")
                         self.set_job_failed(job_id, str(e))

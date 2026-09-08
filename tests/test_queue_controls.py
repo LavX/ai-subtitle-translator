@@ -151,3 +151,35 @@ class TestUiControls:
         self.manager.set_job_completed(job_id, {"content": "done"})
         finished = gui.metadata(self.manager.get_job(job_id))
         assert finished["completedAt"] == self.manager.get_job(job_id).completed_at.isoformat()
+
+
+class TestCancelThenShutdown:
+    @pytest.mark.asyncio
+    async def test_stopping_workers_right_after_a_cancel_still_stops(self, manager):
+        """A worker whose handler was cancelled for the user must still obey stop_workers.
+
+        Task.cancel() on the worker only cancels the handler it is awaiting, so the
+        worker saw the user's cancel, recorded it and went back to the queue while
+        stop_workers() waited on it forever.
+        """
+        entered = asyncio.Event()
+
+        async def handler(job_manager, job_id, job_type):
+            entered.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                await asyncio.sleep(0.05)
+                raise
+
+        manager.set_worker_handler(handler)
+        await manager.start_workers()
+        job_id = await manager.submit_job(REQUEST, JobType.TRANSLATE_FILE)
+        await asyncio.wait_for(entered.wait(), 5)
+
+        assert manager.cancel_job(job_id) is True
+        await asyncio.sleep(0)
+        await asyncio.wait_for(manager.stop_workers(), 2)
+
+        assert manager.get_job(job_id).status == JobStatus.CANCELLED
+        assert manager._workers == []
