@@ -970,6 +970,7 @@ class BatchProcessor:
         )
 
         translated_indices: set[str] = set()
+        line_counts = Counter(str(line["index"]) for line in lines)
         for i, batch_lines in enumerate(batches):
             batch = TranslationBatch(
                 lines=batch_lines,
@@ -993,7 +994,8 @@ class BatchProcessor:
             translated_indices.update(
                 str(t["index"]) for t in result.translations if str(t["index"]) in requested
             )
-            progress.completed_lines = len(translated_indices)
+            # Lines sharing a position are all covered by its translation.
+            progress.completed_lines = sum(line_counts[index] for index in translated_indices)
             if not result.success:
                 progress.failed_batches += 1
 

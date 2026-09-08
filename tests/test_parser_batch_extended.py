@@ -689,6 +689,24 @@ class TestProcessBatchesStream:
         assert results[0][1].percent_complete == 100.0
 
     @pytest.mark.asyncio
+    async def test_stream_counts_every_line_sharing_a_position(self):
+        provider = _mock_provider(
+            translate_result=TranslationResult(
+                translations=[{"index": "0", "content": "Hola"}],
+                model_used="test",
+                total_tokens=10,
+                cost=0.001,
+            )
+        )
+        processor = BatchProcessor(provider, _make_settings())
+        lines = [{"index": "0", "content": "Hello"}, {"index": "0", "content": "Hello again"}]
+        results = []
+        async for _, progress in processor.process_batches_stream(lines, "en", "es"):
+            results.append(progress)
+        assert results[-1].total_lines == 2
+        assert results[-1].completed_lines == 2
+
+    @pytest.mark.asyncio
     async def test_stream_multiple_batches(self):
         provider = _mock_provider()
         settings = _make_settings(batch_size=1)

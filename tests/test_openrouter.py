@@ -1158,10 +1158,44 @@ class TestEnsureModelParamsCache:
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
             await provider._ensure_model_params_cache()
-
-        # Should mark as fetched even on failure (so it doesn't retry endlessly)
-        assert provider._model_params_fetched is True
+            # A failed fetch is retried later, not at once and not never.
+            assert provider._model_params_fetched is False
+            assert provider._model_params_retry_at > 0
+            MockClient.reset_mock()
+            await provider._ensure_model_params_cache()
+            MockClient.assert_not_called()
         assert provider._model_params_cache == {}
+
+    async def test_retries_after_the_pause_and_then_applies_capabilities(self):
+        """One failed fetch at startup must not send temperature to Luna forever."""
+        provider = OpenRouterProvider(settings=_make_settings())
+        provider._client = AsyncMock()
+        provider._client.is_closed = False
+        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        catalog_client = AsyncMock()
+        catalog_client.get.side_effect = [
+            httpx.ConnectError("down"),
+            _mock_response(
+                200,
+                {
+                    "data": [
+                        {
+                            "id": "openai/gpt-5.6-luna",
+                            "supported_parameters": ["reasoning", "response_format"],
+                        }
+                    ]
+                },
+            ),
+        ]
+        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as factory:
+            factory.return_value.__aenter__.return_value = catalog_client
+            await provider.translate_batch(_make_batch(), model="openai/gpt-5.6-luna")
+            assert "temperature" in provider._client.post.call_args.kwargs["json"]
+            provider._model_params_retry_at = 0.0  # the pause has passed
+            await provider.translate_batch(_make_batch(), model="openai/gpt-5.6-luna")
+        assert catalog_client.get.await_count == 2
+        assert provider._model_params_fetched is True
+        assert "temperature" not in provider._client.post.call_args.kwargs["json"]
 
     async def test_handles_non_200(self):
         provider = OpenRouterProvider(settings=_make_settings())
@@ -1176,7 +1210,8 @@ class TestEnsureModelParamsCache:
 
             await provider._ensure_model_params_cache()
 
-        assert provider._model_params_fetched is True
+        assert provider._model_params_fetched is False
+        assert provider._model_params_retry_at > 0
         assert provider._model_params_cache == {}
 
 

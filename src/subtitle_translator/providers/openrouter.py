@@ -28,6 +28,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# How long to wait before retrying a model catalog fetch that failed.
+MODEL_CATALOG_RETRY_SECONDS = 60.0
+
 # Debug logger for detailed request/response logging
 debug_logger = logging.getLogger(f"{__name__}.debug")
 
@@ -372,6 +375,8 @@ class OpenRouterProvider(TranslationProvider):
         self._model_params_cache: dict[str, list[str]] = {}
         self._model_reasoning_cache: dict[str, dict] = {}
         self._model_params_fetched: bool = False
+        # A failed catalog fetch is retried after this deadline instead of never.
+        self._model_params_retry_at: float = 0.0
         self._model_params_lock: asyncio.Lock = asyncio.Lock()
 
     @property
@@ -516,12 +521,21 @@ class OpenRouterProvider(TranslationProvider):
         }
 
     async def _ensure_model_params_cache(self) -> None:
-        """Fetch and cache supported_parameters for all models from OpenRouter API."""
+        """Fetch and cache supported_parameters for all models from OpenRouter API.
+
+        A fetch that fails is not treated as done: the capabilities decide whether
+        a model takes a temperature at all, and one bad moment at startup must not
+        leave every later request wrong until a restart. Failures are retried after
+        a bounded pause so a provider outage does not turn into a fetch per request.
+        """
         if self._model_params_fetched:
+            return
+        loop = asyncio.get_running_loop()
+        if loop.time() < self._model_params_retry_at:
             return
         async with self._model_params_lock:
             # Double-check after acquiring lock
-            if self._model_params_fetched:
+            if self._model_params_fetched or loop.time() < self._model_params_retry_at:
                 return
             try:
                 # Use a plain client without auth — /models is a public endpoint
@@ -545,13 +559,15 @@ class OpenRouterProvider(TranslationProvider):
                         f"Cached supported_parameters for "
                         f"{len(self._model_params_cache)} models from OpenRouter API"
                     )
+                    self._model_params_fetched = True
                 else:
                     logger.warning(
                         f"Failed to fetch models from OpenRouter API: {response.status_code}"
                     )
             except Exception as e:
                 logger.warning(f"Failed to fetch model params from OpenRouter API: {e}")
-            self._model_params_fetched = True
+            if not self._model_params_fetched:
+                self._model_params_retry_at = loop.time() + MODEL_CATALOG_RETRY_SECONDS
 
     async def _get_reasoning_type(self, model_id: str) -> str | None:
         """
