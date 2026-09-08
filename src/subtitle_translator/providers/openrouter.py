@@ -3,6 +3,10 @@
 import asyncio
 import json
 import logging
+import math
+from copy import copy
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import TYPE_CHECKING, Any, Optional
 
 import httpx
@@ -11,6 +15,7 @@ from subtitle_translator.config import Settings, get_settings
 from subtitle_translator.providers.base import (
     AuthenticationError,
     InvalidResponseError,
+    ProviderTimeoutError,
     RateLimitError,
     TranslationBatch,
     TranslationProvider,
@@ -32,6 +37,22 @@ debug_logger = logging.getLogger(f"{__name__}.debug")
 # provider.sort value, and OpenRouter does not stack them with other variants.
 ROUTING_SUFFIXES = ("nitro", "floor")
 ROUTING_SUFFIX_SORT = {"nitro": "throughput", "floor": "price"}
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        seconds = float(value)
+    except ValueError:
+        try:
+            date = parsedate_to_datetime(value)
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=UTC)
+            seconds = max(0.0, (date - datetime.now(UTC)).total_seconds())
+        except (ValueError, TypeError, OverflowError):
+            return None
+    return seconds if math.isfinite(seconds) and seconds >= 0 else None
 
 
 def split_routing_suffix(model_id: str) -> tuple[str, str | None]:
@@ -349,6 +370,7 @@ class OpenRouterProvider(TranslationProvider):
         self.settings = settings or get_settings()
         self._client: httpx.AsyncClient | None = None
         self._model_params_cache: dict[str, list[str]] = {}
+        self._model_reasoning_cache: dict[str, dict] = {}
         self._model_params_fetched: bool = False
         self._model_params_lock: asyncio.Lock = asyncio.Lock()
 
@@ -369,6 +391,14 @@ class OpenRouterProvider(TranslationProvider):
             )
         return self._client
 
+    def with_settings(self, settings: Settings) -> "OpenRouterProvider":
+        """Share the connection pool while preserving each job's settings snapshot."""
+        client = self.client
+        snapshot = copy(self)
+        snapshot.settings = settings
+        snapshot._client = client
+        return snapshot
+
     async def close(self) -> None:
         """Close the HTTP client."""
         if self._client is not None and not self._client.is_closed:
@@ -381,7 +411,9 @@ class OpenRouterProvider(TranslationProvider):
             return False
 
         try:
-            response = await self.client.get("/models", timeout=10.0)
+            response = await self.client.get(
+                "/models", timeout=10.0, headers=self.settings.openrouter_headers
+            )
             return response.status_code == 200
         except Exception as e:
             logger.warning(f"OpenRouter health check failed: {e}")
@@ -506,6 +538,9 @@ class OpenRouterProvider(TranslationProvider):
                         params = model.get("supported_parameters", [])
                         if model_id and params:
                             self._model_params_cache[model_id] = params
+                        reasoning = model.get("reasoning")
+                        if model_id and isinstance(reasoning, dict):
+                            self._model_reasoning_cache[model_id] = reasoning
                     logger.info(
                         f"Cached supported_parameters for "
                         f"{len(self._model_params_cache)} models from OpenRouter API"
@@ -582,8 +617,47 @@ class OpenRouterProvider(TranslationProvider):
         reasoning_config = config_override.reasoning
         use_thinking = config_override.use_thinking_variant
 
+        disabled = reasoning_config is not None and (
+            reasoning_config.enabled is False or (reasoning_config.effort or "").lower() == "none"
+        )
+        if disabled:
+            # Mandatory is an explicit capability. Missing "none" in the effort
+            # list alone does not mean that disabling reasoning is impossible.
+            await self._ensure_model_params_cache()
+            base_model, _ = split_routing_suffix(model_id)
+            capabilities = self._model_reasoning_cache.get(base_model, {})
+            if capabilities.get("mandatory") is True:
+                raise TranslationProviderError(
+                    f"Reasoning is mandatory for {model_id} and cannot be disabled.",
+                    provider=self.provider_name,
+                    retryable=False,
+                )
+            if use_thinking or model_id.endswith(":thinking"):
+                raise TranslationProviderError(
+                    "Reasoning cannot be disabled while a thinking variant is selected.",
+                    provider=self.provider_name,
+                    retryable=False,
+                )
+            return final_model_id, {"reasoning": {"effort": "none"}}
+
         # Check if model supports reasoning
         reasoning_type = await self._get_reasoning_type(model_id)
+
+        if reasoning_config and reasoning_config.effort:
+            await self._ensure_model_params_cache()
+            base_model, _ = split_routing_suffix(model_id)
+            efforts = self._model_reasoning_cache.get(base_model, {}).get("supported_efforts")
+            if isinstance(efforts, list):
+                effort = reasoning_config.effort.lower()
+                if effort not in efforts:
+                    raise TranslationProviderError(
+                        f"Reasoning effort {effort} is not supported by {model_id}.",
+                        provider=self.provider_name,
+                        retryable=False,
+                    )
+                # Preserve explicit variant selection after validating the effort.
+                if not (use_thinking and reasoning_type == "thinking_variant"):
+                    return final_model_id, {"reasoning": {"effort": effort}}
 
         if reasoning_type is None:
             # Model doesn't support reasoning, skip
@@ -603,11 +677,6 @@ class OpenRouterProvider(TranslationProvider):
 
         # Handle reasoning config
         if reasoning_config:
-            # effort: "none" means disable reasoning regardless of type
-            if reasoning_config.effort and reasoning_config.effort.lower() == "none":
-                logger.info("Reasoning effort: none — reasoning disabled")
-                return final_model_id, reasoning_params
-
             if reasoning_type == "enabled":
                 # For models like Grok that use reasoning.enabled parameter
                 if reasoning_config.enabled:
@@ -844,12 +913,16 @@ class OpenRouterProvider(TranslationProvider):
             "usage": {"include": True},
         }
 
+        supported = self._model_params_cache.get(bare_model)
+        if supported is not None and "temperature" not in supported:
+            payload.pop("temperature", None)
+
         # JSON mode constrains the reply to a JSON object at the top level, which is
         # why the prompt asks for {"translations": [...]}: when it asked for a bare
         # array, models resolved the conflict by answering with one translated line.
         # It is still skipped when reasoning is on; some models (mistral-small-2603)
         # misbehaved with reasoning and json_object together.
-        if not reasoning_params:
+        if not reasoning_params or reasoning_params.get("reasoning", {}).get("effort") == "none":
             payload["response_format"] = {"type": "json_object"}
 
         # Add reasoning params if configured
@@ -859,6 +932,9 @@ class OpenRouterProvider(TranslationProvider):
         # Add provider routing params
         if provider_params:
             payload.update(provider_params)
+
+        if config_override and config_override.service_tier is not None:
+            payload["service_tier"] = config_override.service_tier
 
         # Debug logging: Log incoming batch data
         debug_logger.debug("=== INCOMING BATCH DATA ===")
@@ -879,37 +955,28 @@ class OpenRouterProvider(TranslationProvider):
         debug_logger.debug(f"Temperature: {temp_to_use}")
         debug_logger.debug(f"Payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
 
+        request_timeout = (
+            config_override.request_timeout
+            if config_override and config_override.request_timeout is not None
+            else self.settings.request_timeout
+        )
         try:
-            # Create request-specific client if API key differs from default
-            # Always use config_override API key if available
-            if config_override and config_override.api_key:
-                headers = self.settings.get_openrouter_headers(
-                    api_key_override=config_override.api_key
+            # Authentication belongs to the request, never to mutable client
+            # defaults shared with older jobs or another request's override.
+            async with asyncio.timeout(request_timeout):
+                response = await self.client.post(
+                    "/chat/completions",
+                    json=payload,
+                    headers=self.settings.get_openrouter_headers(api_key_override=api_key),
+                    timeout=httpx.Timeout(request_timeout),
                 )
-                logger.debug("Making request with per-request API key")
-                async with httpx.AsyncClient(
-                    base_url=self.settings.openrouter_api_base,
-                    headers=headers,
-                    timeout=httpx.Timeout(self.settings.request_timeout),
-                    follow_redirects=False,
-                ) as client:
-                    response = await client.post("/chat/completions", json=payload)
-                    result = await self._process_response(response, model_to_use)
-                    # Perform safety validation
-                    self._validate_and_warn_unchanged(batch.lines, result.translations)
-                    return result
-            else:
-                logger.debug("Making request with default API key")
-                response = await self.client.post("/chat/completions", json=payload)
-                result = await self._process_response(response, model_to_use)
-                # Perform safety validation
-                self._validate_and_warn_unchanged(batch.lines, result.translations)
-                return result
-        except httpx.TimeoutException as e:
-            raise TranslationProviderError(
-                f"Request timed out after {self.settings.request_timeout}s",
+            result = await self._process_response(response, model_to_use)
+            self._validate_and_warn_unchanged(batch.lines, result.translations)
+            return result
+        except (httpx.TimeoutException, TimeoutError) as e:
+            raise ProviderTimeoutError(
+                f"Request timed out after {request_timeout}s",
                 provider=self.provider_name,
-                retryable=True,
             ) from e
         except httpx.RequestError as e:
             raise TranslationProviderError(
@@ -934,63 +1001,79 @@ class OpenRouterProvider(TranslationProvider):
         Raises:
             Various TranslationProviderError subclasses on failure
         """
-        status_code = response.status_code
-
-        # Handle error status codes
-        if status_code == 401:
-            raise AuthenticationError(
-                "Invalid OpenRouter API key",
-                provider=self.provider_name,
-            )
-        elif status_code == 429:
-            retry_after = response.headers.get("retry-after")
-            retry_seconds = float(retry_after) if retry_after else None
-            raise RateLimitError(
-                "OpenRouter rate limit exceeded",
-                provider=self.provider_name,
-                retry_after=retry_seconds,
-            )
-        elif status_code >= 500:
-            raise TranslationProviderError(
-                f"OpenRouter server error: {status_code}",
-                provider=self.provider_name,
-                retryable=True,
-                status_code=status_code,
-            )
-        elif status_code >= 400:
-            try:
-                error_data = response.json()
-                error_msg = error_data.get("error", {}).get("message", response.text)
-            except Exception:
-                error_msg = response.text
-            raise TranslationProviderError(
-                f"OpenRouter API error: {error_msg}",
-                provider=self.provider_name,
-                retryable=False,
-                status_code=status_code,
-            )
-
-        # Parse successful response
         try:
             data = response.json()
-        except json.JSONDecodeError as e:
-            raise InvalidResponseError(
-                f"Invalid JSON response: {str(e)}",
-                provider=self.provider_name,
-                raw_response=response.text[:1000],
-            ) from e
+        except ValueError:
+            data = None
 
-        # Extract usage information
-        usage = data.get("usage", {})
+        usage = data.get("usage") if isinstance(data, dict) else None
+        usage = usage if isinstance(usage, dict) else {}
         prompt_tokens = usage.get("prompt_tokens")
         completion_tokens = usage.get("completion_tokens")
         total_tokens = usage.get("total_tokens")
-        cost = usage.get("cost")
-        if cost is not None:
-            try:
-                cost = float(cost)
-            except (ValueError, TypeError):
+        if not isinstance(total_tokens, int) or isinstance(total_tokens, bool) or total_tokens < 0:
+            total_tokens = None
+        try:
+            cost = float(usage["cost"])
+            if not math.isfinite(cost) or cost < 0:
                 cost = None
+        except (KeyError, ValueError, TypeError):
+            cost = None
+
+        def fail(detail: Any) -> None:
+            code = response.status_code if response.status_code >= 400 else None
+            if code is None and isinstance(detail, dict):
+                raw_code = detail.get("code")
+                if isinstance(raw_code, str) and raw_code.isascii() and raw_code.isdigit():
+                    raw_code = int(raw_code)
+                if (
+                    isinstance(raw_code, int)
+                    and not isinstance(raw_code, bool)
+                    and 400 <= raw_code <= 599
+                ):
+                    code = raw_code
+            if code == 401:
+                error = AuthenticationError(
+                    "Invalid OpenRouter API key", provider=self.provider_name
+                )
+            elif code == 429:
+                error = RateLimitError(
+                    "OpenRouter rate limit exceeded", provider=self.provider_name
+                )
+            elif code is not None and code >= 500:
+                error = TranslationProviderError(
+                    f"OpenRouter server error: {code}",
+                    provider=self.provider_name,
+                    retryable=True,
+                    status_code=code,
+                )
+            else:
+                message = detail.get("message") if isinstance(detail, dict) else None
+                message = message if isinstance(message, str) else "Provider returned an error"
+                error = TranslationProviderError(
+                    f"OpenRouter API error: {message[:500]}",
+                    provider=self.provider_name,
+                    retryable=code is None,
+                    status_code=code,
+                )
+            error.tokens_used = total_tokens or 0
+            error.cost = cost or 0.0
+            error.retry_after = _retry_after_seconds(response.headers.get("retry-after"))
+            raise error
+
+        # OpenRouter may commit HTTP 200 before an upstream error arrives.
+        # Classify its envelope before checking for translated choices, otherwise
+        # rate limits incorrectly trigger adaptive batch shrinking.
+        if response.status_code >= 400:
+            fail(data.get("error") if isinstance(data, dict) else None)
+        if not isinstance(data, dict):
+            raise InvalidResponseError(
+                "Invalid JSON response: expected an object",
+                provider=self.provider_name,
+                raw_response=response.text[:1000],
+            )
+        if data.get("error") is not None:
+            fail(data["error"])
 
         # Extract translated content
         choices = data.get("choices", [])
@@ -999,7 +1082,12 @@ class OpenRouterProvider(TranslationProvider):
                 "No choices in response",
                 provider=self.provider_name,
                 raw_response=str(data)[:1000],
+                tokens_used=total_tokens or 0,
+                cost=cost or 0.0,
             )
+
+        if isinstance(choices[0], dict) and choices[0].get("finish_reason") == "error":
+            fail(choices[0].get("error"))
 
         content = choices[0].get("message", {}).get("content", "")
         if not content:
@@ -1007,6 +1095,8 @@ class OpenRouterProvider(TranslationProvider):
                 "Empty content in response",
                 provider=self.provider_name,
                 raw_response=str(data)[:1000],
+                tokens_used=total_tokens or 0,
+                cost=cost or 0.0,
             )
 
         # Debug logging: Log the raw response content
@@ -1018,7 +1108,12 @@ class OpenRouterProvider(TranslationProvider):
         debug_logger.debug(f"Raw content: {content}")
 
         # Parse the JSON array from content
-        translations = self._parse_translations(content)
+        try:
+            translations = self._parse_translations(content)
+        except InvalidResponseError as error:
+            error.tokens_used = total_tokens or 0
+            error.cost = cost or 0.0
+            raise
 
         # Debug logging: Log parsed translations
         debug_logger.debug("=== PARSED TRANSLATIONS ===")

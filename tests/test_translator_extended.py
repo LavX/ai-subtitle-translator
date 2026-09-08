@@ -475,6 +475,7 @@ class TestGetTranslator:
         import subtitle_translator.core.translator as mod
 
         sentinel = MagicMock()
+        sentinel.settings = mod.get_settings()
         mod._translator_instance = sentinel
 
         result = await get_translator()

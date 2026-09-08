@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Optional
 from subtitle_translator.config import Settings, get_settings
 from subtitle_translator.providers.base import (
     InvalidResponseError,
+    ProviderTimeoutError,
     RateLimitError,
     TranslationBatch,
     TranslationProvider,
@@ -35,6 +36,7 @@ class BatchProgress:
     failed_batches: int = 0
     total_tokens: int = 0
     total_cost: float = 0.0
+    message: str = ""
 
     @property
     def percent_complete(self) -> float:
@@ -64,6 +66,7 @@ class BatchResult:
     cost: float = 0.0
     error: str | None = None
     retries: int = 0
+    timed_out: bool = False
 
 
 @dataclass
@@ -80,6 +83,25 @@ class BatchProcessingResult:
     def success(self) -> bool:
         """Check if all batches succeeded."""
         return all(r.success for r in self.batch_results)
+
+
+def summarize_batch_failure(result: BatchProcessingResult, total_batches: int | None) -> str:
+    """Describe attempted failures and any work stopped before an attempt."""
+    failed_batches = [batch for batch in result.batch_results if not batch.success]
+    error = "; ".join(batch.error or "Unknown error" for batch in failed_batches)
+    attempted = len(result.batch_results)
+    total = total_batches if total_batches is not None else attempted
+    not_attempted = max(0, total - attempted)
+    if not_attempted:
+        reason = result.progress.message
+        stop_reason = f"{reason.rstrip('.')}. " if reason else ""
+        return (
+            f"{attempted} of {total} batches attempted; {len(failed_batches)} failed; "
+            f"{not_attempted} not attempted. {stop_reason}{error}"
+        )
+    if result.all_translations:
+        return f"{len(failed_batches)} of {attempted} batches failed: {error}"
+    return f"All {len(failed_batches)} batches failed: {error}"
 
 
 class BatchProcessor:
@@ -147,6 +169,10 @@ class BatchProcessor:
         config_override: Optional["TranslationConfig"] = None,
         _is_adaptive_retry: bool = False,
         _rate_limit_lock: asyncio.Lock | None = None,
+        _deadline: float | None = None,
+        _activity_callback: Callable[[str], None] | None = None,
+        _check_learned_size: bool = True,
+        _prior_retries: int = 0,
     ) -> BatchResult:
         """
         Process a single batch with retry logic.
@@ -166,21 +192,48 @@ class BatchProcessor:
 
         retries = 0
         last_error: str | None = None
-        is_timeout = False
+        loop = asyncio.get_running_loop()
+        request_timeout = (
+            config_override.request_timeout
+            if config_override and config_override.request_timeout is not None
+            else self.settings.request_timeout
+        )
+        if _deadline is None:
+            _deadline = loop.time() + 2 * request_timeout
+
+        def activity(message: str) -> None:
+            if _activity_callback:
+                _activity_callback(f"Batch {batch_index + 1}: {message}")
+
+        async def retry_wait(delay: float) -> None:
+            await asyncio.sleep(min(delay, max(0, _deadline - loop.time())))
+
         # Usage of an attempt that is retried is still billed; it is carried into the
         # eventual result so the job totals stay honest.
         spent_tokens = 0
         spent_cost = 0.0
+        non_timeout_failure = False
+        retained: dict[str, dict[str, str]] = {}
+        requested = {str(line["index"]) for line in batch.lines}
 
-        def _billed(outcome: BatchResult) -> BatchResult:
+        def _billed(outcome: BatchResult, add_retries: bool = False) -> BatchResult:
             # Whatever the outcome, the attempts made before it were billed.
             outcome.tokens_used += spent_tokens
             outcome.cost += spent_cost
+            if add_retries:
+                outcome.retries += retries
+            outcome.timed_out = outcome.timed_out and not non_timeout_failure
+            merged = dict(retained)
+            merged.update(
+                {str(t["index"]): t for t in outcome.translations if str(t["index"]) in requested}
+            )
+            outcome.translations = list(merged.values())
             return outcome
 
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
         # Rate limits get extra retries (3 more than normal errors)
-        max_retries_with_rate_limit = self.settings.max_retries + 3
+        max_retries = max(0, self.settings.max_retries - _prior_retries)
+        max_retries_with_rate_limit = self.settings.max_retries + 3 - _prior_retries
         model_id = (
             (config_override.model if config_override and config_override.model else None)
             or model
@@ -201,18 +254,69 @@ class BatchProcessor:
                 resolver.record_floor_failure(model_id)
 
         while retries < max_retries_with_rate_limit:
-            try:
-                result = await self.provider.translate_batch(
-                    batch, model=model, temperature=temperature, config_override=config_override
+            if loop.time() >= _deadline:
+                activity("timeout budget exhausted; stopping this batch")
+                return _billed(
+                    BatchResult(
+                        batch_index=batch_index,
+                        success=False,
+                        timed_out=True,
+                        error="Batch timeout budget exhausted",
+                        retries=retries,
+                    )
                 )
+            # Backoff yields to other roots, which may lower the learned cap.
+            # Split only to a strictly smaller size and keep the spent retry budget.
+            if _check_learned_size or retries:
+                learned_size = get_batch_size_resolver().limit_planned_size(
+                    model_id, len(batch.lines)
+                )
+                if learned_size < len(batch.lines):
+                    activity(f"using learned limit of {learned_size} lines per request")
+                    return _billed(
+                        await self._process_sub_batches(
+                            batch,
+                            batch_index,
+                            learned_size,
+                            model,
+                            temperature,
+                            config_override,
+                            _rate_limit_lock,
+                            _deadline,
+                            _activity_callback,
+                            _is_adaptive_retry=_is_adaptive_retry,
+                            _prior_retries=_prior_retries + retries,
+                        ),
+                        add_retries=True,
+                    )
+            # Publish only service-generated activity, without provider response text.
+            activity(f"request in progress for {len(batch.lines)} lines (attempt {retries + 1})")
+            try:
+                try:
+                    async with asyncio.timeout_at(_deadline):
+                        result = await self.provider.translate_batch(
+                            batch,
+                            model=model,
+                            temperature=temperature,
+                            config_override=config_override,
+                        )
+                except TimeoutError as e:
+                    raise ProviderTimeoutError("Batch timeout budget exhausted") from e
 
                 # Every requested position has to come back. A response with the right
                 # count but substituted or repeated indices leaves lines untranslated and
                 # used to pass as a success that also grew the learned size.
-                requested = {str(line["index"]) for line in batch.lines}
                 returned = {str(item["index"]) for item in result.translations}
+                retained.update(
+                    {
+                        str(t["index"]): t
+                        for t in result.translations
+                        if str(t["index"]) in requested
+                    }
+                )
                 covered = len(requested & returned)
                 if covered < len(requested):
+                    non_timeout_failure = True
                     logger.warning(
                         f"Batch {batch_index}: got {covered}/{len(requested)} translations"
                     )
@@ -227,7 +331,11 @@ class BatchProcessor:
                                 temperature,
                                 config_override,
                                 _rate_limit_lock,
-                            )
+                                _deadline,
+                                _activity_callback,
+                                _prior_retries=_prior_retries + retries,
+                            ),
+                            add_retries=True,
                         )
                     # A sub-batch or a floor batch cannot split again. A partial reply
                     # is as transient as an unparsable one (a model that answers five
@@ -236,18 +344,19 @@ class BatchProcessor:
                     # batch used to fail on the first partial reply, which turned one
                     # bad answer into "all 72 batches failed".
                     last_error = f"Partial translations: expected {len(requested)}, got {covered}"
-                    if retries < self.settings.max_retries:
+                    if retries < max_retries:
                         retries += 1
-                        await asyncio.sleep(self.settings.retry_delay * (2 ** (retries - 1)))
+                        activity(f"retry {retries} after incomplete or invalid response")
+                        await retry_wait(self.settings.retry_delay * (2 ** (retries - 1)))
                         continue
                     _note_unsplittable_failure(size_related=True)
-                    return BatchResult(
-                        batch_index=batch_index,
-                        success=False,
-                        tokens_used=spent_tokens,
-                        cost=spent_cost,
-                        error=last_error,
-                        retries=retries,
+                    return _billed(
+                        BatchResult(
+                            batch_index=batch_index,
+                            success=False,
+                            error=last_error,
+                            retries=retries,
+                        )
                     )
 
                 get_batch_size_resolver().record_success(model_id, len(batch.lines))
@@ -255,13 +364,16 @@ class BatchProcessor:
                 return BatchResult(
                     batch_index=batch_index,
                     success=True,
-                    translations=result.translations,
+                    translations=list(retained.values()),
                     tokens_used=spent_tokens + (result.total_tokens or 0),
                     cost=spent_cost + (result.cost or 0.0),
                     retries=retries,
                 )
 
             except InvalidResponseError as e:
+                non_timeout_failure = True
+                spent_tokens += e.tokens_used
+                spent_cost += e.cost
                 if can_adaptive:
                     return _billed(
                         await self._retry_with_smaller_batches(
@@ -271,13 +383,18 @@ class BatchProcessor:
                             temperature,
                             config_override,
                             _rate_limit_lock,
-                        )
+                            _deadline,
+                            _activity_callback,
+                            _prior_retries=_prior_retries + retries,
+                        ),
+                        add_retries=True,
                     )
                 # At floor or already in adaptive retry - use normal retry
-                if retries < self.settings.max_retries:
+                if retries < max_retries:
                     retries += 1
                     last_error = e.message
-                    await asyncio.sleep(self.settings.retry_delay * (2 ** (retries - 1)))
+                    activity(f"retry {retries} after invalid response")
+                    await retry_wait(self.settings.retry_delay * (2 ** (retries - 1)))
                 else:
                     _note_unsplittable_failure(size_related=True)
                     return _billed(
@@ -290,36 +407,91 @@ class BatchProcessor:
                     )
 
             except RateLimitError as e:
+                non_timeout_failure = True
+                spent_tokens += e.tokens_used
+                spent_cost += e.cost
                 # Rate limits: start at 5s, exponential backoff, cap at 30s.
                 # Use lock to serialize retries so parallel batches don't all
                 # hammer the API simultaneously after a 429.
                 rate_limit_base_delay = 5.0
-                delay = e.retry_after or min(rate_limit_base_delay * (2**retries), 30.0)
+                delay = (
+                    e.retry_after
+                    if e.retry_after is not None
+                    else min(rate_limit_base_delay * (2**retries), 30.0)
+                )
                 retries += 1
-                if _rate_limit_lock:
-                    async with _rate_limit_lock:
-                        logger.warning(
-                            f"Rate limit (429) on batch {batch_index}, waiting {delay:.0f}s "
-                            f"(retry {retries}/{max_retries_with_rate_limit})"
+                activity(f"rate limited; retry {retries} after {delay:g}s backoff")
+                try:
+                    async with asyncio.timeout_at(_deadline):
+                        if _rate_limit_lock:
+                            async with _rate_limit_lock:
+                                await retry_wait(delay)
+                        else:
+                            await retry_wait(delay)
+                except TimeoutError:
+                    activity("rate-limit retry budget exhausted; stopping this batch")
+                    return _billed(
+                        BatchResult(
+                            batch_index=batch_index,
+                            success=False,
+                            error="Rate-limit retry budget exhausted",
+                            retries=retries,
                         )
-                        await asyncio.sleep(delay)
-                else:
-                    logger.warning(
-                        f"Rate limit (429) on batch {batch_index}, waiting {delay:.0f}s "
-                        f"(retry {retries}/{max_retries_with_rate_limit})"
                     )
-                    await asyncio.sleep(delay)
                 last_error = str(e)
 
+            except ProviderTimeoutError as e:
+                spent_tokens += e.tokens_used
+                spent_cost += e.cost
+                exhausted = loop.time() >= _deadline
+                activity("timeout budget exhausted" if exhausted else "request timed out")
+                if can_adaptive and not exhausted:
+
+                    def recovery_activity(message: str) -> None:
+                        if _activity_callback:
+                            _activity_callback(f"{message} (recovering after timeout)")
+
+                    return _billed(
+                        await self._retry_with_smaller_batches(
+                            batch,
+                            batch_index,
+                            model,
+                            temperature,
+                            config_override,
+                            _rate_limit_lock,
+                            _deadline,
+                            recovery_activity,
+                            _prior_retries=_prior_retries + retries,
+                        ),
+                        add_retries=True,
+                    )
+                _note_unsplittable_failure(size_related=True)
+                return _billed(
+                    BatchResult(
+                        batch_index=batch_index,
+                        success=False,
+                        timed_out=True,
+                        error="Batch timeout budget exhausted" if exhausted else e.message,
+                        retries=retries,
+                    )
+                )
+
             except TranslationProviderError as e:
-                is_timeout = "timeout" in e.message.lower()
-                if e.retryable and retries < self.settings.max_retries:
-                    delay = self.settings.retry_delay * (2**retries)
+                non_timeout_failure = True
+                spent_tokens += e.tokens_used
+                spent_cost += e.cost
+                if e.retryable and retries < max_retries:
+                    delay = (
+                        e.retry_after
+                        if e.retry_after is not None
+                        else self.settings.retry_delay * (2**retries)
+                    )
                     logger.warning(
                         f"Retryable error on batch {batch_index}: {e.message}, "
                         f"waiting {delay}s (retry {retries + 1})"
                     )
-                    await asyncio.sleep(delay)
+                    activity(f"provider error; retry {retries + 1} after {delay:g}s backoff")
+                    await retry_wait(delay)
                     retries += 1
                     last_error = e.message
                 else:
@@ -339,15 +511,7 @@ class BatchProcessor:
                     )
                 )
 
-        # Max retries exceeded
-        if is_timeout and can_adaptive:
-            return _billed(
-                await self._retry_with_smaller_batches(
-                    batch, batch_index, model, temperature, config_override, _rate_limit_lock
-                )
-            )
-
-        _note_unsplittable_failure(size_related=is_timeout)
+        _note_unsplittable_failure(size_related=False)
         return _billed(
             BatchResult(
                 batch_index=batch_index,
@@ -365,6 +529,9 @@ class BatchProcessor:
         temperature: float | None = None,
         config_override: Optional["TranslationConfig"] = None,
         _rate_limit_lock: asyncio.Lock | None = None,
+        _deadline: float | None = None,
+        _activity_callback: Callable[[str], None] | None = None,
+        _prior_retries: int = 0,
     ) -> BatchResult:
         """Retry a failed batch by splitting it into smaller sub-batches."""
         from subtitle_translator.core.batch_sizing import get_batch_size_resolver
@@ -381,14 +548,60 @@ class BatchProcessor:
             f"Batch {batch_index}: adaptive retry with size {new_size} (was {len(batch.lines)})"
         )
 
-        sub_batches = [batch.lines[i : i + new_size] for i in range(0, len(batch.lines), new_size)]
+        if _activity_callback:
+            _activity_callback(
+                f"Batch {batch_index + 1}: recovering with smaller {new_size}-line requests"
+            )
+
+        return await self._process_sub_batches(
+            batch,
+            batch_index,
+            new_size,
+            model,
+            temperature,
+            config_override,
+            _rate_limit_lock,
+            _deadline,
+            _activity_callback,
+            _is_adaptive_retry=True,
+            _prior_retries=_prior_retries,
+        )
+
+    async def _process_sub_batches(
+        self,
+        batch: TranslationBatch,
+        batch_index: int,
+        batch_size: int,
+        model: str | None = None,
+        temperature: float | None = None,
+        config_override: Optional["TranslationConfig"] = None,
+        _rate_limit_lock: asyncio.Lock | None = None,
+        _deadline: float | None = None,
+        _activity_callback: Callable[[str], None] | None = None,
+        _is_adaptive_retry: bool = False,
+        _prior_retries: int = 0,
+    ) -> BatchResult:
+        """Dispatch smaller requests within the original root's budget and result."""
+        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+
+        model_id = (
+            (config_override.model if config_override and config_override.model else None)
+            or model
+            or self.settings.openrouter_default_model
+        )
+        resolver = get_batch_size_resolver()
 
         all_translations: list[dict[str, str]] = []
         total_tokens = 0
         total_cost = 0.0
         total_retries = 0
 
-        for sub_batch_lines in sub_batches:
+        offset = 0
+        while offset < len(batch.lines):
+            # Another in-flight request may lower the cap between these children.
+            # Resizing pending work is not a failure and does not spend a retry.
+            size = resolver.limit_planned_size(model_id, batch_size)
+            sub_batch_lines = batch.lines[offset : offset + size]
             sub_batch = TranslationBatch(
                 lines=sub_batch_lines,
                 source_language=batch.source_language,
@@ -402,24 +615,36 @@ class BatchProcessor:
                 model,
                 temperature,
                 config_override,
-                _is_adaptive_retry=True,
+                _is_adaptive_retry=_is_adaptive_retry,
                 _rate_limit_lock=_rate_limit_lock,
+                _deadline=_deadline,
+                _activity_callback=_activity_callback,
+                # This loop owns scheduling. A child may recover from one actual
+                # failure, but cannot recursively split just to apply a learned cap.
+                _check_learned_size=False,
+                _prior_retries=_prior_retries,
             )
             if not sub_result.success:
                 # The finished sub-batches and the failed attempts were billed too.
+                failure_context = "Adaptive retry" if _is_adaptive_retry else "Smaller batch"
                 return BatchResult(
                     batch_index=batch_index,
                     success=False,
-                    translations=all_translations,
+                    translations=all_translations + sub_result.translations,
                     tokens_used=total_tokens + sub_result.tokens_used,
                     cost=total_cost + sub_result.cost,
-                    error=f"Adaptive retry failed at size {new_size}: {sub_result.error}",
+                    error=(
+                        f"{failure_context} failed at size {len(sub_batch_lines)}: "
+                        f"{sub_result.error}"
+                    ),
                     retries=total_retries + sub_result.retries,
+                    timed_out=sub_result.timed_out,
                 )
             all_translations.extend(sub_result.translations)
             total_tokens += sub_result.tokens_used
             total_cost += sub_result.cost
             total_retries += sub_result.retries
+            offset += len(sub_batch_lines)
 
         return BatchResult(
             batch_index=batch_index,
@@ -485,6 +710,7 @@ class BatchProcessor:
 
         batch_results: list[BatchResult] = []
         all_translations: list[dict[str, str]] = []
+        translated_indices: set[str] = set()
 
         # Create indexed batches for tracking
         indexed_batches = list(enumerate(batches))
@@ -501,6 +727,13 @@ class BatchProcessor:
         # Fire initial progress so job shows totalBatches immediately
         if progress_callback:
             progress_callback(progress)
+
+        def activity(message: str) -> None:
+            progress.message = message
+            if progress_callback:
+                progress_callback(progress)
+
+        active_messages: dict[int, str] = {}
 
         # Process batches in parallel groups, updating progress per batch
         for group_start in range(0, len(indexed_batches), parallel_count):
@@ -525,6 +758,11 @@ class BatchProcessor:
                     context_title=context_title,
                     context_media_type=context_media_type,
                 )
+
+                def batch_activity(message: str) -> None:
+                    active_messages[bi] = message
+                    activity(message)
+
                 r = await self.process_batch(
                     b,
                     batch_index=bi,
@@ -532,6 +770,7 @@ class BatchProcessor:
                     temperature=temperature,
                     config_override=config_override,
                     _rate_limit_lock=rate_limit_lock,
+                    _activity_callback=batch_activity,
                 )
                 return bi, bl, r
 
@@ -540,25 +779,42 @@ class BatchProcessor:
                 for i, (bi, bl) in enumerate(batch_group)
             ]
 
-            # Process results as each batch completes (not waiting for all)
-            for coro in asyncio.as_completed(tasks):
-                batch_index, batch_lines, result = await coro
-                batch_results.append(result)
+            group_results: list[BatchResult] = []
+            try:
+                for coro in asyncio.as_completed(tasks):
+                    batch_index, batch_lines, result = await coro
+                    batch_results.append(result)
+                    group_results.append(result)
+                    progress.total_tokens += result.tokens_used
+                    progress.total_cost += result.cost
+                    requested = {str(line["index"]) for line in batch_lines}
+                    for translation in result.translations:
+                        index = str(translation["index"])
+                        if index in requested and index not in translated_indices:
+                            all_translations.append(translation)
+                            translated_indices.add(index)
+                    progress.completed_lines = len(translated_indices)
+                    if not result.success:
+                        progress.failed_batches += 1
+                        logger.error(f"Batch {batch_index + 1} failed: {result.error}")
+                    progress.completed_batches += 1
+                    active_messages.pop(batch_index, None)
+                    progress.message = next(reversed(active_messages.values()), "")
+                    if progress_callback:
+                        progress_callback(progress)
+            finally:
+                # Parent cancellation and callback errors must finish child cleanup
+                # before workers release the provider or persistent progress store.
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
 
-                # A failed batch was billed for its attempts as much as a successful one.
-                progress.total_tokens += result.tokens_used
-                progress.total_cost += result.cost
-                if result.success:
-                    all_translations.extend(result.translations)
-                    progress.completed_lines += len(batch_lines)
-                else:
-                    progress.failed_batches += 1
-                    logger.error(f"Batch {batch_index + 1} failed: {result.error}")
-
-                progress.completed_batches += 1
-
-                if progress_callback:
-                    progress_callback(progress)
+            if group_results and all(r.timed_out and not r.translations for r in group_results):
+                activity(
+                    "Provider requests timed out without usable output; remaining batches stopped"
+                )
+                break
 
         # Sort batch_results by batch_index to maintain order
         batch_results.sort(key=lambda r: r.batch_index)
@@ -609,6 +865,7 @@ class BatchProcessor:
             total_lines=len(lines),
         )
 
+        translated_indices: set[str] = set()
         for i, batch_lines in enumerate(batches):
             batch = TranslationBatch(
                 lines=batch_lines,
@@ -628,9 +885,12 @@ class BatchProcessor:
 
             progress.total_tokens += result.tokens_used
             progress.total_cost += result.cost
-            if result.success:
-                progress.completed_lines += len(batch_lines)
-            else:
+            requested = {str(line["index"]) for line in batch_lines}
+            translated_indices.update(
+                str(t["index"]) for t in result.translations if str(t["index"]) in requested
+            )
+            progress.completed_lines = len(translated_indices)
+            if not result.success:
                 progress.failed_batches += 1
 
             progress.completed_batches += 1

@@ -14,6 +14,8 @@ from pydantic import BaseModel, ConfigDict
 if TYPE_CHECKING:
     from subtitle_translator.queue.job_store import JobStore
 
+from subtitle_translator.queue.job_events import JobEvents
+
 logger = logging.getLogger(__name__)
 
 
@@ -113,9 +115,18 @@ class JobManager:
         self.job_ttl = timedelta(hours=job_ttl_hours)
         self._workers_started = False
         self._workers: list[asyncio.Task] = []
+        self._admission = asyncio.Condition()
+        self._running_jobs = 0
+        self._scheduled_jobs: set[str] = set()
         self._cleanup_task: asyncio.Task | None = None
         self._worker_handler: Any | None = None
         self._store: JobStore | None = None
+        self.events = JobEvents()
+
+    def _publish(self, job: Job) -> None:
+        owner = job.request_data.get("_ui_owner")
+        if isinstance(owner, str):
+            self.events.notify(owner)
 
     def set_store(self, store: JobStore) -> None:
         """Set the persistent job store for write-through caching."""
@@ -139,17 +150,23 @@ class JobManager:
         if not self._store:
             return 0
 
-        # Load ALL non-expired jobs so completed results survive restarts
-        all_jobs = self._store.load_all_jobs(limit=self.max_jobs)
+        # Accepted work survives even if the admission limit has since decreased.
+        all_jobs = self._store.load_active_jobs() + self._store.load_all_jobs(
+            limit=self.max_jobs, terminal_only=True
+        )
         requeued = 0
         restored = 0
         for job in all_jobs:
             if job.status in (JobStatus.QUEUED, JobStatus.PROCESSING):
+                if job.id in self._scheduled_jobs:
+                    continue
+                self._scheduled_jobs.add(job.id)
                 job.status = JobStatus.QUEUED
                 job.message = "Recovered after restart"
                 self.jobs[job.id] = job
                 await self.queue.put((job.id, job.job_type))
                 self._store.save_job(job)
+                self._publish(job)
                 requeued += 1
             else:
                 self.jobs[job.id] = job
@@ -258,8 +275,10 @@ class JobManager:
         )
 
         self.jobs[job_id] = job
+        self._scheduled_jobs.add(job_id)
         if self._store:
             self._store.save_job(job)
+        self._publish(job)
         await self.queue.put((job_id, job_type))
 
         logger.info(f"Job {job_id} submitted (type: {job_type.value})")
@@ -331,6 +350,16 @@ class JobManager:
                 job.total_cost = total_cost
             if self._store:
                 self._store.save_job(job)
+            self._publish(job)
+
+    def set_job_model(self, job_id: str, model: str) -> None:
+        """Persist the effective model selected when a job starts."""
+        if job_id in self.jobs:
+            job = self.jobs[job_id]
+            job.model = model
+            if self._store:
+                self._store.save_job(job)
+            self._publish(job)
 
     def set_job_processing(self, job_id: str) -> None:
         """Mark a job as processing."""
@@ -341,6 +370,7 @@ class JobManager:
             job.message = "Processing translation..."
             if self._store:
                 self._store.save_job(job)
+            self._publish(job)
 
     def set_job_completed(
         self,
@@ -364,6 +394,7 @@ class JobManager:
             logger.info(f"Job {job_id} completed successfully")
             if self._store:
                 self._store.save_job(job)
+            self._publish(job)
 
     def set_job_partial(
         self,
@@ -391,6 +422,7 @@ class JobManager:
             logger.warning(f"Job {job_id} partially completed: {error}")
             if self._store:
                 self._store.save_job(job)
+            self._publish(job)
 
     def set_job_failed(
         self,
@@ -413,6 +445,7 @@ class JobManager:
             logger.error(f"Job {job_id} failed: {error}")
             if self._store:
                 self._store.save_job(job)
+            self._publish(job)
 
     def cancel_job(self, job_id: str) -> bool:
         """
@@ -435,6 +468,7 @@ class JobManager:
             logger.info(f"Job {job_id} cancelled")
             if self._store:
                 self._store.save_job(job)
+            self._publish(job)
             return True
 
         return False
@@ -461,6 +495,7 @@ class JobManager:
                 del self.jobs[job_id]
                 if self._store:
                     self._store.delete_job(job_id)
+                self._publish(job)
                 logger.info(f"Job {job_id} deleted")
                 return True
         return False
@@ -557,70 +592,50 @@ class JobManager:
 
         logger.info(f"Updating max concurrent workers: {old_max} -> {new_max}")
 
-        # Start additional workers if needed
-        if new_max > old_max and self._workers_started:
-            for i in range(old_max, new_max):
-                logger.info(f"Starting additional worker {i}")
-                task = asyncio.create_task(self._worker(i))
-                self._workers.append(task)
-
-        # Remove finished worker tasks from the list
-        self._workers = [w for w in self._workers if not w.done()]
+        # Keep ownership of idle workers across decreases. They park at admission,
+        # so a later increase reuses them instead of duplicating worker IDs.
+        if self._workers_started:
+            for i in range(len(self._workers), new_max):
+                self._workers.append(asyncio.create_task(self._worker(i)))
+        async with self._admission:
+            self._admission.notify_all()
 
     async def _worker(self, worker_id: int) -> None:
-        """
-        Background worker that processes jobs from the queue.
-
-        Args:
-            worker_id: Worker identifier for logging
-        """
+        """Process queued work subject to the current global admission limit."""
         logger.info(f"Worker {worker_id} started")
-
         while True:
             try:
-                if worker_id >= self.max_concurrent:
-                    logger.info(
-                        f"Worker {worker_id} exiting: exceeds max_concurrent ({self.max_concurrent})"
-                    )
-                    break
-
-                # Get next job from queue
                 job_id, job_type = await self.queue.get()
-
-                # Check if job still exists and is queued
-                job = self.jobs.get(job_id)
-                if job is None:
-                    logger.warning(f"Worker {worker_id}: Job {job_id} not found")
-                    self.queue.task_done()
-                    continue
-
-                if job.status != JobStatus.QUEUED:
-                    logger.warning(
-                        f"Worker {worker_id}: Job {job_id} status is {job.status}, skipping"
-                    )
-                    self.queue.task_done()
-                    continue
-
-                logger.info(f"Worker {worker_id}: Processing job {job_id}")
-
-                # Mark as processing
-                self.set_job_processing(job_id)
-
-                # Process the job using the handler
+                admitted = False
                 try:
-                    await self._worker_handler(self, job_id, job_type)
-                except Exception as e:
-                    logger.exception(f"Worker {worker_id}: Job {job_id} failed with error: {e}")
-                    self.set_job_failed(job_id, str(e))
-
-                self.queue.task_done()
-
+                    async with self._admission:
+                        await self._admission.wait_for(
+                            lambda: self._running_jobs < self.max_concurrent
+                        )
+                        job = self.jobs.get(job_id)
+                        if job is None or job.status != JobStatus.QUEUED:
+                            continue
+                        self.set_job_processing(job_id)
+                        self._running_jobs += 1
+                        admitted = True
+                    try:
+                        await self._worker_handler(self, job_id, job_type)
+                    except Exception as e:
+                        logger.exception(f"Worker {worker_id}: Job {job_id} failed: {e}")
+                        self.set_job_failed(job_id, str(e))
+                finally:
+                    if admitted:
+                        async with self._admission:
+                            self._running_jobs -= 1
+                            self._admission.notify_all()
+                    self._scheduled_jobs.discard(job_id)
+                    self.queue.task_done()
             except asyncio.CancelledError:
                 logger.info(f"Worker {worker_id} cancelled")
                 break
             except Exception as e:
                 logger.exception(f"Worker {worker_id}: Unexpected error: {e}")
-                await asyncio.sleep(1)  # Brief pause before continuing
+                await asyncio.sleep(1)
 
     async def _cleanup_loop(self) -> None:
         """Periodically clean up expired jobs."""
@@ -648,6 +663,7 @@ class JobManager:
                 if job.completed_at and (now - job.completed_at) > self.job_ttl:
                     expired_ids.append(job_id)
 
+        expired_jobs = [self.jobs[job_id] for job_id in expired_ids]
         for job_id in expired_ids:
             del self.jobs[job_id]
 
@@ -657,6 +673,8 @@ class JobManager:
         if self._store:
             hours = int(self.job_ttl.total_seconds() / 3600)
             self._store.cleanup_expired(hours)
+        for job in expired_jobs:
+            self._publish(job)
 
 
 # Global job manager instance

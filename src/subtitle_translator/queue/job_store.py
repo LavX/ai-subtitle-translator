@@ -247,11 +247,12 @@ class JobStore:
             logger.error("Failed to load corrupt job id=%s", job_id, exc_info=True)
             return None
 
-    def load_all_jobs(self, limit: int = 100) -> list[Job]:
-        """Return all jobs ordered by created_at descending."""
+    def load_all_jobs(self, limit: int = 100, terminal_only: bool = False) -> list[Job]:
+        """Return bounded recent history, optionally excluding active jobs."""
+        where = "WHERE status NOT IN ('queued', 'processing')" if terminal_only else ""
         with self._lock:
             rows = self._conn.execute(
-                "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
+                f"SELECT * FROM jobs {where} ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
         jobs = []

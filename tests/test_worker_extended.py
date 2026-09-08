@@ -433,10 +433,8 @@ class TestContentJobPartialFailure:
                 assert job.result["lines"] == [line.model_dump() for line in mock_map.return_value]
 
     @pytest.mark.asyncio
-    async def test_partial_failure_counts_repeated_positions_as_lines(
-        self, manager, mock_translator
-    ):
-        """Two request lines sharing a position are two translated lines, not one."""
+    async def test_partial_failure_counts_repeated_positions_once(self, manager, mock_translator):
+        """Repeated input positions count once in unique translation coverage."""
         mock_result = _partial_result(
             translations=[
                 {"index": "1", "content": "Hola"},
@@ -473,7 +471,7 @@ class TestContentJobPartialFailure:
 
                 job = manager.get_job(job_id)
                 assert job.status == JobStatus.PARTIAL
-                assert job.error.startswith("3/3 lines translated.")
+                assert job.error.startswith("2/2 lines translated.")
 
 
 # ---------------------------------------------------------------------------
@@ -941,10 +939,10 @@ class TestFileJobExceptionHandler:
 class TestExtractConfigParallelBatches:
     """Test that parallelBatches is recognized by _extract_config_override_from_dict."""
 
-    def test_parallel_batches_alias_not_in_check_list(self):
-        """parallelBatches is not in the recognized key list, so dict with only that key returns None."""
+    def test_parallel_batches_alias_is_recognized(self):
+        """A parallelism-only file config must survive extraction."""
         result = _extract_config_override_from_dict({"parallelBatches": 3})
-        assert result is None
+        assert result.parallel_batches == 3
 
     def test_parallel_batches_with_recognized_key(self):
         """parallelBatches works when combined with a recognized key."""

@@ -604,7 +604,8 @@ class TestStorePersistence:
             request_data={},
             created_at=datetime.now(UTC),
         )
-        store.load_all_jobs.return_value = [queued_job, processing_job, completed_job]
+        store.load_active_jobs.return_value = [queued_job, processing_job]
+        store.load_all_jobs.return_value = [completed_job]
 
         manager.set_store(store)
         count = await manager.recover_jobs()

@@ -1,5 +1,6 @@
 """Comprehensive tests for OpenRouterProvider."""
 
+import asyncio
 import json
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -222,7 +223,9 @@ class TestHealthCheck:
         mock_client.is_closed = False
 
         assert await provider.health_check() is True
-        mock_client.get.assert_awaited_once_with("/models", timeout=10.0)
+        mock_client.get.assert_awaited_once_with(
+            "/models", timeout=10.0, headers=provider.settings.openrouter_headers
+        )
 
     async def test_failure_non_200(self):
         provider = OpenRouterProvider(settings=_make_settings())
@@ -346,6 +349,33 @@ class TestGetHungarianRecommendations:
 class TestTranslateBatch:
     """Tests for the main translate_batch method."""
 
+    async def test_luna_omits_temperature_unsupported_by_catalog(self):
+        provider = OpenRouterProvider(settings=_make_settings())
+        provider._client = AsyncMock()
+        provider._client.is_closed = False
+        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        catalog_client = AsyncMock()
+        catalog_client.get.return_value = _mock_response(
+            200,
+            {
+                "data": [
+                    {
+                        "id": "openai/gpt-5.6-luna",
+                        "supported_parameters": ["reasoning", "response_format"],
+                    }
+                ]
+            },
+        )
+        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as factory:
+            factory.return_value.__aenter__.return_value = catalog_client
+            await provider.translate_batch(
+                _make_batch(), config_override=TranslationConfig(model="openai/gpt-5.6-luna:floor")
+            )
+        catalog_client.get.assert_awaited_once_with("/models")
+        payload = provider._client.post.call_args.kwargs["json"]
+        assert payload["model"] == "openai/gpt-5.6-luna:floor"
+        assert "temperature" not in payload
+
     async def test_success_default_settings(self):
         provider = OpenRouterProvider(settings=_make_settings())
         batch = _make_batch()
@@ -386,26 +416,17 @@ class TestTranslateBatch:
         assert payload["temperature"] == 0.7
 
     async def test_success_with_config_override_api_key(self):
-        """When config_override has api_key, a separate httpx client is used."""
+        """Override authentication is attached to the request on the shared client."""
         provider = OpenRouterProvider(settings=_make_settings())
-        batch = _make_batch()
-        config = TranslationConfig(api_key="sk-override-key")
-        resp_json = _ok_response_json()
-        mock_resp = _mock_response(200, resp_json)
-
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
-            mock_ctx = AsyncMock()
-            mock_ctx.post.return_value = mock_resp
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            result = await provider.translate_batch(batch, config_override=config)
-            assert isinstance(result, TranslationResult)
-            # Verify the override client was created with the right headers
-            MockClient.assert_called_once()
-            call_kwargs = MockClient.call_args
-            headers = call_kwargs.kwargs.get("headers") or call_kwargs[1].get("headers")
-            assert "sk-override-key" in headers["Authorization"]
+        provider._client = AsyncMock()
+        provider._client.is_closed = False
+        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        result = await provider.translate_batch(
+            _make_batch(), config_override=TranslationConfig(api_key="sk-override-key")
+        )
+        assert isinstance(result, TranslationResult)
+        headers = provider._client.post.call_args.kwargs["headers"]
+        assert headers["Authorization"] == "Bearer sk-override-key"
 
     async def test_no_api_key_raises(self):
         settings = _make_settings(openrouter_api_key="")
@@ -489,6 +510,39 @@ class TestTranslateBatch:
             await provider.translate_batch(batch)
         assert exc_info.value.retryable is False
         assert exc_info.value.status_code == 400
+
+    async def test_response_deadline_cancels_a_still_open_request(self):
+        provider = OpenRouterProvider(settings=_make_settings(request_timeout=0.02))
+        provider._client = AsyncMock()
+        provider._client.is_closed = False
+        cancelled = False
+
+        async def stalled(*args, **kwargs):
+            nonlocal cancelled
+            try:
+                await asyncio.sleep(1)
+            finally:
+                cancelled = True
+
+        provider._client.post.side_effect = stalled
+        with pytest.raises(TranslationProviderError, match="timed out"):
+            await provider.translate_batch(_make_batch())
+        assert cancelled
+
+    async def test_request_timeout_override_reaches_provider(self):
+        provider = OpenRouterProvider(settings=_make_settings())
+        provider._client = AsyncMock()
+        provider._client.is_closed = False
+        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        await provider.translate_batch(
+            _make_batch(), config_override=TranslationConfig(requestTimeout=600)
+        )
+        assert provider._client.post.call_args.kwargs["timeout"].as_dict() == {
+            "connect": 600,
+            "read": 600,
+            "write": 600,
+            "pool": 600,
+        }
 
     async def test_timeout_raises_retryable(self):
         provider = OpenRouterProvider(settings=_make_settings())
@@ -837,12 +891,13 @@ class TestBuildReasoningPayload:
 
     async def test_effort_none_disables(self):
         provider = OpenRouterProvider(settings=_make_settings())
+        provider._model_params_fetched = True
         config = TranslationConfig(
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(effort="none"),
         )
         model, params = await provider._build_reasoning_payload(EFFORT_REASONING_MODELS[0], config)
-        assert params == {}
+        assert params == {"reasoning": {"effort": "none"}}
 
     async def test_invalid_effort_ignored(self):
         provider = OpenRouterProvider(settings=_make_settings())
@@ -887,12 +942,13 @@ class TestBuildReasoningPayload:
 
     async def test_enabled_reasoning_false(self):
         provider = OpenRouterProvider(settings=_make_settings())
+        provider._model_params_fetched = True
         config = TranslationConfig(
             model=ENABLED_REASONING_MODELS[0],
             reasoning=ReasoningConfig(enabled=False),
         )
         model, params = await provider._build_reasoning_payload(ENABLED_REASONING_MODELS[0], config)
-        assert params == {"reasoning": {"enabled": False}}
+        assert params == {"reasoning": {"effort": "none"}}
 
     async def test_thinking_variant_via_use_thinking(self):
         provider = OpenRouterProvider(settings=_make_settings())

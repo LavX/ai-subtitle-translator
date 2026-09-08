@@ -199,6 +199,7 @@ class TestBatchProcessor:
     def mock_settings(self):
         """Create mock settings."""
         settings = MagicMock()
+        settings.request_timeout = 120.0
         settings.batch_size = 50
         settings.max_retries = 3
         settings.retry_delay = 0.1
@@ -318,6 +319,7 @@ class TestSubtitleTranslator:
     def mock_settings(self):
         """Create mock settings."""
         settings = MagicMock()
+        settings.request_timeout = 120.0
         settings.batch_size = 100
         settings.max_retries = 3
         settings.retry_delay = 0.1

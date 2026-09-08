@@ -11,7 +11,7 @@ Translate SRT files and subtitle lines through OpenRouter. Run the service on yo
 
 [![CI](https://github.com/LavX/ai-subtitle-translator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LavX/ai-subtitle-translator/actions/workflows/ci.yml) [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml) [![License: MIT](https://img.shields.io/badge/license-MIT-3a8068)](LICENSE) [![Sponsor LavX](https://img.shields.io/badge/Sponsor-LavX-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/LavX)
 
-**[Get started](#quick-start)** · **[Models & costs](#subtitle-translation-leaderboard)** · **[Use the API](#api-endpoints)** · **[Configuration](#configuration)**
+**[Get started](#quick-start)** · **[Models & costs](#subtitle-translation-leaderboard)** · **[Web UI](#optional-web-ui)** · **[Use the API](#api-endpoints)** · **[Configuration](#configuration)**
 
 - **SRT in, SRT out.** Subtitle files and right-to-left language support.
 - **Choose your model.** OpenRouter models with per-request provider routing.
@@ -77,6 +77,37 @@ uvicorn subtitle_translator.main:app --host 0.0.0.0 --port 8765
 ```
 
 The examples select Gemini 3.1 Flash Lite with `:floor` routing. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
+
+## Optional web UI
+
+Enable the standalone subtitle studio for single-file or batch SRT translation:
+
+```dotenv
+UI_ENABLED=true
+```
+
+Add that setting to `.env` for the supplied Compose setup, then run `docker compose up -d --build`. For a manual installation, export `UI_ENABLED=true` before starting the service. Open **http://localhost:8765/ui/**, or use your server's host name and port. The UI is disabled by default and adds no frontend build step or external CDN dependency.
+
+1. Enter your **OpenRouter API key** and click **Connect**. No service token or encryption key is needed in the GUI. Connection checks use OpenRouter's [key endpoint](https://openrouter.ai/docs/api_reference/limits), without making a translation request.
+2. Optionally select **Remember on this device** to save and reuse the validated key in this browser. **Forget saved key** removes it and disconnects. Unchecking Remember also removes the saved copy.
+3. Add UTF-8 `.srt` files, choose the source and target languages, and select a model or enter a custom ID. Luna is preselected, with the full OpenRouter catalog available. Choose Lowest price (`:floor`, the default), Fastest (`:nitro`), or OpenRouter default routing. **Service tier** starts at **Standard**, which keeps that routing preference while disabling automatic Flex and priority tier selection. **Follow routing** allows discounted Flex with `:floor` or priority capacity with `:nitro`.
+4. Translate the batch, follow each file's progress and reported cost, then download individual SRTs or the ready results as a ZIP.
+
+The preview supports side-by-side comparison, subtitle italics/bold/underline, cue search, direct cue entry and keyboard navigation. Partial downloads show translated-cue coverage separately from completed batches. **Request options** sets a provider deadline of 2, 5 or 10 minutes; the UI starts at 10 minutes for slower routes. This gives requests more time, but does not guarantee provider availability. Flex capacity can be much slower or unavailable. Standard capacity can cost more than the catalog price and the historical `:floor` estimates below. See [OpenRouter service tiers](https://openrouter.ai/docs/guides/features/service-tiers) and [service compatibility](#subtitle-translation-leaderboard).
+
+To select a specific provider, open **Request options** and enter its OpenRouter ID in **Provider**, for example `azure`. The request is restricted to that provider with fallbacks disabled, so it must serve the selected model. Leave it empty for automatic selection. Routing and tier settings still apply, but a tier-specific endpoint ID can change the eligible tier and price. This can help when one provider is slow, but does not guarantee availability.
+
+**Reasoning** starts at **Off**, which explicitly disables reasoning for subtitle translation. **Model default** omits the setting, and catalog-supported effort levels are available when reported. A model that declares mandatory reasoning cannot use Off. Changing models keeps your explicit selection and explains incompatible choices before you submit. Custom model IDs remain usable with Off or Model default; the backend checks metadata when available.
+
+The queue shows files awaiting submission, active jobs and downloadable outputs, with partial downloads counted separately. Job messages show the latest reported request, backoff and timeout recovery activity. Elapsed time and an accepted API key do not confirm translated output. If an older server has no activity detail, the UI says so. Terminal errors retain attempted and unattempted batch counts, including after restoring history.
+
+GUI translations always use the OpenRouter key you entered. The GUI never falls back to the server's configured key. Its session shows only GUI jobs belonging to that key; people sharing a key share access to those jobs. Existing service-token API clients keep their authentication flow and do not list GUI jobs.
+
+Remembering is opt-in and uses browser local storage, so save a key only on a trusted device. Without it, the browser keeps the key only for the current session. Disconnect clears the in-memory key; a saved key remains available until you forget it. Your key and subtitles pass through this self-hosted service to OpenRouter. Use HTTPS when accessing the service across an untrusted network.
+
+Batch translation submits one job per file, not OpenRouter's asynchronous batch API. Queued jobs can be cancelled; processing jobs continue on the server. Partial results are marked and remain downloadable. After a reload, the GUI restores retained jobs automatically when you connect with the same key. A remembered key reconnects automatically. Connection interruptions leave the last known progress visible while the GUI reconnects. Submissions are never automatically replayed. **Restore recent jobs** also brings back entries you have forgotten from the page.
+
+The GUI is served by the application. Its Python controller calls the job manager directly, using one same-origin `/ui/session` WebSocket for browser commands and live updates. Browser state is plain JSON, with no custom encryption layer. Reverse proxies must forward WebSocket upgrades. Queued cancellation preserves results if a job finishes before the command arrives. Existing HTTP API clients remain supported. Per-job keys use the service's existing encryption at rest. If encryption is disabled, keys are not persisted, and interrupted GUI jobs fail after a restart instead of using the server's key.
 
 ## Authentication
 
@@ -163,7 +194,7 @@ In our September 7, 2026 English-to-Hungarian smoke test, **Luna offered the str
 
 Times are medians. Initial requests had a 100-second limit; DeepSeek's two initial requests timed out, then succeeded at 148 and 193 seconds with a 600-second limit. Its row uses successful retries only and excludes unknown charges from the original timeouts. Completion means all cue IDs returned, not correct language or meaning.
 
-**Service compatibility:** the benchmark used a direct request harness. It omitted temperature for Luna, while the service currently always sends temperature. Luna's result does not prove compatibility with the service's current payload. The quick-start examples use Gemini 3.1 Flash Lite; all benchmark results remain subject to provider and prompt differences.
+**Service compatibility:** the benchmark used a direct request harness. The service now omits temperature when OpenRouter's cached model catalog lists it as unsupported, including Luna. A September 7 live GUI API check translated 20 synthetic Hungarian-to-English cues with Luna on `:nitro` in 3.73 seconds for $0.000577. Two direct 20-cue `:floor` probes timed out with a 120-second request timeout, with model-default and low reasoning respectively. These small checks establish the tested route behavior, not full-movie reliability. Provider and prompt differences still apply.
 
 For DeepSeek or other slow `:floor` providers, consider a longer HTTP timeout in `.env` (forwarded by Compose):
 
@@ -447,7 +478,7 @@ Every translate endpoint accepts an optional `config` block to override defaults
 }
 ```
 
-Reasoning effort levels: `xhigh`, `high`, `medium`, `low`, `minimal`, `none`. The `none` value omits explicit reasoning settings; provider defaults may still enable reasoning.
+Reasoning effort levels: `xhigh`, `high`, `medium`, `low`, `minimal`, `none`. The `none` value explicitly disables reasoning. Omitting reasoning settings retains model defaults.
 
 Provider routing (`provider.sort`) decides which OpenRouter provider serves the model:
 
@@ -462,6 +493,8 @@ Provider routing (`provider.sort`) decides which OpenRouter provider serves the 
 
 `nitro` and `floor` are supersets of the matching sort. OpenRouter does not stack slug variants, so on a slug that already carries one (`:thinking`, `:free`, ...) they fall back to the plain `throughput`/`price` sort. A `:nitro` or `:floor` typed straight into the model id is honoured as-is and no competing sort is sent. `provider.order`, `only`, `ignore` and `allowFallbacks` are passed through unchanged.
 
+Per-request `config.serviceTier` accepts `default` (standard capacity), `flex`, or `priority`. It is forwarded as OpenRouter's top-level `service_tier`. Setting `default` prevents route shortcuts from admitting Flex and priority tiers, while retaining their price or throughput sorting. Omitting it preserves OpenRouter's routing-based tier selection. The GUI explicitly selects standard capacity for new submissions; existing API clients retain their current behavior.
+
 ## Configuration
 
 The table lists application defaults. For manual runs, most settings load from environment variables or a `.env` file in the working directory. `LOG_LEVEL` and `CORS_ALLOWED_ORIGINS` read the process environment directly: export them for manual runs. Docker Compose only forwards the variables explicitly listed in `docker-compose.yml`; add other settings to its `environment` section. Its default model is `google/gemini-2.5-flash-preview-09-2025`, which differs from the application default below. Set a model ID available to your OpenRouter account explicitly.
@@ -474,13 +507,14 @@ The table lists application defaults. For manual runs, most settings load from e
 | `BATCH_SIZE` | `100` | Max subtitle lines per batch (auto-adjusted per model) |
 | `PARALLEL_BATCHES_PER_JOB` | `4` | Concurrent batches per translation job |
 | `JOB_QUEUE_MAX_CONCURRENT` | `15` | Concurrent translation job workers at startup |
-| `JOB_QUEUE_MAX_JOBS` | `500` | Maximum queued and processing jobs accepted; see the startup-load caveat below |
+| `JOB_QUEUE_MAX_JOBS` | `500` | Maximum queued and processing jobs accepted; existing active jobs are retained after a lower limit is configured |
 | `RETRY_DELAY` | `1.0` | Base delay in seconds for ordinary retries |
 | `MAX_RETRIES` | `3` | Ordinary retry setting; repeated 429s use up to `MAX_RETRIES + 3` attempts |
-| `REQUEST_TIMEOUT` | `120.0` | HTTP request timeout in seconds, not a whole-job deadline |
+| `REQUEST_TIMEOUT` | `120.0` | Provider request timeout in seconds; each root batch has a budget of twice this value including recovery |
 | `LOG_LEVEL` | `INFO` | Log level (`DEBUG` for full request/response logging) |
 | `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed CORS origins |
 | `ADMIN_API_KEY` | *(empty)* | Required as `X-Admin-Key` header for PUT /config when set |
+| `UI_ENABLED` | `false` | Serve the optional web UI at `/ui/` |
 | `HOST` | `0.0.0.0` | Bind address when launched with `python -m subtitle_translator.main` |
 | `PORT` | `8765` | Port when launched with `python -m subtitle_translator.main` |
 | `ENCRYPTION_ENABLED` | `true` | Enable AES-256-GCM API key encryption |
@@ -492,13 +526,19 @@ The table lists application defaults. For manual runs, most settings load from e
 
 The Docker image and manual Uvicorn command above explicitly bind to `0.0.0.0:8765`. Change the Uvicorn arguments to use another bind address or port.
 
-`PUT /api/v1/config` changes are held in memory and lost on restart. The current implementation can keep using previously cached model, API key, temperature and batch defaults after an update. For reliable default changes, update the environment and restart the service. See the interactive schema for accepted fields.
+`PUT /api/v1/config` changes are held in memory and lost on restart. Running jobs keep the model, temperature, parallel batch count and API key defaults captured when they started. Queued jobs use current defaults when they start; explicit request overrides retain priority. API key rotation updates subsequent requests without closing connections used by running jobs. See the interactive schema for accepted fields.
+
+Provider timeouts immediately trigger one smaller-batch recovery when the batch is above the five-line floor. A timed-out floor batch or recovery request is not repeated. The root batch, including recovery, has a budget of twice the configured request timeout. A parallel group that produces no usable output and only timeout failures stops later groups; earlier translations and reported usage remain available. Ordinary invalid-response, network and rate-limit errors keep their distinct retry handling within the batch budget. Per-request `config.requestTimeout` overrides the timeout (30-900 seconds).
+
+OpenRouter can return HTTP 200 with an error inside the response body. The service handles those errors by their embedded code: rate limits wait before retrying and do not reduce batch size; transient server errors use bounded retries; authentication and credit errors fail the batch. Reported usage from failed attempts remains included. A provider error marker cannot count as a completed translation.
+
+Job messages publish request, retry, backoff and recovery activity while work is pending. Activity does not advance completed line/batch counts or invent usage. Partial adaptive output retains translated indices while missing positions use source-text fallbacks in downloadable results. Only distinct translated input indices count as completed.
 
 ## Job persistence
 
 Jobs are stored in SQLite and survive container restarts. On startup, queued or in-progress jobs from the previous session are recovered and re-queued from the beginning; completed batches are not checkpointed for resumption. Per-request API keys are encrypted at rest when encryption is enabled. With encryption disabled, those keys are not persisted, so recovery requires a configured default API key.
 
-Startup currently loads only the newest 500 records, including finished jobs. Recovery runs before the configured queue limit is applied. Older active jobs outside that window are not automatically re-queued.
+Startup recovers every stored queued or processing job independently of recent terminal history. History loaded into memory is bounded by `JOB_QUEUE_MAX_JOBS`. If that limit has decreased below the accepted active count, existing work is retained and new submissions wait until the active count falls below the limit.
 
 Mount a volume to `/app/data` to persist across container recreations:
 
@@ -540,17 +580,19 @@ When OpenRouter returns 429 Too Many Requests:
 
 ## Reasoning support
 
-Reasoning configuration first uses built-in model overrides and recommended-model metadata, then falls back to the OpenRouter `/models` API for other model IDs. When reasoning is requested:
+Reasoning configuration uses explicit catalog effort metadata when available, then falls back to built-in model overrides and recommended-model metadata. Other model IDs use the OpenRouter `/models` API. When reasoning is requested:
 
 - For effort-based models, the service forwards the requested effort, for example `{"reasoning": {"effort": "low"}}`
-- For models using a token budget, pass `{"reasoning": {"maxTokens": N}}` in request config. The service sends OpenRouter `max_tokens`; an `effort` value alone is ignored for these models
-- `effort: "none"` omits explicit reasoning parameters; it does not send a provider-side disable flag
-- `response_format: json_object` is sent when no reasoning payload is built. JSON mode only allows an object at the top level, so the prompt asks for `{"translations": [...]}`; asking for a bare array under JSON mode made some models (DeepSeek V4 Flash among them) answer with a single translated line per batch. The parser also accepts a wrapper under any single list-valued key.
-- `response_format: json_object` is skipped when a reasoning payload is present (some models misbehave with reasoning and JSON mode together)
+- When the catalog declares supported efforts, an explicit effort is forwarded unchanged or rejected before a translation request if unsupported. This metadata takes priority over older token-budget model overrides. Without effort metadata, token-budget models accept `{"reasoning": {"maxTokens": N}}`; an `effort` value alone keeps the existing fallback behavior
+- `effort: "none"` or `enabled: false` sends `reasoning: {"effort": "none"}` to OpenRouter. Omitted reasoning settings retain model defaults. Models declaring mandatory reasoning in `/models` metadata reject explicit disable before a translation request is sent. Disable also conflicts with an explicitly selected thinking variant.
+- `response_format: json_object` is sent when reasoning is omitted or explicitly disabled. JSON mode only allows an object at the top level, so the prompt asks for `{"translations": [...]}`; asking for a bare array under JSON mode made some models (DeepSeek V4 Flash among them) answer with a single translated line per batch. The parser also accepts a wrapper under any single list-valued key.
+- `response_format: json_object` is skipped when reasoning is enabled (some models misbehave with reasoning and JSON mode together)
 
 </details>
 
 ## Development
+
+Open feature and fix pull requests against `development`, the pre-release branch. `main` is the stable branch.
 
 ```bash
 pip install -e ".[dev]"
@@ -558,6 +600,22 @@ pytest tests/ -v --tb=short # unit and integration tests
 ruff check src/ tests/    # lint
 ruff format src/ tests/   # format
 ```
+
+The optional UI has dependency-free JavaScript checks:
+
+```bash
+node --test tests/ui/*.test.mjs
+```
+
+For browser acceptance checks, install Playwright in your development environment:
+
+```bash
+pip install playwright
+playwright install chromium
+PYTHONPATH=src python tests/ui_browser.py
+```
+
+This starts a temporary local service using the real API and job worker with synthetic translations and dummy OpenRouter key validation. It makes no paid model calls. The checks cover key saving and reuse, job ownership, batch downloads, partial results, cancellation races and interrupted submissions. Set `CHROMIUM_PATH` to use a particular Chromium executable.
 
 ## Project structure
 
@@ -567,6 +625,10 @@ src/subtitle_translator/
   config.py               # Settings from environment variables
   crypto.py               # AES-256-GCM encryption and key management
   cli.py                  # CLI commands (key regeneration)
+  web.py                  # Optional static UI routes
+  gui.py                  # App-owned browser commands and live job updates
+  ui_api.py               # OpenRouter key authentication and GUI job ownership
+  static/                 # Browser workspace and ZIP download helper
   api/
     routes.py             # REST API endpoints
     models.py             # Pydantic request/response models

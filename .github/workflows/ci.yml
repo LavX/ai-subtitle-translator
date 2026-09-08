@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
-    branches: [main]
+    branches: [development]
 
 jobs:
   test:
@@ -31,3 +31,16 @@ jobs:
 
       - name: Run ruff lint
         run: ruff check src/ tests/
+
+  web-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check browser modules and archive helpers
+        run: |
+          node --check src/subtitle_translator/static/app.js
+          node --check src/subtitle_translator/static/session.mjs
+          node --test tests/ui/*.test.mjs

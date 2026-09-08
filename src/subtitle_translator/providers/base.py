@@ -41,12 +41,25 @@ class TranslationProviderError(Exception):
         provider: str = "unknown",
         retryable: bool = False,
         status_code: int | None = None,
+        tokens_used: int = 0,
+        cost: float = 0.0,
+        retry_after: float | None = None,
     ):
         super().__init__(message)
         self.message = message
         self.provider = provider
         self.retryable = retryable
         self.status_code = status_code
+        self.tokens_used = tokens_used
+        self.cost = cost
+        self.retry_after = retry_after
+
+
+class ProviderTimeoutError(TranslationProviderError):
+    """A provider request exceeded its transport timeout."""
+
+    def __init__(self, message: str, provider: str = "unknown"):
+        super().__init__(message, provider, retryable=True)
 
 
 class RateLimitError(TranslationProviderError):
@@ -67,9 +80,18 @@ class AuthenticationError(TranslationProviderError):
 class InvalidResponseError(TranslationProviderError):
     """Raised when the provider returns an invalid response."""
 
-    def __init__(self, message: str, provider: str = "unknown", raw_response: str | None = None):
+    def __init__(
+        self,
+        message: str,
+        provider: str = "unknown",
+        raw_response: str | None = None,
+        tokens_used: int = 0,
+        cost: float = 0.0,
+    ):
         super().__init__(message, provider, retryable=True)
         self.raw_response = raw_response
+        self.tokens_used = tokens_used
+        self.cost = cost
 
 
 class TranslationProvider(ABC):

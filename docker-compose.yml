@@ -16,6 +16,7 @@ services:
       # Server Configuration
       - HOST=0.0.0.0
       - PORT=8765
+      - UI_ENABLED=${UI_ENABLED:-false}
       # Translation Configuration
       - BATCH_SIZE=${BATCH_SIZE:-100}
       - MAX_RETRIES=${MAX_RETRIES:-3}

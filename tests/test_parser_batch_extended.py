@@ -441,7 +441,8 @@ class TestFailedBatchUsageIsCounted:
         # the second answers one line twice (3 + 3 tokens) and fails the batch.
         assert result.success is False
         assert "Adaptive retry failed at size 5" in result.error
-        assert len(result.translations) == 5
+        assert len(result.translations) == 6
+        assert result.translations[-1] == {"index": "5", "content": "Hola"}
         assert result.tokens_used == 13
         assert result.cost == pytest.approx(0.003)
         assert result.retries == 1
