@@ -335,6 +335,7 @@ class BatchProcessor:
                     non_timeout_failure = True
                     logger.warning(
                         f"Batch {batch_index + 1}: got {covered}/{len(requested)} translations"
+                        + (f" ({result.note})" if result.note else "")
                     )
                     spent_tokens += result.total_tokens or 0
                     spent_cost += result.cost or 0.0
@@ -361,6 +362,8 @@ class BatchProcessor:
                     # batch used to fail on the first partial reply, which turned one
                     # bad answer into "all 72 batches failed".
                     last_error = f"Partial translations: expected {len(requested)}, got {covered}"
+                    if result.note:
+                        last_error += f" ({result.note})"
                     if retries < max_retries:
                         retries += 1
                         activity(f"retry {retries} after incomplete or invalid response")
@@ -648,9 +651,20 @@ class BatchProcessor:
         total_tokens = 0
         total_cost = 0.0
         total_retries = 0
+        failures: list[str] = []
+        failed_timed_out = True
+        loop = asyncio.get_running_loop()
 
         offset = 0
         while offset < len(batch.lines):
+            if failures and loop.time() >= _deadline:
+                # A failed child already spent the budget; do not queue instant timeouts.
+                remaining = batch.lines[offset:]
+                failures.append(
+                    f"cues {remaining[0]['index']}-{remaining[-1]['index']} not attempted "
+                    "(batch budget exhausted)"
+                )
+                break
             # Another in-flight request may lower the cap between these children.
             # Resizing pending work is not a failure and does not spend a retry.
             size = resolver.limit_planned_size(model_id, batch_size)
@@ -678,27 +692,33 @@ class BatchProcessor:
                 _prior_retries=_prior_retries,
                 _prior_attempts=_prior_attempts,
             )
-            if not sub_result.success:
-                # The finished sub-batches and the failed attempts were billed too.
-                failure_context = "Adaptive retry" if _is_adaptive_retry else "Smaller batch"
-                return BatchResult(
-                    batch_index=batch_index,
-                    success=False,
-                    translations=all_translations + sub_result.translations,
-                    tokens_used=total_tokens + sub_result.tokens_used,
-                    cost=total_cost + sub_result.cost,
-                    error=(
-                        f"{failure_context} failed at size {len(sub_batch_lines)}: "
-                        f"{sub_result.error}"
-                    ),
-                    retries=total_retries + sub_result.retries,
-                    timed_out=sub_result.timed_out,
-                )
             all_translations.extend(sub_result.translations)
             total_tokens += sub_result.tokens_used
             total_cost += sub_result.cost
             total_retries += sub_result.retries
             offset += len(sub_batch_lines)
+            if not sub_result.success:
+                # One bad answer must not cost the lines behind it: the siblings are
+                # still attempted, and the failure names the cues it covers so the
+                # result can say which lines were left in the source language.
+                failed_timed_out = failed_timed_out and sub_result.timed_out
+                failures.append(
+                    f"cues {sub_batch_lines[0]['index']}-{sub_batch_lines[-1]['index']} "
+                    f"at size {len(sub_batch_lines)}: {sub_result.error}"
+                )
+
+        if failures:
+            failure_context = "Adaptive retry" if _is_adaptive_retry else "Smaller batch"
+            return BatchResult(
+                batch_index=batch_index,
+                success=False,
+                translations=all_translations,
+                tokens_used=total_tokens,
+                cost=total_cost,
+                error=f"{failure_context} failed for {'; '.join(failures)}",
+                retries=total_retries,
+                timed_out=failed_timed_out,
+            )
 
         return BatchResult(
             batch_index=batch_index,

@@ -1113,7 +1113,7 @@ class OpenRouterProvider(TranslationProvider):
 
         # Parse the JSON array from content
         try:
-            translations = self._parse_translations(content)
+            translations, note = self._parse_translations_with_note(content)
         except InvalidResponseError as error:
             error.tokens_used = total_tokens or 0
             error.cost = cost or 0.0
@@ -1133,6 +1133,7 @@ class OpenRouterProvider(TranslationProvider):
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
             cost=cost,
+            note=note,
             raw_response=data,
         )
 
@@ -1191,6 +1192,12 @@ class OpenRouterProvider(TranslationProvider):
                 )
 
     def _parse_translations(self, content: str) -> list[dict[str, str]]:
+        """Parse translation JSON from LLM response; see _parse_translations_with_note."""
+        return self._parse_translations_with_note(content)[0]
+
+    def _parse_translations_with_note(
+        self, content: str
+    ) -> tuple[list[dict[str, str]], str | None]:
         """
         Parse translation JSON from LLM response.
 
@@ -1198,7 +1205,8 @@ class OpenRouterProvider(TranslationProvider):
             content: Raw content string from LLM response
 
         Returns:
-            List of translation dictionaries
+            List of translation dictionaries, and a note when the reply had to be
+            repaired or cut down to its usable part
 
         Raises:
             InvalidResponseError: If JSON parsing fails
@@ -1295,7 +1303,7 @@ class OpenRouterProvider(TranslationProvider):
                 if index and text is not None:
                     translations.append({"index": index, "content": str(text)})
 
-            return translations
+            return translations, None
 
         except json.JSONDecodeError as e:
             # Try to extract JSON from markdown code blocks
@@ -1303,21 +1311,66 @@ class OpenRouterProvider(TranslationProvider):
 
             json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
             if json_match:
-                return self._parse_translations(json_match.group(1))
+                return self._parse_translations_with_note(json_match.group(1))
 
             # Try to find JSON array directly
             array_match = re.search(r"\[[\s\S]*\]", content)
-            if array_match:
+            if array_match and array_match.group(0) != content:
                 try:
-                    return self._parse_translations(array_match.group(0))
+                    return self._parse_translations_with_note(array_match.group(0))
                 except Exception:
                     pass
 
+            # Small models are loose with JSON: a trailing comma before a closing
+            # bracket, or an object cut off by the token limit. A trailing comma is
+            # repaired. A reply whose tail is broken keeps the complete objects before
+            # the break; the caller sees a short reply and re-requests the rest.
+            repaired = re.sub(r",(\s*[\]}])", r"\1", content)
+            if repaired != content:
+                try:
+                    return self._parse_translations_with_note(repaired)
+                except InvalidResponseError:
+                    pass
+            excerpt = content[max(0, e.pos - 30) : e.pos + 30].replace("\n", " ")
+            salvaged = self._salvage_complete_objects(content)
+            if salvaged:
+                note = f"reply was not valid JSON: {e.msg} near {excerpt!r}"
+                logger.warning(
+                    f"{note}; kept {len(salvaged)} complete translations before the break"
+                )
+                return salvaged, note
+
             raise InvalidResponseError(
-                f"Failed to parse JSON: {str(e)}",
+                f"Failed to parse JSON: {str(e)} near {excerpt!r}",
                 provider=self.provider_name,
                 raw_response=content[:1000],
             ) from e
+
+    def _salvage_complete_objects(self, content: str) -> list[dict[str, str]]:
+        """Return the translation objects that decode cleanly before a broken tail."""
+        decoder = json.JSONDecoder(strict=False)
+        start = content.find("[")
+        if start < 0:
+            return []
+        position = start + 1
+        found: list[dict[str, str]] = []
+        while True:
+            while position < len(content) and content[position] in " \t\r\n,":
+                position += 1
+            if position >= len(content) or content[position] != "{":
+                break
+            try:
+                item, end = decoder.raw_decode(content, position)
+            except json.JSONDecodeError:
+                break
+            if not isinstance(item, dict):
+                break
+            index = str(item.get("index", item.get("idx", item.get("position", ""))))
+            text = item.get("content", item.get("text", item.get("translation", "")))
+            if index and text is not None:
+                found.append({"index": index, "content": str(text)})
+            position = end
+        return found
 
 
 async def get_openrouter_provider() -> OpenRouterProvider:

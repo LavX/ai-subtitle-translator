@@ -19,6 +19,7 @@ class TranslationResult:
     total_tokens: int | None = None
     cost: float | None = None
     raw_response: dict | None = None
+    note: str | None = None  # why the reply had to be repaired or cut down
 
 
 @dataclass

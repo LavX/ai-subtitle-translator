@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from subtitle_translator.providers.base import InvalidResponseError
 from subtitle_translator.providers.openrouter import OpenRouterProvider
 
 
@@ -260,3 +261,46 @@ class TestParseTranslationsFallbacks:
 
         with pytest.raises(InvalidResponseError):
             provider._parse_translations("this is not json at all")
+
+
+class TestLooseJson:
+    """Small models return JSON that is not quite JSON; keep what is usable."""
+
+    def test_trailing_comma_in_array_is_repaired(self, provider):
+        content = (
+            '{"translations": [{"index": "1", "content": "A"}, {"index": "2", "content": "B"},]}'
+        )
+        assert provider._parse_translations(content) == [
+            {"index": "1", "content": "A"},
+            {"index": "2", "content": "B"},
+        ]
+
+    def test_trailing_comma_in_object_is_repaired(self, provider):
+        content = '[{"index": "1", "content": "A",}, {"index": "2", "content": "B",},]'
+        assert [t["index"] for t in provider._parse_translations(content)] == ["1", "2"]
+
+    def test_truncated_tail_keeps_the_complete_translations(self, provider):
+        content = (
+            '{"translations": [{"index": "1", "content": "A"}, '
+            '{"index": "2", "content": "B"}, {"index": "3", "content": "C'
+        )
+        assert [t["index"] for t in provider._parse_translations(content)] == ["1", "2"]
+
+    def test_bare_array_cut_after_last_object(self, provider):
+        content = '[{"index": "1", "content": "A"}, {"index": "2", "content": "B"}'
+        assert [t["index"] for t in provider._parse_translations(content)] == ["1", "2"]
+
+    def test_unescaped_quote_keeps_the_lines_before_it(self, provider):
+        content = (
+            '[{"index": "1", "content": "A"}, {"index": "2", "content": "say "hi" now"}, '
+            '{"index": "3", "content": "C"}]'
+        )
+        assert [t["index"] for t in provider._parse_translations(content)] == ["1"]
+
+    def test_nothing_usable_still_raises_with_an_excerpt(self, provider):
+        content = '[{"index": "1", "content": "say "hi" now"}]'
+        with pytest.raises(InvalidResponseError) as caught:
+            provider._parse_translations(content)
+        assert "Failed to parse JSON" in caught.value.message
+        assert "near" in caught.value.message
+        assert '"hi"' in caught.value.message

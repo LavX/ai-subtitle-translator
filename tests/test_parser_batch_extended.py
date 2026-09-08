@@ -440,7 +440,7 @@ class TestFailedBatchUsageIsCounted:
         # 10 lines fail, the retry runs two 5-line sub-batches: the first succeeds (7 tokens),
         # the second answers one line twice (3 + 3 tokens) and fails the batch.
         assert result.success is False
-        assert "Adaptive retry failed at size 5" in result.error
+        assert "Adaptive retry failed for cues 5-9 at size 5" in result.error
         assert len(result.translations) == 6
         assert result.translations[-1] == {"index": "5", "content": "Hola"}
         assert result.tokens_used == 13

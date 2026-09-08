@@ -115,8 +115,16 @@ async def test_retry_resize_preserves_partial_usage_and_consumed_retry_budget(
         assert result.tokens_used == sum(billed_tokens)
         assert result.cost == pytest.approx(sum(billed_tokens) / 1000)
         if resized_request_fails:
-            assert [(first, size) for first, size, _ in calls if size == 5] == [(0, 5)]
-            assert result.translations == [{"index": "0", "content": "translated"}]
+            # The failed first child does not cost its siblings: every line after
+            # it is still requested, at whatever size the cap allows by then.
+            requested_after_failure = set()
+            for first, size, _ in calls[calls.index((0, 5, 5)) + 1 :]:
+                requested_after_failure.update(range(first, first + size))
+            assert requested_after_failure == set(range(5, 100))
+            assert {line["index"] for line in result.translations} == {"0"} | {
+                str(i) for i in range(5, 100)
+            }
+            assert "cues 0-4 at size 5" in result.error
         else:
             assert {line["index"] for line in result.translations} == {str(i) for i in range(100)}
     finally:
@@ -283,8 +291,9 @@ async def test_pending_children_observe_a_limit_lowered_by_another_batch():
         release_first.set()
         result = await task
         assert not other.success
-        # 20 splits to two children of 10; each short count then records the floor.
-        assert [size for first, size, _ in calls if first >= 1000] == [20, 10, 10]
+        # 20 splits to two children of 10; the first child's short count and retry
+        # record the floor, so its sibling is re-planned as two children of 5.
+        assert [size for first, size, _ in calls if first >= 1000] == [20, 10, 10, 5, 5, 5, 5]
         main_calls = [call for call in calls if call[0] < 1000]
         assert main_calls[0] == (0, 50, 50)
         assert main_calls[1] == (50, 5, 5)

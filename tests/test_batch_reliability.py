@@ -520,10 +520,10 @@ async def test_terminal_timeout_summary_preserves_unattempted_work_and_stop_reas
             output = persisted.result["content"] if file_job else str(persisted.result["lines"])
             assert "translated" in output
             assert "source 101" in output
-            assert calls == [("1", 100), ("101", 100), ("101", 100), ("101", 50)]
+            assert calls == [("1", 100), ("101", 100), ("101", 100), ("101", 50), ("151", 50)]
         else:
             assert state["status"] == "failed"
-            assert calls == [("1", 100), ("1", 100), ("1", 50)]
+            assert calls == [("1", 100), ("1", 100), ("1", 50), ("51", 50)]
     finally:
         await manager.stop_workers()
         await translator.close()
