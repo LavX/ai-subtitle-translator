@@ -10,6 +10,7 @@ from subtitle_translator.config import Settings
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.core.translator import SubtitleTranslator
+from subtitle_translator.providers.base import TranslationBatch
 from subtitle_translator.providers.openrouter import OpenRouterProvider
 from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
 from subtitle_translator.queue.worker import (
@@ -81,6 +82,7 @@ async def test_adaptive_jobs_retain_unique_output_and_all_billed_usage(
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     translator = SubtitleTranslator(provider, provider.settings)
     manager = JobManager()
     data = {"sourceLanguage": "en", "targetLanguage": "hu"}
@@ -130,6 +132,7 @@ async def test_actual_provider_timeout_splits_and_floor_is_bounded():
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     try:
         result = await BatchProcessor(provider, provider.settings).process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(10)],
@@ -170,6 +173,7 @@ async def test_batch_parent_awaits_active_and_delayed_children(exit_kind):
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     provider.settings.parallel_batches_per_job = 3
 
     def callback(value):
@@ -231,6 +235,7 @@ async def test_floor_timeout_is_not_repeated_and_stops_later_groups(prior_succes
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     try:
         result = await BatchProcessor(provider, provider.settings).process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(15)], "en", "hu", batch_size=5
@@ -265,6 +270,7 @@ async def test_adaptive_timeout_budget_preserves_finished_subbatch_and_cleans_re
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     start = asyncio.get_running_loop().time()
     try:
         result = await asyncio.wait_for(
@@ -311,6 +317,7 @@ async def test_timeout_recovery_activity_reaches_job_api_without_false_progress(
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     translator = SubtitleTranslator(provider, provider.settings)
     manager = JobManager(max_concurrent=1)
     store = JobStore(str(tmp_path / "activity.db"))
@@ -394,6 +401,7 @@ async def test_cancel_awaits_multiple_requests_and_network_retry_backoff():
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     task = asyncio.create_task(
         BatchProcessor(provider, provider.settings).process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(3)], "en", "hu", batch_size=1
@@ -436,6 +444,7 @@ async def test_non_timeout_provider_errors_keep_distinct_attempts_without_splitt
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     try:
         result = await BatchProcessor(provider, provider.settings).process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(10)], "en", "hu"
@@ -470,6 +479,7 @@ async def test_terminal_timeout_summary_preserves_unattempted_work_and_stop_reas
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     translator = SubtitleTranslator(provider, provider.settings)
     manager = JobManager(max_concurrent=1)
     store = JobStore(str(tmp_path / "terminal.db"))
@@ -550,6 +560,7 @@ async def test_synchronous_timeout_error_preserves_stop_summary(
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     translator = SubtitleTranslator(provider, provider.settings)
     data = {"sourceLanguage": "en", "targetLanguage": "hu"}
     if file_translation:
@@ -595,3 +606,35 @@ async def test_synchronous_timeout_error_preserves_stop_summary(
             assert expected in failed.json()["detail"]["message"]
     finally:
         await translator.close()
+
+
+@pytest.mark.asyncio
+async def test_complementary_partial_replies_complete_a_floor_batch():
+    """Cues 1-3 on the first attempt and 4-5 on the retry make a whole batch."""
+    calls = []
+
+    async def send(request):
+        lines = json.loads(json.loads(request.content)["messages"][-1]["content"])
+        calls.append(len(lines))
+        chosen = lines[:3] if len(calls) == 1 else lines[3:]
+        return response([{**x, "content": "translated"} for x in chosen])
+
+    provider = OpenRouterProvider(settings())
+    provider._client = httpx.AsyncClient(
+        transport=httpx.MockTransport(send), base_url="https://fake"
+    )
+    provider._model_params_fetched = True
+    try:
+        result = await BatchProcessor(provider, provider.settings).process_batch(
+            TranslationBatch(
+                [{"index": str(i), "content": "source"} for i in range(1, 6)], "en", "hu"
+            ),
+            0,
+            model="test/complementary",
+        )
+        assert calls == [5, 5]
+        assert result.success
+        assert sorted(t["index"] for t in result.translations) == ["1", "2", "3", "4", "5"]
+        assert result.retries == 1
+    finally:
+        await provider.close()

@@ -349,6 +349,31 @@ class TestGetHungarianRecommendations:
 class TestTranslateBatch:
     """Tests for the main translate_batch method."""
 
+    async def test_fresh_provider_omits_temperature_without_a_config_block(self):
+        """The catalog is consulted even when no reasoning config has loaded it."""
+        provider = OpenRouterProvider(settings=_make_settings())
+        provider._client = AsyncMock()
+        provider._client.is_closed = False
+        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        catalog_client = AsyncMock()
+        catalog_client.get.return_value = _mock_response(
+            200,
+            {
+                "data": [
+                    {
+                        "id": "openai/gpt-5.6-luna",
+                        "supported_parameters": ["reasoning", "response_format"],
+                    }
+                ]
+            },
+        )
+        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as factory:
+            factory.return_value.__aenter__.return_value = catalog_client
+            await provider.translate_batch(_make_batch(), model="openai/gpt-5.6-luna:floor")
+        catalog_client.get.assert_awaited_once_with("/models")
+        payload = provider._client.post.call_args.kwargs["json"]
+        assert "temperature" not in payload
+
     async def test_luna_omits_temperature_unsupported_by_catalog(self):
         provider = OpenRouterProvider(settings=_make_settings())
         provider._client = AsyncMock()
@@ -407,6 +432,7 @@ class TestTranslateBatch:
         mock_client.post.return_value = mock_resp
         mock_client.is_closed = False
         provider._client = mock_client
+        provider._model_params_fetched = True  # keep the catalog lookup offline
 
         result = await provider.translate_batch(batch, config_override=config)
         assert result.model_used == "openai/gpt-5"

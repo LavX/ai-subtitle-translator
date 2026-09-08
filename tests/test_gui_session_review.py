@@ -157,7 +157,8 @@ async def test_store_failure_does_not_emit_success_invalidation(ui_environment, 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "origin", [None, "null", "http://testserver:81", "http://testserver.evil", "https://testserver"]
+    "origin",
+    [None, "null", "http://testserver:81", "http://testserver.evil", "https://testserver:8443"],
 )
 async def test_foreign_or_absent_origin_never_validates_a_key(ui_environment, origin):
     app, manager, _, _, network = ui_environment
@@ -310,6 +311,15 @@ async def test_other_owner_cannot_read_or_cancel_a_job(ui_environment):
             assert response["error"]["status"] == 404
             assert KEY_A not in json.dumps(response)
         assert manager.get_job(job_id).status == JobStatus.QUEUED
+    assert manager.events._subscribers == {}
+
+
+@pytest.mark.asyncio
+async def test_https_origin_behind_a_tls_terminating_proxy_is_accepted(ui_environment):
+    """The proxy hands the service a plain ws scope while the browser says https."""
+    app, manager, *_ = ui_environment
+    async with GuiSession(app, origin="https://testserver", scheme="ws") as session:
+        assert (await session.authenticate())["jobs"] == []
     assert manager.events._subscribers == {}
 
 

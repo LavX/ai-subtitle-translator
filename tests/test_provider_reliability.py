@@ -266,6 +266,13 @@ async def test_http_runtime_defaults_snapshot_running_and_queued_jobs(monkeypatc
         return client
 
     monkeypatch.setattr(httpx, "AsyncClient", make_client)
+
+    async def no_catalog(self):
+        # The catalog lookup opens and closes a client of its own, which is not
+        # one of the translation clients this test watches.
+        self._model_params_fetched = True
+
+    monkeypatch.setattr(OpenRouterProvider, "_ensure_model_params_cache", no_catalog)
     api = client_class(transport=httpx.ASGITransport(app=app), base_url="http://test")
     try:
         assert (await api.get("/health")).status_code == 200

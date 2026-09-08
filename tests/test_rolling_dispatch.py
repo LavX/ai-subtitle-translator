@@ -322,3 +322,30 @@ async def test_nothing_is_admitted_after_cancellation():
         assert sorted(r for r, _ in tracker.started) == [0, 1]
     finally:
         await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_completed_lines_count_every_request_line_sharing_a_position():
+    """A translation for a repeated position covers every line carrying it."""
+
+    async def send(request):
+        _, lines = root_of(request)
+        return response(lines)
+
+    provider = provider_with_transport(send, parallel=1)
+    try:
+        result = await BatchProcessor(provider, provider.settings).process_all_batches(
+            [
+                {"index": "1", "content": "first"},
+                {"index": "1", "content": "first again"},
+                {"index": "2", "content": "second"},
+            ],
+            "en",
+            "hu",
+            model="test/rolling",
+        )
+        assert result.success
+        assert result.progress.total_lines == 3
+        assert result.progress.completed_lines == 3
+    finally:
+        await provider.close()

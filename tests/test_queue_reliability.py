@@ -169,6 +169,7 @@ async def test_lifespan_applies_history_limit_and_awaits_batches_before_close(
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     translator = SubtitleTranslator(provider, runtime_settings)
 
     async def handler(manager, job_id, job_type):

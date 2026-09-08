@@ -913,6 +913,9 @@ class OpenRouterProvider(TranslationProvider):
             "usage": {"include": True},
         }
 
+        # The catalog decides whether the model takes a temperature at all; make
+        # sure it is loaded even when no reasoning config has fetched it yet.
+        await self._ensure_model_params_cache()
         supported = self._model_params_cache.get(bare_model)
         if supported is not None and "temperature" not in supported:
             payload.pop("temperature", None)

@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
@@ -322,7 +322,6 @@ class BatchProcessor:
                 # Every requested position has to come back. A response with the right
                 # count but substituted or repeated indices leaves lines untranslated and
                 # used to pass as a success that also grew the learned size.
-                returned = {str(item["index"]) for item in result.translations}
                 retained.update(
                     {
                         str(t["index"]): t
@@ -330,7 +329,9 @@ class BatchProcessor:
                         if str(t["index"]) in requested
                     }
                 )
-                covered = len(requested & returned)
+                # Coverage is cumulative over the attempts of this batch: a retry that
+                # brings the cues the previous reply left out completes the batch.
+                covered = len(retained)
                 if covered < len(requested):
                     non_timeout_failure = True
                     logger.warning(
@@ -837,6 +838,9 @@ class BatchProcessor:
         # without output stops the job, and the cohort after it is only admitted
         # once one of its results has proved that cannot happen.
         pending = deque(indexed_batches)
+        # A request may repeat a position; a translation is applied to every line
+        # carrying it, so completed lines count lines, not distinct positions.
+        line_counts = Counter(str(line["index"]) for line in lines)
         running: dict[asyncio.Task, tuple[int, list]] = {}
         cohort_sizes = [
             len(indexed_batches[i : i + parallel_count])
@@ -884,7 +888,9 @@ class BatchProcessor:
                         if index in requested and index not in translated_indices:
                             all_translations.append(translation)
                             translated_indices.add(index)
-                    progress.completed_lines = len(translated_indices)
+                    progress.completed_lines = sum(
+                        line_counts[index] for index in translated_indices
+                    )
                     if not result.success:
                         progress.failed_batches += 1
                         logger.error(f"Batch {batch_index + 1} failed: {result.error}")

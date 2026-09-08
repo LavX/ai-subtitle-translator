@@ -324,8 +324,10 @@ async def receive_frame(socket: WebSocket, max_bytes: int) -> dict:
 @gui_router.websocket("/ui/session")
 async def gui_session(socket: WebSocket) -> None:
     host = socket.headers.get("host", "")
-    scheme = "https" if socket.url.scheme == "wss" else "http"
-    if not host or socket.headers.get("origin") != f"{scheme}://{host}":
+    # The page must come from this host. Either scheme is accepted, because a
+    # reverse proxy that terminates TLS hands the service a plain ws scope while
+    # the browser's Origin says https.
+    if not host or socket.headers.get("origin") not in {f"http://{host}", f"https://{host}"}:
         await socket.close(code=1008)
         return
     await socket.accept()
