@@ -410,3 +410,26 @@ async def test_change_during_initial_snapshot_send_is_not_lost(ui_environment):
     finally:
         release.set()
     assert manager.events._subscribers == {}
+
+
+@pytest.mark.asyncio
+async def test_history_window_keeps_the_job_that_finished_last(ui_environment):
+    """A job created before a hundred newer ones but finished last is in the snapshot."""
+    from datetime import UTC, datetime, timedelta
+
+    app, manager, *_ = ui_environment
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    early = await seeded_job(manager)
+    manager.set_job_completed(early, {"content": "early"})
+    manager.get_job(early).created_at = base
+    manager.get_job(early).completed_at = base + timedelta(days=2)
+    for offset in range(101):
+        job_id = await seeded_job(manager)
+        manager.set_job_completed(job_id, {"content": "later"})
+        manager.get_job(job_id).created_at = base + timedelta(minutes=offset + 1)
+        manager.get_job(job_id).completed_at = base + timedelta(minutes=offset + 2)
+    async with GuiSession(app) as session:
+        snapshot = await session.authenticate()
+    assert snapshot.get("historyLimited") is True
+    assert len(snapshot["jobs"]) == 100
+    assert snapshot["jobs"][0]["jobId"] == early

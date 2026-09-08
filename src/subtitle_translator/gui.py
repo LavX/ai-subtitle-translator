@@ -83,6 +83,10 @@ def metadata(job: Job) -> dict:
             reason = "Provider rate limit reached."
         elif re.search(r"402|insufficient credit", error, re.IGNORECASE):
             reason = "OpenRouter reported insufficient credit."
+        elif re.search(r"\b40[13]\b|api key|authenticat|unauthori[sz]ed", error, re.IGNORECASE):
+            reason = (
+                "OpenRouter rejected the API key for this job. Check the key and its permissions."
+            )
         value["error"] = (
             (coverage[0] if coverage else "") + (counters[0] + " " if counters else "") + reason
         )
@@ -159,6 +163,14 @@ class GuiSession:
         history = [
             job for job in jobs if job.status not in (JobStatus.QUEUED, JobStatus.PROCESSING)
         ]
+        # The browser orders by the latest event, so the window must too: a long
+        # job created before a hundred newer ones but finished last must be in it.
+        history.sort(
+            key=lambda job: max(
+                job.created_at, job.started_at or job.created_at, job.completed_at or job.created_at
+            ),
+            reverse=True,
+        )
         snapshot = {"type": "snapshot", "jobs": [metadata(job) for job in active + history[:100]]}
         if len(history) > 100:
             snapshot["historyLimited"] = True

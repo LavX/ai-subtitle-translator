@@ -31,6 +31,40 @@ logger = logging.getLogger(__name__)
 # How long to wait before retrying a model catalog fetch that failed.
 MODEL_CATALOG_RETRY_SECONDS = 60.0
 
+
+def _strip_trailing_commas(text: str) -> str:
+    """Drop a comma that directly precedes a closing bracket, outside strings only.
+
+    A blanket substitution would also rewrite a comma inside a translated line
+    that happens to end in "," before a bracket, and then accept the altered text
+    as a successful translation.
+    """
+    out: list[str] = []
+    in_string = False
+    escaped = False
+    length = len(text)
+    for position, char in enumerate(text):
+        if in_string:
+            out.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == ",":
+            following = position + 1
+            while following < length and text[following] in " \t\r\n":
+                following += 1
+            if following < length and text[following] in "]}":
+                continue
+        out.append(char)
+    return "".join(out)
+
+
 # Debug logger for detailed request/response logging
 debug_logger = logging.getLogger(f"{__name__}.debug")
 
@@ -942,6 +976,10 @@ class OpenRouterProvider(TranslationProvider):
         # sure it is loaded even when no reasoning config has fetched it yet.
         await self._ensure_model_params_cache()
         supported = self._model_params_cache.get(bare_model)
+        if supported is None and _has_variant_suffix(bare_model):
+            # A variant such as ":thinking" may not have its own catalog entry;
+            # the base model's capabilities still apply to it.
+            supported = self._model_params_cache.get(bare_model.rsplit(":", 1)[0])
         if supported is not None and "temperature" not in supported:
             payload.pop("temperature", None)
 
@@ -1360,7 +1398,7 @@ class OpenRouterProvider(TranslationProvider):
             # bracket, or an object cut off by the token limit. A trailing comma is
             # repaired. A reply whose tail is broken keeps the complete objects before
             # the break; the caller sees a short reply and re-requests the rest.
-            repaired = re.sub(r",(\s*[\]}])", r"\1", content)
+            repaired = _strip_trailing_commas(content)
             if repaired != content:
                 try:
                     return self._parse_translations_with_note(repaired)

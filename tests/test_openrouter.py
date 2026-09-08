@@ -374,6 +374,21 @@ class TestTranslateBatch:
         payload = provider._client.post.call_args.kwargs["json"]
         assert "temperature" not in payload
 
+    async def test_variant_model_uses_the_base_models_capabilities(self):
+        """ ":thinking" may have no catalog entry of its own; the base decides."""
+        provider = OpenRouterProvider(settings=_make_settings())
+        provider._client = AsyncMock()
+        provider._client.is_closed = False
+        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        provider._model_params_cache = {"deepseek/deepseek-chat": ["reasoning"]}
+        provider._model_params_fetched = True
+        await provider.translate_batch(_make_batch(), model="deepseek/deepseek-chat:thinking:floor")
+        payload = provider._client.post.call_args.kwargs["json"]
+        # Variants do not stack a routing shortcut; the sort travels in the body.
+        assert payload["model"] == "deepseek/deepseek-chat:thinking"
+        assert payload["provider"]["sort"] == "price"
+        assert "temperature" not in payload
+
     async def test_luna_omits_temperature_unsupported_by_catalog(self):
         provider = OpenRouterProvider(settings=_make_settings())
         provider._client = AsyncMock()

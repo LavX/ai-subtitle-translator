@@ -183,3 +183,18 @@ class TestCancelThenShutdown:
 
         assert manager.get_job(job_id).status == JobStatus.CANCELLED
         assert manager._workers == []
+
+
+class TestSanitizedReasons:
+    @pytest.mark.asyncio
+    async def test_authentication_failure_is_named_without_provider_text(self, manager):
+        job_id = await manager.submit_job(REQUEST, JobType.TRANSLATE_FILE)
+        manager.set_job_failed(
+            job_id, "All 1 batches failed: Invalid OpenRouter API key (raw provider detail)"
+        )
+        value = gui.metadata(manager.get_job(job_id))
+        assert value["error"] == (
+            "All 1 batches failed: OpenRouter rejected the API key for this job. "
+            "Check the key and its permissions."
+        )
+        assert "raw provider detail" not in value["error"]

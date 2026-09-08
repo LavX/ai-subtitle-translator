@@ -304,3 +304,12 @@ class TestLooseJson:
         assert "Failed to parse JSON" in caught.value.message
         assert "near" in caught.value.message
         assert '"hi"' in caught.value.message
+
+    def test_trailing_comma_repair_leaves_string_contents_alone(self, provider):
+        content = (
+            '{"translations":[{"index":"1","content":"Hi,]"},{"index":"2","content":"B, }"},]}'
+        )
+        assert provider._parse_translations(content) == [
+            {"index": "1", "content": "Hi,]"},
+            {"index": "2", "content": "B, }"},
+        ]
