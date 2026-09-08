@@ -46,7 +46,7 @@ def loose_reply(lines):
 
 
 @pytest.mark.asyncio
-async def test_a_bad_line_only_costs_its_own_floor_batch():
+async def test_a_bad_line_costs_only_the_child_batch_holding_it():
     calls = []
 
     async def send(request):
@@ -79,14 +79,14 @@ async def test_a_bad_line_only_costs_its_own_floor_batch():
     finally:
         await translator.close()
 
-    # The 20-line reply keeps cues 1-6 before the break; the batch is split into
-    # children of 10, the child holding cue 7 fails after its retry and teaches
-    # the floor, and its sibling is still sent as two children of 5.
-    assert calls == [("1", 20), ("1", 10), ("1", 10), ("11", 5), ("16", 5)]
+    # The 20-line reply keeps cues 1-6 before the break, so only 7-20 are sent
+    # again as children of 10: the child holding cue 7 fails after its retry and
+    # teaches the floor, and its sibling (17-20) is still sent.
+    assert calls == [("1", 20), ("7", 10), ("7", 10), ("17", 4)]
     assert not result.success
     translated = {str(line.position) for line in result.lines if line.line.startswith("T")}
-    assert translated == {str(i) for i in range(1, 21)} - {"7", "8", "9", "10"}
+    assert translated == {str(i) for i in range(1, 7)} | {str(i) for i in range(17, 21)}
     assert len(result.lines) == 20
-    assert "cues 1-10 at size 10" in result.error
-    assert "expected 10, got 6 (reply was not valid JSON" in result.error
+    assert "cues 7-16 at size 10" in result.error
+    assert "Failed to parse JSON" in result.error
     assert '"hi"' in result.error

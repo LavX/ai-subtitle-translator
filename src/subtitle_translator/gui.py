@@ -26,6 +26,7 @@ _ACTIVITY = re.compile(
     r"retry \d+ after (?:incomplete or invalid response|invalid response)|"
     r"(?:rate limited|provider error); retry \d+ after [\d.]+s backoff|"
     r"(?:rate-limit retry budget|timeout budget) exhausted(?:; stopping this batch)?|"
+    r"rate-limit retries exhausted; stopping this batch|"
     r"request timed out(?:; retrying at the same size)?)(?: \(recovering after timeout\))?"
 )
 

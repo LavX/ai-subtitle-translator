@@ -242,3 +242,46 @@ class TestTimeoutRecoveryPolicy:
 
         planned = get_batch_size_resolver().limit_planned_size("test/model", 50)
         assert planned == 50, f"a timeout taught the resolver a smaller size: {planned}"
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_exhaustion_activity_reaches_the_browser():
+    """The stop after the last rate-limited attempt must pass the GUI allowlist too."""
+    import httpx
+
+    from subtitle_translator.config import Settings
+    from subtitle_translator.gui import _ACTIVITY
+    from subtitle_translator.providers.openrouter import OpenRouterProvider
+
+    async def send(request):
+        return httpx.Response(
+            429, headers={"retry-after": "0.01"}, json={"error": {"message": "slow down"}}
+        )
+
+    provider = OpenRouterProvider(
+        Settings(
+            _env_file=None,
+            openrouter_api_key="synthetic-test-only",
+            max_retries=0,
+            retry_delay=0,
+            parallel_batches_per_job=1,
+        )
+    )
+    provider._client = httpx.AsyncClient(
+        transport=httpx.MockTransport(send), base_url="https://fake"
+    )
+    provider._model_params_fetched = True
+    messages = []
+    try:
+        result = await BatchProcessor(provider, provider.settings).process_batch(
+            TranslationBatch([{"index": "1", "content": "source"}], "en", "hu"),
+            0,
+            model="test/rate-limit-activity",
+            _activity_callback=messages.append,
+        )
+    finally:
+        await provider.close()
+    assert not result.success
+    assert any("rate-limit retries exhausted" in m for m in messages)
+    unmatched = [m for m in messages if not _ACTIVITY.fullmatch(m)]
+    assert not unmatched, f"the GUI would blank these messages: {unmatched}"

@@ -209,7 +209,7 @@ async def test_successful_smaller_requests_allow_later_roots_to_grow():
             model="test/dispatch-growth",
             batch_size=100,
         )
-        assert calls == [100, 50, 50, 50, 50, 100]
+        assert calls == [100, 50, 49, 50, 50, 100]
         assert result.success
         assert len(result.all_translations) == 300
         assert result.progress.completed_batches == result.progress.total_batches == 3
@@ -293,7 +293,9 @@ async def test_pending_children_observe_a_limit_lowered_by_another_batch():
         assert not other.success
         # 20 splits to two children of 10; the first child's short count and retry
         # record the floor, so its sibling is re-planned as two children of 5.
-        assert [size for first, size, _ in calls if first >= 1000] == [20, 10, 10, 5, 5, 5, 5]
+        # The line the short reply did answer is not sent again, so the sibling
+        # holds nine lines and splits into 5 + 4 at the learned floor.
+        assert [size for first, size, _ in calls if first >= 1000] == [20, 10, 10, 5, 5, 4, 4]
         main_calls = [call for call in calls if call[0] < 1000]
         assert main_calls[0] == (0, 50, 50)
         assert main_calls[1] == (50, 5, 5)
@@ -322,7 +324,7 @@ async def test_preemptive_children_recover_once_and_retain_partial_output_and_us
         calls.append((first, len(lines)))
         if first == "50" and len(lines) == 50:
             return response([lines[0]], tokens=7)
-        if first == "75":
+        if first == "76":
             return httpx.Response(
                 200,
                 json={
@@ -342,13 +344,14 @@ async def test_preemptive_children_recover_once_and_retain_partial_output_and_us
             batch_size=100,
             config_override=TranslationConfig(model=model),
         )
-        assert calls == [("0", 50), ("50", 50), ("50", 25), ("75", 25), ("75", 25)]
+        # Line 50 came back with the short reply, so recovery requests 51-99 only.
+        assert calls == [("0", 50), ("50", 50), ("51", 25), ("76", 24), ("76", 24)]
         assert not result.success
-        assert {line["index"] for line in result.all_translations} == {str(i) for i in range(75)}
+        assert {line["index"] for line in result.all_translations} == {str(i) for i in range(76)}
         assert result.total_tokens == 33
         assert result.progress.total_cost == pytest.approx(0.033)
         assert result.progress.completed_batches == result.progress.total_batches == 1
-        assert result.progress.completed_lines == 75
+        assert result.progress.completed_lines == 76
         assert result.progress.failed_batches == 1
         assert result.batch_results[0].retries == 1
         assert not result.batch_results[0].timed_out

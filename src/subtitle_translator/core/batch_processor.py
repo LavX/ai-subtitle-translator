@@ -237,13 +237,6 @@ class BatchProcessor:
                 {str(t["index"]): t for t in outcome.translations if str(t["index"]) in requested}
             )
             outcome.translations = list(merged.values())
-            if not outcome.success and requested <= merged.keys():
-                # A child covering a range the first reply had already answered can
-                # fail while the other children fill in the rest; what matters is
-                # that every requested line now has a translation.
-                outcome.success = True
-                outcome.error = None
-                outcome.timed_out = False
             return outcome
 
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
@@ -348,6 +341,9 @@ class BatchProcessor:
                     spent_tokens += result.total_tokens or 0
                     spent_cost += result.cost or 0.0
                     if can_adaptive:
+                        # The cues the reply did answer are kept; only the rest are
+                        # requested again, so a reply cut off near its end is not
+                        # paid for twice.
                         return _billed(
                             await self._retry_with_smaller_batches(
                                 batch,
@@ -360,6 +356,11 @@ class BatchProcessor:
                                 _activity_callback,
                                 _prior_retries=_prior_retries + retries,
                                 _prior_attempts=_prior_attempts + retries + 1,
+                                _remaining_lines=[
+                                    line
+                                    for line in batch.lines
+                                    if str(line["index"]) not in retained
+                                ],
                             ),
                             add_retries=True,
                         )
@@ -595,8 +596,13 @@ class BatchProcessor:
         _prior_retries: int = 0,
         _prior_attempts: int = 0,
         _record_size_failure: bool = True,
+        _remaining_lines: list[dict[str, str]] | None = None,
     ) -> BatchResult:
-        """Retry a failed batch by splitting it into smaller sub-batches."""
+        """Retry a failed batch by splitting it into smaller sub-batches.
+
+        The size that failed is the whole batch; the lines sent again can be a
+        subset of it when the failed reply answered some of them.
+        """
         from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, get_batch_size_resolver
 
         model_id = (
@@ -621,8 +627,17 @@ class BatchProcessor:
                 f"Batch {batch_index + 1}: recovering with smaller {new_size}-line requests"
             )
 
+        work = batch
+        if _remaining_lines is not None:
+            work = TranslationBatch(
+                lines=_remaining_lines,
+                source_language=batch.source_language,
+                target_language=batch.target_language,
+                context_title=batch.context_title,
+                context_media_type=batch.context_media_type,
+            )
         return await self._process_sub_batches(
-            batch,
+            work,
             batch_index,
             new_size,
             model,

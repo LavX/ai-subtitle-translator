@@ -641,45 +641,6 @@ async def test_complementary_partial_replies_complete_a_floor_batch():
 
 
 @pytest.mark.asyncio
-async def test_coverage_merged_across_the_parent_and_its_children_is_a_success():
-    """The first reply answers 1-6, the child for 1-10 answers only 7-10 and fails
-    its retry, the children for 11-20 succeed: every line has a translation."""
-    calls = []
-
-    async def send(request):
-        lines = json.loads(json.loads(request.content)["messages"][-1]["content"])
-        first, size = lines[0]["index"], len(lines)
-        calls.append((first, size))
-        if size == 20:
-            chosen = lines[:6]
-        elif first == "1":
-            chosen = lines[6:]
-        else:
-            chosen = lines
-        return response([{**x, "content": "translated"} for x in chosen])
-
-    provider = OpenRouterProvider(settings())
-    provider._client = httpx.AsyncClient(
-        transport=httpx.MockTransport(send), base_url="https://fake"
-    )
-    provider._model_params_fetched = True
-    try:
-        result = await BatchProcessor(provider, provider.settings).process_batch(
-            TranslationBatch(
-                [{"index": str(i), "content": "source"} for i in range(1, 21)], "en", "hu"
-            ),
-            0,
-            model="test/merged-coverage",
-        )
-        assert calls == [("1", 20), ("1", 10), ("1", 10), ("11", 5), ("16", 5)]
-        assert result.success
-        assert result.error is None
-        assert sorted(int(t["index"]) for t in result.translations) == list(range(1, 21))
-    finally:
-        await provider.close()
-
-
-@pytest.mark.asyncio
 async def test_no_backoff_after_the_last_rate_limited_attempt():
     """Three 429s with max_retries=0: two backoffs, then a stop with no third wait."""
     messages = []
@@ -714,5 +675,36 @@ async def test_no_backoff_after_the_last_rate_limited_attempt():
         backoffs = [m for m in messages if "backoff" in m]
         assert [m.split("retry ")[1][0] for m in backoffs] == ["1", "2"]
         assert any("rate-limit retries exhausted" in m for m in messages)
+    finally:
+        await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_recovery_requests_only_the_cues_the_reply_left_out():
+    """A reply cut off after cue 6 of 20 leads to requests for 7-20 only."""
+    calls = []
+
+    async def send(request):
+        lines = json.loads(json.loads(request.content)["messages"][-1]["content"])
+        calls.append((lines[0]["index"], len(lines)))
+        chosen = lines[:6] if len(lines) == 20 else lines
+        return response([{**x, "content": "translated"} for x in chosen])
+
+    provider = OpenRouterProvider(settings())
+    provider._client = httpx.AsyncClient(
+        transport=httpx.MockTransport(send), base_url="https://fake"
+    )
+    provider._model_params_fetched = True
+    try:
+        result = await BatchProcessor(provider, provider.settings).process_batch(
+            TranslationBatch(
+                [{"index": str(i), "content": "source"} for i in range(1, 21)], "en", "hu"
+            ),
+            0,
+            model="test/remaining-only",
+        )
+        assert calls == [("1", 20), ("7", 10), ("17", 4)]
+        assert result.success
+        assert sorted(int(t["index"]) for t in result.translations) == list(range(1, 21))
     finally:
         await provider.close()
