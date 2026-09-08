@@ -124,11 +124,17 @@ function noBatchFeedback(row) {
  const reportedActivity = /\b(request|retry|backoff|recover|timeout|rate.limit)/i.test(row.message || '');
  return `${prolonged ? 'No batch has completed for at least 2 minutes. Provider output is still unconfirmed.' : 'No completed batch yet.'}${reportedActivity ? '' : ' The server has not reported request activity.'}`;
 }
+function ordered() {
+ // Files awaiting submission first, then running jobs, then finished ones; newest first within each.
+ const rank = row => row.state === 'ready' ? 0 : ['submitting', 'queued', 'processing', 'finishing'].includes(row.state) ? 1 : 2;
+ const when = row => Date.parse((row.createdAt || row.startedAt || '').replace(/([+-]\d\d:\d\d)Z$/, '$1')) || 0;
+ return [...rows].sort((a, b) => rank(a) - rank(b) || when(b) - when(a) || b.key - a.key);
+}
 function render() {
  const focusedAction = document.activeElement?.dataset?.action;
  $('files').replaceChildren();
  let cost = 0;
- for (const row of rows) {
+ for (const row of ordered()) {
   const li = document.createElement('li'); li.className = `file ${row.state}${previewRow() === row ? ' selected' : ''}`;
   if (previewRow() === row) li.setAttribute('aria-current', 'true');
   const text = document.createElement('div');
@@ -166,8 +172,12 @@ function render() {
   }
   action('Preview', () => { selectedRow = row; $('cue-search').value = ''; render(); void hydrate(row); $('caption-preview').scrollIntoView({block: 'nearest', behavior: 'smooth'}); });
   if (downloadable(row)) action(row.state === 'partial' ? 'Download partial SRT' : 'Download SRT', () => downloadOne(row));
-  if (row.state === 'queued') action('Cancel queued job', () => cancel(row), !session?.live || row.cancelling);
-  if (!['submitting', 'processing', 'queued', 'finishing'].includes(row.state)) action(row.state === 'ready' ? 'Remove' : 'Forget', () => {
+  if (row.state === 'queued' || row.state === 'processing') action(row.state === 'queued' ? 'Cancel queued job' : 'Cancel', () => cancel(row), !session?.live || row.cancelling);
+  if (!['submitting', 'processing', 'queued', 'finishing'].includes(row.state)) action(row.state === 'ready' ? 'Remove' : 'Forget', async () => {
+   if (row.jobId && connected && session?.live) {
+    try { await session.request('forget', {jobId: row.jobId}); }
+    catch (error) { if (error?.status !== 404) { notify('The job could not be removed from the service and stays in your history.', true); return; } }
+   }
    if (row.jobId) forgotten.add(row.jobId);
    rows.splice(rows.indexOf(row), 1); if (selectedRow === row) selectedRow = null; render();
   });
@@ -215,7 +225,10 @@ async function addFiles(files) {
  notify(errors.length ? errors.join(' ') : 'Files added. Check the settings, then translate.', errors.length > 0);
 }
 $('upload-panel').addEventListener('click', (event) => {
- if (!reading && event.target !== $('file-input') && !event.target.closest('[data-preview-interactive]')) $('file-input').click();
+ // Use the dispatch-time path: a click inside an interactive region may re-render that region
+ // before bubbling reaches the panel, leaving the target detached and closest() blind.
+ const insideInteractive = event.composedPath().some(node => node instanceof Element && node.hasAttribute('data-preview-interactive'));
+ if (!reading && event.target !== $('file-input') && !insideInteractive) $('file-input').click();
 });
 $('file-input').addEventListener('change', () => { const files = [...$('file-input').files]; $('file-input').value = ''; void addFiles(files); });
 let dragDepth = 0;
@@ -310,7 +323,7 @@ function failureReason(row) {
 function applyJob(row, result) {
  row.revision = (row.revision || 0) + 1;
  row.state = result.status; row.progress = result.progress;
- row.startedAt = result.startedAt; row.totalBatches = result.totalBatches; row.completedBatches = result.completedBatches;
+ row.startedAt = result.startedAt; row.createdAt = result.createdAt; row.totalBatches = result.totalBatches; row.completedBatches = result.completedBatches;
  row.totalLines = result.totalLines; row.completedLines = result.completedLines; row.error = result.error;
  row.message = typeof result.message === 'string' ? result.message : '';
  row.cost = result.totalCost;
@@ -380,7 +393,7 @@ async function hydrate(row, source = true, statusOnly = false) {
  return row.hydrating;
 }
 async function cancel(row) {
- if (!connected || row.state !== 'queued' || row.cancelling) return;
+ if (!connected || !['queued', 'processing'].includes(row.state) || row.cancelling) return;
  const version = epoch;
  const generation = session.generation;
  const current = () => session.live && epoch === version && generation === session.generation && rows.includes(row);
@@ -390,7 +403,10 @@ async function cancel(row) {
   if (!current()) return;
   if (result.status === 'cancelled') {
    if (!terminal.has(row.state)) row.state = 'cancelled';
-   row.note = ''; notify('Queued job cancelled.');
+   row.note = ''; notify('Job cancelled.');
+  } else if (result.status === 'cancelling') {
+   row.note = 'Cancelling. The job stops after its current request.';
+   notify('Cancellation requested. The job stops after its current request.');
   } else if (result.status === 'processing') {
    if (!terminal.has(row.state)) row.state = 'processing';
    row.note = 'Already processing. This job was not cancelled.';
@@ -502,7 +518,7 @@ $('routing').addEventListener('change', () => {
 
 function updateTierHint() {
  $('service-tier-hint').textContent = $('service-tier').value === 'default'
-  ? 'Uses standard pricing with automatic providers. A specific provider endpoint can change the tier and price.'
+  ? 'Standard keeps the provider on its normal processing queue even with lowest-price routing. Follow routing lets a :floor route use a provider\u2019s cheaper Flex queue, which can wait minutes per request.'
   : $('routing').value === 'floor'
    ? 'Allows discounted Flex capacity. Requests can be much slower or time out.'
    : $('routing').value === 'nitro'

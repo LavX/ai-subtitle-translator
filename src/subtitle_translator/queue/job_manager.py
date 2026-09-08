@@ -118,6 +118,9 @@ class JobManager:
         self._admission = asyncio.Condition()
         self._running_jobs = 0
         self._scheduled_jobs: set[str] = set()
+        # Handler task per running job, so a user can interrupt work already started.
+        self._active_tasks: dict[str, asyncio.Task] = {}
+        self._cancel_requested: set[str] = set()
         self._cleanup_task: asyncio.Task | None = None
         self._worker_handler: Any | None = None
         self._store: JobStore | None = None
@@ -471,7 +474,38 @@ class JobManager:
             self._publish(job)
             return True
 
+        # A running job is interrupted through its handler task. The worker records
+        # the cancelled status once the handler has actually stopped, so partial
+        # progress it wrote stays consistent with what was really done.
+        task = self._active_tasks.get(job_id)
+        if job.status == JobStatus.PROCESSING and task is not None and not task.done():
+            self._cancel_requested.add(job_id)
+            task.cancel()
+            logger.info(f"Job {job_id}: cancellation requested while processing")
+            return True
+
         return False
+
+    def is_cancelling(self, job_id: str) -> bool:
+        """Whether a running job has been asked to stop and has not recorded it yet."""
+        return job_id in self._cancel_requested
+
+    def _record_cancelled(self, job_id: str) -> None:
+        job = self.jobs.get(job_id)
+        if job is None:
+            return
+        job.status = JobStatus.CANCELLED
+        job.completed_at = datetime.now(UTC)
+        done = (
+            f" after {job.completed_batches}/{job.total_batches} batches"
+            if job.total_batches
+            else ""
+        )
+        job.message = f"Job cancelled by user{done}"
+        logger.info(f"Job {job_id} cancelled while processing{done}")
+        if self._store:
+            self._store.save_job(job)
+        self._publish(job)
 
     def delete_job(self, job_id: str) -> bool:
         """
@@ -618,11 +652,22 @@ class JobManager:
                         self.set_job_processing(job_id)
                         self._running_jobs += 1
                         admitted = True
+                    handler = asyncio.create_task(self._worker_handler(self, job_id, job_type))
+                    self._active_tasks[job_id] = handler
                     try:
-                        await self._worker_handler(self, job_id, job_type)
+                        await handler
+                    except asyncio.CancelledError:
+                        if job_id not in self._cancel_requested:
+                            # The worker itself is being stopped; take the handler down too.
+                            handler.cancel()
+                            raise
+                        self._record_cancelled(job_id)
                     except Exception as e:
                         logger.exception(f"Worker {worker_id}: Job {job_id} failed: {e}")
                         self.set_job_failed(job_id, str(e))
+                    finally:
+                        self._active_tasks.pop(job_id, None)
+                        self._cancel_requested.discard(job_id)
                 finally:
                     if admitted:
                         async with self._admission:

@@ -293,7 +293,23 @@ async def cancel_job(job_id: str, identity: Identity) -> JobDeleteResponse:
         job_manager.cancel_job(job_id)
         message = "Job cancelled successfully"
     elif job.status == JobStatus.PROCESSING:
+        if job_manager.cancel_job(job_id):
+            # The worker records the final status once the handler has stopped.
+            status = "cancelled" if job.status == JobStatus.CANCELLED else "cancelling"
+            return JobDeleteResponse(jobId=job_id, status=status, message="Cancellation requested")
         message = "Cannot cancel job that is currently processing"
     else:
         message = "Job is no longer queued; kept unchanged"
     return JobDeleteResponse(jobId=job_id, status=job.status.value, message=message)
+
+
+async def forget_job(job_id: str, identity: Identity) -> dict:
+    """Delete a finished job and its stored result. Active jobs are refused."""
+    job = _owned_job(job_id, identity)
+    if job.status in (JobStatus.QUEUED, JobStatus.PROCESSING):
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "active", "message": "Cancel the job before forgetting it"},
+        )
+    job_manager.delete_job(job_id)
+    return {"jobId": job_id, "deleted": True}

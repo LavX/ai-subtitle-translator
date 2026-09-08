@@ -45,6 +45,7 @@ def metadata(job: Job) -> dict:
         "tokensUsed": job.tokens_used,
         "totalCost": job.total_cost or None,
         "startedAt": job.started_at.isoformat() if job.started_at else None,
+        "createdAt": job.created_at.isoformat() if job.created_at else None,
     }
     for public, private in (
         ("fileName", "file_name"),
@@ -55,7 +56,9 @@ def metadata(job: Job) -> dict:
         value[public] = str(getattr(job, private) or "")[:512]
     message = job.message or ""
     progress_message = re.fullmatch(
-        r"Translated \d+/\d+ lines \(\d+/\d+ batches(?:, \d+ failed)?\)", message
+        r"Translated \d+/\d+ lines \(\d+/\d+ batches(?:, \d+ failed)?\)"
+        r"|Job cancelled by user(?: after \d+/\d+ batches)?",
+        message,
     )
     value["message"] = (
         message
@@ -186,7 +189,7 @@ class GuiSession:
                     request, self.identity, submission.submissionId
                 )
                 value = value.model_dump(mode="json", by_alias=True)
-            elif command.type in ("job", "status", "source", "cancel"):
+            elif command.type in ("job", "status", "source", "cancel", "forget"):
                 job_id = OwnedJob.model_validate(payload).jobId
                 job = ui_api._owned_job(job_id, self.identity)
                 if command.type == "job":
@@ -198,6 +201,8 @@ class GuiSession:
                     value = metadata(job)
                 elif command.type == "source":
                     value = {"content": job.request_data.get("content", "")}
+                elif command.type == "forget":
+                    value = await ui_api.forget_job(job_id, self.identity)
                 else:
                     value = (await ui_api.cancel_job(job_id, self.identity)).model_dump(
                         mode="json", by_alias=True

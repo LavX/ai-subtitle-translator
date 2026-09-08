@@ -60,7 +60,7 @@ def run(base, artifacts, case):
 
         elif case == "tier":
             expect(page.locator("#service-tier")).to_have_value("default")
-            expect(page.locator("#service-tier-hint")).to_contain_text("standard pricing")
+            expect(page.locator("#service-tier-hint")).to_contain_text("normal processing queue")
             page.locator(".request-options summary").click()
             expect(page.locator("#provider-only")).to_have_value("")
             page.locator("#provider-only").fill(" Azure ")
@@ -159,6 +159,64 @@ def run(base, artifacts, case):
                 "success",
             ]
             assert [entry["lineCount"] for entry in trace] == [10, 10, 10, 5, 5]
+
+        elif case == "controls":
+            chooser = []
+            step = ["start"]
+            page.on("filechooser", lambda dialog: chooser.append(step[0]))
+            # Finished jobs list newest first.
+            step[0] = "upload-older"
+            upload(page, "Older.srt", "Older cue")
+            page.locator("#translate").click()
+            expect(page.get_by_role("button", name="Download SRT", exact=True)).to_have_count(1)
+            step[0] = "upload-newer"
+            upload(page, "Newer.srt", "Newer cue")
+            page.locator("#translate").click()
+            expect(page.get_by_role("button", name="Download SRT", exact=True)).to_have_count(2)
+            expect(page.locator("#files h3").first).to_have_text("Newer.srt")
+            # A running job sits above finished ones and can be cancelled mid-request.
+            step[0] = "upload-running"
+            upload(page, "Running.srt", *(f"RECOVER slow cue {i}" for i in range(5)))
+            page.locator("#translate").click()
+            expect(page.locator("#files .job-message").first).to_contain_text("request in progress")
+            expect(page.locator("#files h3").first).to_have_text("Running.srt")
+            step[0] = "cancel"
+            page.get_by_role("button", name="Cancel", exact=True).click()
+            expect(page.locator("#files .state").filter(has_text="Cancelled")).to_have_count(
+                1, timeout=10000
+            )
+            jobs = page.request.get(base + "/ui/api/jobs", headers=HEADERS).json()["jobs"]
+            running = [
+                job
+                for job in jobs
+                if "Running" in (job.get("fileName") or job.get("jobName") or "")
+            ]
+            assert [job["status"] for job in running] == ["cancelled"], jobs
+            # Forget removes the job from the service, not only from the page.
+            page.locator("#files li").filter(has_text="Running.srt").get_by_role(
+                "button", name="Forget", exact=True
+            ).click()
+            expect(page.locator("#files li").filter(has_text="Running.srt")).to_have_count(0)
+            jobs = page.request.get(base + "/ui/api/jobs", headers=HEADERS).json()["jobs"]
+            assert len(jobs) == 2 and all(
+                "Running" not in (job.get("fileName") or job.get("jobName") or "") for job in jobs
+            ), jobs
+            step[0] = "reconnect-restore"
+            connect(page, base)
+            page.locator("#restore-jobs").click()
+            expect(page.locator("#files li")).to_have_count(2)
+            # Choosing a cue in the browser moves the preview and never opens the file picker.
+            page.locator("#files li").filter(has_text="Newer.srt").get_by_role(
+                "button", name="Preview"
+            ).click()
+            step[0] = "open-cue-browser"
+            page.locator("#cue-browser summary").click()
+            step[0] = "click-cue"
+            page.locator("#cue-results button").first.click()
+            expect(page.locator("#cue-position")).to_contain_text("Cue 1 of 1")
+            assert not chooser, f"the file picker opened during: {chooser}"
+            with page.expect_file_chooser():
+                page.locator("#dropzone").click()
 
         elif case == "counts":
             upload(page, "Complete.srt", "Complete cue")
@@ -304,6 +362,7 @@ def main():
             "fallback",
             "tier",
             "rate_limit",
+            "controls",
         ],
         required=True,
     )
