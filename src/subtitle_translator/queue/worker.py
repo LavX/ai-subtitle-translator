@@ -145,10 +145,15 @@ async def process_content_translation_job(
                     request.targetLanguage,
                     translator.settings,
                 )
-                requested_indices = {str(line.position) for line in request.lines}
-                total_lines = len(requested_indices)
+                # Count request lines, not distinct positions: a request may repeat a
+                # position and the translation is applied to every line carrying it,
+                # while a returned index nobody asked for is not a line. The set of
+                # returned indices keeps a duplicated reply from counting twice.
+                total_lines = len(request.lines)
                 returned_indices = {str(t["index"]) for t in result.all_translations}
-                translated_count = len(requested_indices & returned_indices)
+                translated_count = sum(
+                    1 for line in request.lines if str(line.position) in returned_indices
+                )
                 job_manager.set_job_partial(
                     job_id,
                     {
