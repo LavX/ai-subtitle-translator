@@ -116,7 +116,8 @@ def pump(page, predicate, timeout=5):
 def connect(page, base, key=TOKEN):
     page.goto(base + "/ui/")
     # Record the application's socket, not Playwright's native forwarding socket.
-    page.evaluate("""async () => {
+    page.evaluate(
+        """async () => {
         const {GuiSession} = await import(new URL('./session.mjs', location.href).href);
         const open = GuiSession.prototype.open;
         GuiSession.prototype.open = function (...args) {
@@ -124,7 +125,8 @@ def connect(page, base, key=TOKEN):
             window.reviewSockets.push(this.socket);
             return result;
         };
-    }""")
+    }"""
+    )
     page.locator("#api-key").fill(key)
     page.locator("#connect").click()
     expect(page.locator("#connection-state")).to_have_text("Key accepted")
@@ -190,10 +192,12 @@ def run_case(base, artifacts, case):
                 pump(page, lambda: proxy.held is not None)
                 old_reply = json.loads(proxy.held[1])
                 old_snapshot = proxy.last_snapshot
-                page.evaluate("""() => {
+                page.evaluate(
+                    """() => {
                     window.reviewLateMessage = window.reviewSockets[0].onmessage;
                     window.reviewLateClose = window.reviewSockets[0].onclose;
-                }""")
+                }"""
+                )
                 page.locator("#disconnect").click()
                 page.locator("#api-key").fill(SECOND_KEY)
                 page.locator("#connect").click()
@@ -231,15 +235,11 @@ def run_case(base, artifacts, case):
                 proxy.connections[-1].send(json.dumps(proxy.last_snapshot))
                 page.wait_for_timeout(50)
                 expect(page.locator("#files > li")).to_have_count(0)
+                # Forget deletes the job on the service, so a restore cannot bring it back.
                 page.locator("#restore-jobs").click()
-                expect(page.locator("#files > li")).to_have_count(1)
-                expect(page.locator("#preview-source")).to_have_text("Preserved original")
-                expect(page.locator("#preview-translated")).to_have_text("HU: Preserved original")
-                with page.expect_download() as download:
-                    row(page, "Preserved.srt").get_by_role(
-                        "button", name="Download SRT", exact=True
-                    ).click()
-                assert "HU: Preserved original" in Path(download.value.path()).read_text()
+                page.wait_for_timeout(300)
+                expect(page.locator("#files > li")).to_have_count(0)
+                expect(page.locator("body")).not_to_contain_text("Preserved.srt")
                 assert len(proxy.submits) == 1
 
             elif case == "cancel_race":

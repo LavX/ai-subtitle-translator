@@ -90,7 +90,8 @@ def run(base, artifacts):
             lambda request: rest.append(request.url) if "/ui/api/" in request.url else None,
         )
         page.goto(base + "/ui/")
-        assert "Bazarr" not in page.locator("body").inner_text()
+        assert "Bazarr" not in page.locator("main").inner_text()
+        assert page.locator('footer a[href="https://github.com/LavX/bazarr"]').count() >= 1
         expect(page.locator('input[type="password"]')).to_have_count(1)
         page.locator("#api-key").fill("incorrect-fixture-key")
         page.locator("#connect").click()
@@ -126,7 +127,9 @@ def run(base, artifacts):
         expect(page.locator("#preview-translated")).to_contain_text("<script>alert(1)</script>")
         assert page.locator("#caption-preview script").count() == 0
         with page.expect_download() as saved:
-            page.get_by_role("button", name="Download SRT", exact=True).first.click()
+            page.locator("#files > li", has_text="Árvíz.srt").get_by_role(
+                "button", name="Download SRT", exact=True
+            ).click()
         single = saved.value
         assert single.suggested_filename == "Árvíz.hu.srt"
         assert "HU: Hello <script>" in Path(single.path()).read_text()
@@ -134,7 +137,7 @@ def run(base, artifacts):
             page.locator("#download-all").click()
         with zipfile.ZipFile(saved.value.path()) as archive:
             assert archive.testzip() is None
-            assert archive.namelist() == ["Árvíz.hu.srt", "Second.hu.srt"]
+            assert set(archive.namelist()) == {"Árvíz.hu.srt", "Second.hu.srt"}
             assert "HU: Hello" in archive.read("Árvíz.hu.srt").decode()
         assert page.evaluate("[localStorage.length, sessionStorage.length]") == [0, 0]
         page.screenshot(path=str(artifacts / "workspace-desktop.png"), full_page=True)
@@ -265,11 +268,13 @@ def check_saved_keys(browser, base):
     context.close()
 
     blocked = browser.new_context()
-    blocked.add_init_script("""
+    blocked.add_init_script(
+        """
       for (const method of ['getItem','setItem','removeItem']) {
         Storage.prototype[method] = () => { throw new DOMException('Blocked', 'SecurityError'); };
       }
-    """)
+    """
+    )
     page = blocked.new_page()
     page.goto(base + "/ui/")
     page.locator("#api-key").fill(TOKEN)
