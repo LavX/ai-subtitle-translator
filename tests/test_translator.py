@@ -204,6 +204,7 @@ class TestBatchProcessor:
         settings.max_retries = 3
         settings.retry_delay = 0.1
         settings.openrouter_default_model = "test-model"
+        settings.parallel_batches_per_job = 1
         return settings
 
     def test_create_batches(self, mock_provider, mock_settings):
@@ -324,6 +325,7 @@ class TestSubtitleTranslator:
         settings.max_retries = 3
         settings.retry_delay = 0.1
         settings.openrouter_default_model = "test-model"
+        settings.parallel_batches_per_job = 1
         settings.is_rtl_language = MagicMock(return_value=False)
         return settings
 

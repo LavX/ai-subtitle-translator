@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections import defaultdict, deque
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
@@ -768,12 +769,6 @@ class BatchProcessor:
         # Create indexed batches for tracking
         indexed_batches = list(enumerate(batches))
 
-        logger.info(
-            f"Processing {len(batches)} batches with {parallel_count} parallel batches per group - "
-            f"source={source_language}, target={target_language}, "
-            f"model={model_to_use}, temperature={temperature or 'default'}"
-        )
-
         # Shared lock so rate-limited retries don't all fire simultaneously
         rate_limit_lock = asyncio.Lock()
 
@@ -788,56 +783,79 @@ class BatchProcessor:
 
         active_messages: dict[int, str] = {}
 
-        # Process batches in parallel groups, updating progress per batch
-        for group_start in range(0, len(indexed_batches), parallel_count):
-            batch_group = indexed_batches[group_start : group_start + parallel_count]
-
-            group_indices = [idx for idx, _ in batch_group]
-            logger.info(
-                f"Processing parallel batch group: batches {group_indices} "
-                f"({len(batch_group)} batches in parallel)"
+        async def _run_batch(bi: int, bl: list, stagger: float) -> tuple[int, list, BatchResult]:
+            # The root budget starts when the request actually starts, after pacing.
+            if stagger > 0:
+                await asyncio.sleep(stagger)
+            b = TranslationBatch(
+                lines=bl,
+                source_language=source_language,
+                target_language=target_language,
+                context_title=context_title,
+                context_media_type=context_media_type,
             )
 
-            # Create tasks with staggered start to avoid hitting rate limits
-            async def _run_batch(
-                bi: int, bl: list, stagger: float
-            ) -> tuple[int, list, BatchResult]:
-                if stagger > 0:
-                    await asyncio.sleep(stagger)
-                b = TranslationBatch(
-                    lines=bl,
-                    source_language=source_language,
-                    target_language=target_language,
-                    context_title=context_title,
-                    context_media_type=context_media_type,
-                )
+            def batch_activity(message: str) -> None:
+                active_messages[bi] = message
+                activity(message)
 
-                def batch_activity(message: str) -> None:
-                    active_messages[bi] = message
-                    activity(message)
+            r = await self.process_batch(
+                b,
+                batch_index=bi,
+                model=model,
+                temperature=temperature,
+                config_override=config_override,
+                _rate_limit_lock=rate_limit_lock,
+                _activity_callback=batch_activity,
+            )
+            return bi, bl, r
 
-                r = await self.process_batch(
-                    b,
-                    batch_index=bi,
-                    model=model,
-                    temperature=temperature,
-                    config_override=config_override,
-                    _rate_limit_lock=rate_limit_lock,
-                    _activity_callback=batch_activity,
-                )
-                return bi, bl, r
+        # Roots are admitted on a rolling basis: at most parallel_count in flight,
+        # refilled in index order as soon as a slot frees, so one stalled request
+        # does not idle the other slots. The fixed cohorts of parallel_count roots
+        # remain the unit of the early stop: a cohort whose every result timed out
+        # without output stops the job, and the cohort after it is only admitted
+        # once one of its results has proved that cannot happen.
+        pending = deque(indexed_batches)
+        running: dict[asyncio.Task, tuple[int, list]] = {}
+        cohort_sizes = [
+            len(indexed_batches[i : i + parallel_count])
+            for i in range(0, len(indexed_batches), parallel_count)
+        ]
+        cohort_done: dict[int, int] = defaultdict(int)
+        cohort_disproved: set[int] = set()
+        stopped = False
 
-            tasks = [
-                asyncio.ensure_future(_run_batch(bi, bl, i * 0.5))
-                for i, (bi, bl) in enumerate(batch_group)
-            ]
+        logger.info(
+            f"Processing {len(batches)} batches, up to {parallel_count} in flight - "
+            f"source={source_language}, target={target_language}, "
+            f"model={model_to_use}, temperature={temperature or 'default'}"
+        )
 
-            group_results: list[BatchResult] = []
-            try:
-                for coro in asyncio.as_completed(tasks):
-                    batch_index, batch_lines, result = await coro
+        try:
+            while True:
+                admitted = 0
+                while pending and len(running) < parallel_count and not stopped:
+                    batch_index, batch_lines = pending[0]
+                    cohort = batch_index // parallel_count
+                    if cohort and (cohort - 1) not in cohort_disproved:
+                        break
+                    pending.popleft()
+                    # Roots admitted together are staggered by half a second so they do
+                    # not hit the provider as a burst; a single refill of a freed slot
+                    # replaces a request that just finished and starts at once.
+                    stagger = admitted * 0.5
+                    admitted += 1
+                    logger.info(f"Batch {batch_index + 1} admitted ({len(running) + 1} in flight)")
+                    task = asyncio.ensure_future(_run_batch(batch_index, batch_lines, stagger))
+                    running[task] = (batch_index, batch_lines)
+                if not running:
+                    break
+                done, _ = await asyncio.wait(running, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    running.pop(task)
+                    batch_index, batch_lines, result = task.result()
                     batch_results.append(result)
-                    group_results.append(result)
                     progress.total_tokens += result.tokens_used
                     progress.total_cost += result.cost
                     requested = {str(line["index"]) for line in batch_lines}
@@ -855,19 +873,26 @@ class BatchProcessor:
                     progress.message = next(reversed(active_messages.values()), "")
                     if progress_callback:
                         progress_callback(progress)
-            finally:
-                # Parent cancellation and callback errors must finish child cleanup
-                # before workers release the provider or persistent progress store.
-                for task in tasks:
-                    if not task.done():
-                        task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
 
-            if group_results and all(r.timed_out and not r.translations for r in group_results):
-                activity(
-                    "Provider requests timed out without usable output; remaining batches stopped"
-                )
-                break
+                    cohort = batch_index // parallel_count
+                    cohort_done[cohort] += 1
+                    if not (result.timed_out and not result.translations):
+                        cohort_disproved.add(cohort)
+                    elif (
+                        cohort_done[cohort] == cohort_sizes[cohort]
+                        and cohort not in cohort_disproved
+                    ):
+                        stopped = True
+        finally:
+            # Parent cancellation and callback errors must finish child cleanup
+            # before workers release the provider or persistent progress store.
+            for task in running:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*running, return_exceptions=True)
+
+        if stopped and pending:
+            activity("Provider requests timed out without usable output; remaining batches stopped")
 
         # Sort batch_results by batch_index to maintain order
         batch_results.sort(key=lambda r: r.batch_index)
