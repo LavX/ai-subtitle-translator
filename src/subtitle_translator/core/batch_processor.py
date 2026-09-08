@@ -957,9 +957,11 @@ class BatchProcessor:
 
         # A position that a request repeats can land in two roots. When one root
         # answers it and the other leaves it out, the other fails on its own
-        # count although every line it asked for has a translation by now.
+        # count although every line it asked for has a translation by now. Never
+        # after an early stop: roots that were never sent still hold lines nobody
+        # translated, and a result read as a success would hide them.
         lines_of = dict(indexed_batches)
-        for result in batch_results:
+        for result in [] if pending else batch_results:
             if result.success:
                 continue
             asked = {str(line["index"]) for line in lines_of[result.batch_index]}

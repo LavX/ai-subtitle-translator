@@ -379,3 +379,41 @@ async def test_a_repeated_position_answered_by_one_root_completes_the_other():
         assert len(result.all_translations) == 1
     finally:
         await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_coverage_recheck_never_hides_roots_stopped_before_they_were_sent():
+    """Indices [1, 1, 2] in one-line batches: root 2 times out on a covered index
+    and stops the job; root 3 was never sent, so the job must not read as done."""
+    calls = []
+
+    async def send(request):
+        _, lines = root_of(request)
+        calls.append(lines[0]["index"])
+        if len(calls) == 1:
+            return response(lines)
+        raise httpx.ReadTimeout("stalled", request=request)
+
+    provider = provider_with_transport(send, parallel=1)
+    try:
+        result = await BatchProcessor(provider, provider.settings).process_all_batches(
+            [
+                {"index": "1", "content": "first"},
+                {"index": "1", "content": "first again"},
+                {"index": "2", "content": "second"},
+            ],
+            "en",
+            "hu",
+            batch_size=1,
+            model="test/rolling",
+        )
+        assert calls == ["1", "1"]
+        assert not result.success
+        assert result.progress.completed_batches == 2
+        assert result.progress.total_batches == 3
+        assert result.progress.failed_batches == 1
+        assert summarize_batch_failure(result, 3).startswith(
+            "2 of 3 batches attempted; 1 failed; 1 not attempted."
+        )
+    finally:
+        await provider.close()
