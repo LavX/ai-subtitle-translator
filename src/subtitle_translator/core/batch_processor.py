@@ -955,6 +955,20 @@ class BatchProcessor:
         if stopped and pending:
             activity("Provider requests timed out without usable output; remaining batches stopped")
 
+        # A position that a request repeats can land in two roots. When one root
+        # answers it and the other leaves it out, the other fails on its own
+        # count although every line it asked for has a translation by now.
+        lines_of = dict(indexed_batches)
+        for result in batch_results:
+            if result.success:
+                continue
+            asked = {str(line["index"]) for line in lines_of[result.batch_index]}
+            if asked <= translated_indices:
+                result.success = True
+                result.error = None
+                result.timed_out = False
+                progress.failed_batches -= 1
+
         # Sort batch_results by batch_index to maintain order
         batch_results.sort(key=lambda r: r.batch_index)
 

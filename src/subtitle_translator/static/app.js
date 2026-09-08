@@ -31,6 +31,11 @@ function rememberValidatedKey(value) {
 }
 function disconnect(message = 'Disconnected. Server jobs keep running. Reconnect with the same key to resume tracking.') {
  connected = false; submitting = false; restoring = false; token = ''; epoch++;
+ // A submission cut off by the disconnect may or may not have reached the server; the
+ // snapshot after reconnecting matches the row by its submission id either way.
+ for (const row of rows) {
+  if (row.state === 'submitting') { row.state = 'unknown'; row.note = 'Submission status unknown. A server job may exist. Reconnecting will check it automatically. No automatic retry.'; }
+ }
  $('api-key').value = '';
  session?.stop();
  $('connection-panel').classList.remove('connected');
@@ -275,7 +280,7 @@ $('translate').addEventListener('click', async () => {
    row.submissionId ||= crypto.randomUUID?.() || `file-${Date.now()}-${++rowSequence}`;
    row.state = 'submitting'; row.target = targetLanguage; render();
    try {
-    const result = await session.request('submit', {submissionId: row.submissionId, request: {...settings, title: settings.title || row.name.replace(/\.srt$/i, ''), content: row.content, fileName: row.name, jobName: `${row.name} (${targetLanguage})`}});
+    const result = await session.request('submit', {submissionId: row.submissionId, request: {...settings, title: settings.title || row.name.replace(/\.srt$/i, ''), content: row.content, fileName: row.name, jobName: `${row.name} (${targetLanguage})`.slice(0, 200)}});
     if (version !== epoch || !rows.includes(row)) return;
     if (!result.jobId) throw new Error('Missing job ID');
     submittedCount++;
@@ -363,7 +368,13 @@ async function reconcileMissing(snapshot) {
 }
 async function hydrate(row, source = true, statusOnly = false) {
  if (!session?.live || !row.jobId || !rows.includes(row)) return;
- if (row.hydrating) { await row.hydrating; if (statusOnly) return hydrate(row, false, true); return; }
+ if (row.hydrating) {
+  // Whatever was in flight may have fetched less than this caller needs.
+  await row.hydrating;
+  if (statusOnly) return hydrate(row, false, true);
+  if ((source && !row.content) || (row.hasResult && !row.result?.content)) return hydrate(row, source, false);
+  return;
+ }
  const version = epoch, generation = session.generation;
  const current = () => version === epoch && generation === session.generation && rows.includes(row);
  row.hydrating = (async () => {

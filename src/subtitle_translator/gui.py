@@ -17,7 +17,10 @@ HEARTBEAT_SECONDS = 20
 RECEIVE_TIMEOUT = 60
 SEND_TIMEOUT = 10
 MAX_FRAME_BYTES = 12_000_000
-MAX_REPLY_BYTES = 16_000_000
+# A result reply carries a whole translated file. The largest accepted input is
+# 2,000,000 characters; a translation into a four-byte script that also grows the
+# text, serialized as escaped JSON, stays well inside this bound.
+MAX_REPLY_BYTES = 64_000_000
 MAX_COMMANDS = 4
 _ID = r"^[a-zA-Z0-9_-]{1,64}$"
 _ACTIVITY = re.compile(

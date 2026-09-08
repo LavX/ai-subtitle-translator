@@ -349,3 +349,33 @@ async def test_completed_lines_count_every_request_line_sharing_a_position():
         assert result.progress.completed_lines == 3
     finally:
         await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_a_repeated_position_answered_by_one_root_completes_the_other():
+    """Two roots of one line share a position; the second reply omits it."""
+    replies = 0
+
+    async def send(request):
+        nonlocal replies
+        _, lines = root_of(request)
+        replies += 1
+        return response(lines if replies == 1 else [])
+
+    provider = provider_with_transport(send, parallel=1)
+    try:
+        result = await BatchProcessor(provider, provider.settings).process_all_batches(
+            [{"index": "1", "content": "first"}, {"index": "1", "content": "first again"}],
+            "en",
+            "hu",
+            batch_size=1,
+            model="test/rolling",
+        )
+        assert replies >= 2
+        assert result.success
+        assert all(r.success and r.error is None for r in result.batch_results)
+        assert result.progress.failed_batches == 0
+        assert result.progress.completed_lines == 2
+        assert len(result.all_translations) == 1
+    finally:
+        await provider.close()
