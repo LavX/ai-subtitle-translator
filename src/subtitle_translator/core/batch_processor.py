@@ -237,6 +237,13 @@ class BatchProcessor:
                 {str(t["index"]): t for t in outcome.translations if str(t["index"]) in requested}
             )
             outcome.translations = list(merged.values())
+            if not outcome.success and requested <= merged.keys():
+                # A child covering a range the first reply had already answered can
+                # fail while the other children fill in the rest; what matters is
+                # that every requested line now has a translation.
+                outcome.success = True
+                outcome.error = None
+                outcome.timed_out = False
             return outcome
 
         can_adaptive = not _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE
@@ -442,6 +449,13 @@ class BatchProcessor:
                     else min(rate_limit_base_delay * (2**retries), 30.0)
                 )
                 retries += 1
+                last_error = str(e)
+                if retries >= max_retries_with_rate_limit:
+                    # No attempt follows, so there is nothing to wait for; a last
+                    # backoff would only hold this batch and, through the shared
+                    # lock, every other batch behind it.
+                    activity("rate-limit retries exhausted; stopping this batch")
+                    continue
                 activity(f"rate limited; retry {retries} after {delay:g}s backoff")
                 try:
                     async with asyncio.timeout_at(_deadline):
@@ -460,7 +474,6 @@ class BatchProcessor:
                             retries=retries,
                         )
                     )
-                last_error = str(e)
 
             except ProviderTimeoutError as e:
                 spent_tokens += e.tokens_used

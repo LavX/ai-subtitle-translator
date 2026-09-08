@@ -547,15 +547,20 @@ class OpenRouterProvider(TranslationProvider):
                     response = await plain_client.get("/models")
                 data = response.json() if response.status_code == 200 else None
                 records = data.get("data") if isinstance(data, dict) else None
-                if isinstance(records, list) and records:
+                cached = 0
+                if isinstance(records, list):
                     for model in records:
+                        if not isinstance(model, dict):
+                            continue
                         model_id = model.get("id", "")
                         params = model.get("supported_parameters", [])
-                        if model_id and params:
+                        if model_id and isinstance(params, list) and params:
                             self._model_params_cache[model_id] = params
+                            cached += 1
                         reasoning = model.get("reasoning")
                         if model_id and isinstance(reasoning, dict):
                             self._model_reasoning_cache[model_id] = reasoning
+                if cached:
                     logger.info(
                         f"Cached supported_parameters for "
                         f"{len(self._model_params_cache)} models from OpenRouter API"
@@ -1067,6 +1072,13 @@ class OpenRouterProvider(TranslationProvider):
                 error = RateLimitError(
                     "OpenRouter rate limit exceeded", provider=self.provider_name
                 )
+            elif code == 408:
+                # A provider-side timeout is a stall like any other and takes the
+                # same-size retry and recovery path, not a one-shot failure.
+                error = ProviderTimeoutError(
+                    "OpenRouter reported a request timeout (408)", provider=self.provider_name
+                )
+                error.status_code = code
             elif code is not None and code >= 500:
                 error = TranslationProviderError(
                     f"OpenRouter server error: {code}",

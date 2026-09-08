@@ -12,6 +12,7 @@ from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.providers.base import (
     AuthenticationError,
     InvalidResponseError,
+    ProviderTimeoutError,
     RateLimitError,
     TranslationProviderError,
 )
@@ -27,6 +28,7 @@ from tests.test_batch_reliability import response, settings
         (401, AuthenticationError, False),
         (402, TranslationProviderError, False),
         (403, TranslationProviderError, False),
+        (408, ProviderTimeoutError, True),
         (429, RateLimitError, True),
         (500, TranslationProviderError, True),
         (503, TranslationProviderError, True),
