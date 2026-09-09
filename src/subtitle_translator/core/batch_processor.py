@@ -5,8 +5,9 @@ import logging
 from collections import Counter, defaultdict, deque
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
+from subtitle_translator.api.models import TranslationConfig
 from subtitle_translator.config import Settings, get_settings
 from subtitle_translator.providers.base import (
     InvalidResponseError,
@@ -16,9 +17,6 @@ from subtitle_translator.providers.base import (
     TranslationProvider,
     TranslationProviderError,
 )
-
-if TYPE_CHECKING:
-    from subtitle_translator.api.models import TranslationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +196,9 @@ class BatchProcessor:
         """
         from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, get_batch_size_resolver
 
+        if config_override is None or config_override._smartfast_session_id is None:
+            config_override = (config_override or TranslationConfig()).for_operation()
+
         retries = 0
         timeout_retries = 0
         last_error: str | None = None
@@ -333,7 +334,7 @@ class BatchProcessor:
                     {
                         str(t["index"]): t
                         for t in result.translations
-                        if str(t["index"]) in requested
+                        if str(t["index"]) in requested and t["content"].strip()
                     }
                 )
                 # Coverage is cumulative over the attempts of this batch: a retry that
@@ -564,9 +565,20 @@ class BatchProcessor:
                     retries += 1
                     last_error = e.message
                 else:
-                    logger.error(f"Non-retryable error on batch {batch_index}: {e.message}")
-                    last_error = e.message
-                    break
+                    logger.error(f"Provider error on batch {batch_index}: {e.message}")
+                    _note_unsplittable_failure(size_related=False)
+                    return _billed(
+                        BatchResult(
+                            batch_index=batch_index,
+                            success=False,
+                            error=(
+                                f"Max retries exceeded. Last error: {e.message}"
+                                if e.retryable
+                                else e.message
+                            ),
+                            retries=retries,
+                        )
+                    )
 
             except Exception as e:
                 logger.error(f"Unexpected error on batch {batch_index}: {str(e)}")
@@ -799,6 +811,9 @@ class BatchProcessor:
         Returns:
             BatchProcessingResult with all translations
         """
+        if config_override is None or config_override._smartfast_session_id is None:
+            config_override = (config_override or TranslationConfig()).for_operation()
+
         # Determine model to use (config override takes precedence)
         if config_override and config_override.model:
             model_to_use = config_override.model
@@ -1013,7 +1028,9 @@ class BatchProcessor:
         Yields:
             Tuples of (BatchResult, BatchProgress) for each completed batch
         """
-        batches = self.create_batches(lines, batch_size, model=model)
+        if config_override is None or config_override._smartfast_session_id is None:
+            config_override = (config_override or TranslationConfig()).for_operation()
+        batches = self.create_batches(lines, batch_size, model=config_override.model or model)
 
         progress = BatchProgress(
             total_batches=len(batches),

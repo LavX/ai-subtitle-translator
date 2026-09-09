@@ -1,0 +1,380 @@
+[
+  {
+    "model": "inclusionai/ling-3.0-flash-fin:free",
+    "status": "failed",
+    "progress_cues": 0,
+    "returned_cues": 0,
+    "seconds": 92.00173871100196,
+    "full_structural_success": false,
+    "requests": 14,
+    "http_statuses": {
+      "404": 14
+    },
+    "observed_cost": null,
+    "requests_without_cost": 14,
+    "actual_providers": {},
+    "allowed_endpoint_attempts": {
+      "novita": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 0,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": null,
+    "responses_with_reasoning_usage": 0,
+    "reasoning_usage_complete": false,
+    "completion_tokens": null,
+    "responses_with_completion_usage": 0,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": null,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 0.21837194399995496
+  },
+  {
+    "model": "deepseek/deepseek-v4-flash-0731",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 218.0234784029999,
+    "full_structural_success": true,
+    "requests": 14,
+    "http_statuses": {
+      "200": 14
+    },
+    "observed_cost": 0.12413511,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Reka": 14
+    },
+    "allowed_endpoint_attempts": {
+      "reka/fp4": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 14,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 112403,
+    "responses_with_reasoning_usage": 14,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 182044,
+    "responses_with_completion_usage": 14,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 74.38085090399909,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 1.4080682919993706
+  },
+  {
+    "model": "z-ai/glm-5.3-flash",
+    "status": "client_timeout",
+    "progress_cues": 400,
+    "returned_cues": 0,
+    "seconds": 600.0022327789993,
+    "full_structural_success": false,
+    "requests": 54,
+    "http_statuses": {
+      "429": 46,
+      "200": 8
+    },
+    "observed_cost": 0.016346815285,
+    "requests_without_cost": 50,
+    "actual_providers": {
+      "Friendli": 1,
+      "BaseTen": 2,
+      "Modal": 1
+    },
+    "allowed_endpoint_attempts": {
+      "modal/fp8": 19,
+      "baseten/fp8": 16,
+      "makora": 8,
+      "friendli": 10,
+      "phala/fp8": 1
+    },
+    "request_sizes": {
+      "50": 2,
+      "100": 52
+    },
+    "complete_http200_bodies": 4,
+    "interrupted_requests": 4,
+    "interrupted_whitespace_only": 4,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "CancelledError": 1,
+      "TimeoutError": 3
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 15243,
+    "responses_with_reasoning_usage": 4,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 29545,
+    "responses_with_completion_usage": 4,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 108.15014970099946,
+    "max_interrupted_seconds": 119.99898091499927,
+    "headers_seconds_max": 6.671055973001785
+  },
+  {
+    "model": "qwen/qwen3.7-flash",
+    "status": "client_timeout",
+    "progress_cues": 200,
+    "returned_cues": 0,
+    "seconds": 600.1181929549966,
+    "full_structural_success": false,
+    "requests": 22,
+    "http_statuses": {
+      "200": 22
+    },
+    "observed_cost": 0.00273671,
+    "requests_without_cost": 16,
+    "actual_providers": {
+      "Alibaba": 6
+    },
+    "allowed_endpoint_attempts": {
+      "alibaba": 22
+    },
+    "request_sizes": {
+      "50": 4,
+      "100": 18
+    },
+    "complete_http200_bodies": 6,
+    "interrupted_requests": 16,
+    "interrupted_whitespace_only": 16,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "CancelledError": 12,
+      "TimeoutError": 4
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 4,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 32238,
+    "responses_with_reasoning_usage": 6,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 38610,
+    "responses_with_completion_usage": 6,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 118.23639113299942,
+    "max_interrupted_seconds": 120.01093014499929,
+    "headers_seconds_max": 1.8144962119986303
+  },
+  {
+    "model": "qwen/qwen3.8-flash",
+    "status": "client_timeout",
+    "progress_cues": 400,
+    "returned_cues": 0,
+    "seconds": 600.1202890309978,
+    "full_structural_success": false,
+    "requests": 38,
+    "http_statuses": {
+      "429": 18,
+      "200": 20
+    },
+    "observed_cost": 0.01086041,
+    "requests_without_cost": 34,
+    "actual_providers": {
+      "Makora": 4
+    },
+    "allowed_endpoint_attempts": {
+      "makora/fp4": 15,
+      "alibaba": 23
+    },
+    "request_sizes": {
+      "50": 2,
+      "100": 36
+    },
+    "complete_http200_bodies": 4,
+    "interrupted_requests": 16,
+    "interrupted_whitespace_only": 16,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "CancelledError": 12,
+      "TimeoutError": 4
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 6588,
+    "responses_with_reasoning_usage": 4,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 19766,
+    "responses_with_completion_usage": 4,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 22.743930077002005,
+    "max_interrupted_seconds": 120.01307523399737,
+    "headers_seconds_max": 7.058430537999811
+  },
+  {
+    "model": "dots-studio/dots-3-note-preview:free",
+    "status": "client_timeout",
+    "progress_cues": 417,
+    "returned_cues": 0,
+    "seconds": 600.1228553750007,
+    "full_structural_success": false,
+    "requests": 73,
+    "http_statuses": {
+      "200": 73
+    },
+    "observed_cost": 0,
+    "requests_without_cost": 9,
+    "actual_providers": {
+      "AtlasCloud": 64
+    },
+    "allowed_endpoint_attempts": {
+      "atlas-cloud/fp8": 73
+    },
+    "request_sizes": {
+      "1": 3,
+      "2": 1,
+      "5": 19,
+      "6": 4,
+      "9": 1,
+      "10": 22,
+      "12": 2,
+      "20": 6,
+      "25": 6,
+      "50": 5,
+      "100": 4
+    },
+    "complete_http200_bodies": 64,
+    "interrupted_requests": 9,
+    "interrupted_whitespace_only": 9,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "CancelledError": 5,
+      "TimeoutError": 4
+    },
+    "content_filter_responses": 12,
+    "empty_content_responses": 9,
+    "strict_partial_responses": 3,
+    "reasoning_tokens": 132733,
+    "responses_with_reasoning_usage": 64,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 185427,
+    "responses_with_completion_usage": 64,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 118.22743175000141,
+    "max_interrupted_seconds": 119.99606382099955,
+    "headers_seconds_max": 2.258012736998353
+  },
+  {
+    "model": "liquid/lfm-2.5-2.6b:free",
+    "status": "client_timeout",
+    "progress_cues": 501,
+    "returned_cues": 0,
+    "seconds": 600.1250741820004,
+    "full_structural_success": false,
+    "requests": 103,
+    "http_statuses": {
+      "200": 87,
+      "429": 16
+    },
+    "observed_cost": 0,
+    "requests_without_cost": 21,
+    "actual_providers": {
+      "Liquid": 82
+    },
+    "allowed_endpoint_attempts": {
+      "liquid/fp8": 103
+    },
+    "request_sizes": {
+      "1": 3,
+      "4": 3,
+      "5": 50,
+      "8": 2,
+      "10": 23,
+      "12": 8,
+      "15": 1,
+      "20": 6,
+      "24": 1,
+      "50": 2,
+      "100": 4
+    },
+    "complete_http200_bodies": 82,
+    "interrupted_requests": 5,
+    "interrupted_whitespace_only": 5,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "CancelledError": 3,
+      "TimeoutError": 2
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 1,
+    "strict_partial_responses": 8,
+    "reasoning_tokens": 140455,
+    "responses_with_reasoning_usage": 82,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 172551,
+    "responses_with_completion_usage": 82,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 64.70988300099998,
+    "max_interrupted_seconds": 23.061021781999443,
+    "headers_seconds_max": 3.3529541220013925
+  },
+  {
+    "model": "nvidia/nemotron-3.5-lightning:free",
+    "status": "client_timeout",
+    "progress_cues": 0,
+    "returned_cues": 0,
+    "seconds": 600.1260463629987,
+    "full_structural_success": false,
+    "requests": 20,
+    "http_statuses": {
+      "200": 20
+    },
+    "observed_cost": null,
+    "requests_without_cost": 20,
+    "actual_providers": {},
+    "allowed_endpoint_attempts": {
+      "nvidia/nvfp4": 20
+    },
+    "request_sizes": {
+      "50": 4,
+      "100": 16
+    },
+    "complete_http200_bodies": 0,
+    "interrupted_requests": 20,
+    "interrupted_whitespace_only": 20,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "CancelledError": 16,
+      "TimeoutError": 4
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": null,
+    "responses_with_reasoning_usage": 0,
+    "reasoning_usage_complete": false,
+    "completion_tokens": null,
+    "responses_with_completion_usage": 0,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": null,
+    "max_interrupted_seconds": 120.042240666,
+    "headers_seconds_max": 10.26799703299912
+  }
+]

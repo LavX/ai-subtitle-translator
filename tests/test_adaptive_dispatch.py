@@ -390,12 +390,12 @@ async def test_preemptive_children_and_recovery_share_the_root_timeout_budget():
                 model=model,
                 batch_size=100,
                 # Compress the request override below its public API minimum for this test.
-                config_override=TranslationConfig.model_construct(request_timeout=0.1),
+                config_override=TranslationConfig.model_construct(request_timeout=0.25),
             ),
-            0.5,
+            1.1,
         )
         # Three request windows: attempt, one same-size retry, then the split.
-        assert asyncio.get_running_loop().time() - start < 0.38
+        assert asyncio.get_running_loop().time() - start < 0.9
         assert calls == [50, 50, 50, 25]
         assert not result.success
         assert result.progress.completed_lines == 50

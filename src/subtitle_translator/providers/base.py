@@ -20,6 +20,7 @@ class TranslationResult:
     cost: float | None = None
     raw_response: dict | None = None
     note: str | None = None  # why the reply had to be repaired or cut down
+    routing_diagnostics: dict | None = None
 
 
 @dataclass
@@ -54,6 +55,7 @@ class TranslationProviderError(Exception):
         self.tokens_used = tokens_used
         self.cost = cost
         self.retry_after = retry_after
+        self.routing_diagnostics: dict | None = None
 
 
 class ProviderTimeoutError(TranslationProviderError):

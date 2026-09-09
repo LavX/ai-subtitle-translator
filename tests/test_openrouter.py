@@ -136,6 +136,29 @@ def _mock_response(status_code=200, json_data=None, text="", headers=None):
     return resp
 
 
+class _CompletionClient(httpx.AsyncClient):
+    """Real HTTP request building with a fixture completion transport."""
+
+    def __init__(self):
+        self.response = _mock_response(200, _ok_response_json())
+        self.failure = None
+        self.requests = []
+        super().__init__(
+            base_url="https://openrouter.ai/api/v1",
+            transport=httpx.MockTransport(self.respond),
+        )
+
+    async def respond(self, request):
+        self.requests.append(request)
+        if self.failure is not None:
+            raise self.failure
+        return httpx.Response(
+            self.response.status_code,
+            headers=self.response.headers,
+            text=self.response.text,
+        )
+
+
 # ===========================================================================
 # Tests
 # ===========================================================================
@@ -352,9 +375,8 @@ class TestTranslateBatch:
     async def test_fresh_provider_omits_temperature_without_a_config_block(self):
         """The catalog is consulted even when no reasoning config has loaded it."""
         provider = OpenRouterProvider(settings=_make_settings())
-        provider._client = AsyncMock()
-        provider._client.is_closed = False
-        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        provider._client = _CompletionClient()
+        provider._client.response = _mock_response(200, _ok_response_json())
         catalog_client = AsyncMock()
         catalog_client.get.return_value = _mock_response(
             200,
@@ -371,19 +393,18 @@ class TestTranslateBatch:
             factory.return_value.__aenter__.return_value = catalog_client
             await provider.translate_batch(_make_batch(), model="openai/gpt-5.6-luna:floor")
         catalog_client.get.assert_awaited_once_with("/models")
-        payload = provider._client.post.call_args.kwargs["json"]
+        payload = json.loads(provider._client.requests[-1].content)
         assert "temperature" not in payload
 
     async def test_variant_model_uses_the_base_models_capabilities(self):
         """ ":thinking" may have no catalog entry of its own; the base decides."""
         provider = OpenRouterProvider(settings=_make_settings())
-        provider._client = AsyncMock()
-        provider._client.is_closed = False
-        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        provider._client = _CompletionClient()
+        provider._client.response = _mock_response(200, _ok_response_json())
         provider._model_params_cache = {"deepseek/deepseek-chat": ["reasoning"]}
         provider._model_params_fetched = True
         await provider.translate_batch(_make_batch(), model="deepseek/deepseek-chat:thinking:floor")
-        payload = provider._client.post.call_args.kwargs["json"]
+        payload = json.loads(provider._client.requests[-1].content)
         # Variants do not stack a routing shortcut; the sort travels in the body.
         assert payload["model"] == "deepseek/deepseek-chat:thinking"
         assert payload["provider"]["sort"] == "price"
@@ -391,9 +412,8 @@ class TestTranslateBatch:
 
     async def test_luna_omits_temperature_unsupported_by_catalog(self):
         provider = OpenRouterProvider(settings=_make_settings())
-        provider._client = AsyncMock()
-        provider._client.is_closed = False
-        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        provider._client = _CompletionClient()
+        provider._client.response = _mock_response(200, _ok_response_json())
         catalog_client = AsyncMock()
         catalog_client.get.return_value = _mock_response(
             200,
@@ -412,7 +432,7 @@ class TestTranslateBatch:
                 _make_batch(), config_override=TranslationConfig(model="openai/gpt-5.6-luna:floor")
             )
         catalog_client.get.assert_awaited_once_with("/models")
-        payload = provider._client.post.call_args.kwargs["json"]
+        payload = json.loads(provider._client.requests[-1].content)
         assert payload["model"] == "openai/gpt-5.6-luna:floor"
         assert "temperature" not in payload
 
@@ -422,9 +442,8 @@ class TestTranslateBatch:
         resp_json = _ok_response_json()
         mock_resp = _mock_response(200, resp_json)
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         result = await provider.translate_batch(batch)
@@ -434,7 +453,7 @@ class TestTranslateBatch:
         assert result.prompt_tokens == 100
         assert result.completion_tokens == 50
         assert result.cost == 0.001
-        mock_client.post.assert_awaited_once()
+        assert len(mock_client.requests) == 1
 
     async def test_success_with_config_override_model_and_temp(self):
         provider = OpenRouterProvider(settings=_make_settings())
@@ -443,30 +462,28 @@ class TestTranslateBatch:
         resp_json = _ok_response_json(model="openai/gpt-5")
         mock_resp = _mock_response(200, resp_json)
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
         provider._model_params_fetched = True  # keep the catalog lookup offline
 
         result = await provider.translate_batch(batch, config_override=config)
         assert result.model_used == "openai/gpt-5"
         # Verify payload temperature
-        call_kwargs = mock_client.post.call_args
-        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        request = mock_client.requests[-1]
+        payload = json.loads(request.content)
         assert payload["temperature"] == 0.7
 
     async def test_success_with_config_override_api_key(self):
         """Override authentication is attached to the request on the shared client."""
         provider = OpenRouterProvider(settings=_make_settings())
-        provider._client = AsyncMock()
-        provider._client.is_closed = False
-        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        provider._client = _CompletionClient()
+        provider._client.response = _mock_response(200, _ok_response_json())
         result = await provider.translate_batch(
             _make_batch(), config_override=TranslationConfig(api_key="sk-override-key")
         )
         assert isinstance(result, TranslationResult)
-        headers = provider._client.post.call_args.kwargs["headers"]
+        headers = provider._client.requests[-1].headers
         assert headers["Authorization"] == "Bearer sk-override-key"
 
     async def test_no_api_key_raises(self):
@@ -482,9 +499,8 @@ class TestTranslateBatch:
         batch = _make_batch()
         mock_resp = _mock_response(401, json_data={"error": {"message": "invalid key"}})
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         with pytest.raises(AuthenticationError):
@@ -499,9 +515,8 @@ class TestTranslateBatch:
             headers={"retry-after": "30"},
         )
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         with pytest.raises(RateLimitError) as exc_info:
@@ -513,9 +528,8 @@ class TestTranslateBatch:
         batch = _make_batch()
         mock_resp = _mock_response(429, json_data={"error": {"message": "rate limited"}})
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         with pytest.raises(RateLimitError) as exc_info:
@@ -527,9 +541,8 @@ class TestTranslateBatch:
         batch = _make_batch()
         mock_resp = _mock_response(500, text="Internal Server Error")
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         with pytest.raises(TranslationProviderError) as exc_info:
@@ -542,9 +555,8 @@ class TestTranslateBatch:
         batch = _make_batch()
         mock_resp = _mock_response(400, json_data={"error": {"message": "bad request"}})
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         with pytest.raises(TranslationProviderError) as exc_info:
@@ -552,33 +564,43 @@ class TestTranslateBatch:
         assert exc_info.value.retryable is False
         assert exc_info.value.status_code == 400
 
-    async def test_response_deadline_cancels_a_still_open_request(self):
-        provider = OpenRouterProvider(settings=_make_settings(request_timeout=0.02))
-        provider._client = AsyncMock()
-        provider._client.is_closed = False
+    async def test_response_deadline_cancels_a_still_open_request(self, monkeypatch):
+        from functools import partial
+
+        from subtitle_translator.config import Settings
+
         cancelled = False
 
-        async def stalled(*args, **kwargs):
+        async def stalled(request):
             nonlocal cancelled
+            if request.url.path.endswith("/models"):
+                return httpx.Response(200, json={"data": []})
             try:
                 await asyncio.sleep(1)
             finally:
                 cancelled = True
 
-        provider._client.post.side_effect = stalled
-        with pytest.raises(TranslationProviderError, match="timed out"):
-            await provider.translate_batch(_make_batch())
-        assert cancelled
+        monkeypatch.setattr(
+            httpx, "AsyncClient", partial(httpx.AsyncClient, transport=httpx.MockTransport(stalled))
+        )
+        provider = OpenRouterProvider(
+            Settings(_env_file=None, openrouter_api_key="synthetic-test-only", request_timeout=0.1)
+        )
+        try:
+            with pytest.raises(TranslationProviderError, match="timed out"):
+                await provider.translate_batch(_make_batch())
+            assert cancelled
+        finally:
+            await provider.close()
 
     async def test_request_timeout_override_reaches_provider(self):
         provider = OpenRouterProvider(settings=_make_settings())
-        provider._client = AsyncMock()
-        provider._client.is_closed = False
-        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        provider._client = _CompletionClient()
+        provider._client.response = _mock_response(200, _ok_response_json())
         await provider.translate_batch(
             _make_batch(), config_override=TranslationConfig(requestTimeout=600)
         )
-        assert provider._client.post.call_args.kwargs["timeout"].as_dict() == {
+        assert provider._client.requests[-1].extensions["timeout"] == {
             "connect": 600,
             "read": 600,
             "write": 600,
@@ -589,9 +611,8 @@ class TestTranslateBatch:
         provider = OpenRouterProvider(settings=_make_settings())
         batch = _make_batch()
 
-        mock_client = AsyncMock()
-        mock_client.post.side_effect = httpx.ReadTimeout("timed out")
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.failure = httpx.ReadTimeout("timed out")
         provider._client = mock_client
 
         with pytest.raises(TranslationProviderError) as exc_info:
@@ -602,9 +623,8 @@ class TestTranslateBatch:
         provider = OpenRouterProvider(settings=_make_settings())
         batch = _make_batch()
 
-        mock_client = AsyncMock()
-        mock_client.post.side_effect = httpx.ConnectError("connection refused")
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.failure = httpx.ConnectError("connection refused")
         provider._client = mock_client
 
         with pytest.raises(TranslationProviderError) as exc_info:
@@ -619,14 +639,13 @@ class TestTranslateBatch:
         resp_json = _ok_response_json(model="anthropic/claude-haiku-4.5")
         mock_resp = _mock_response(200, resp_json)
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         await provider.translate_batch(batch, config_override=config)
-        call_kwargs = mock_client.post.call_args
-        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        request = mock_client.requests[-1]
+        payload = json.loads(request.content)
         system_msg = payload["messages"][0]
         assert system_msg["role"] == "system"
         # Anthropic format uses list of content blocks with cache_control
@@ -639,14 +658,13 @@ class TestTranslateBatch:
         resp_json = _ok_response_json()
         mock_resp = _mock_response(200, resp_json)
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         await provider.translate_batch(batch)
-        call_kwargs = mock_client.post.call_args
-        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        request = mock_client.requests[-1]
+        payload = json.loads(request.content)
         system_msg = payload["messages"][0]
         assert isinstance(system_msg["content"], str)
 
@@ -656,14 +674,13 @@ class TestTranslateBatch:
         resp_json = _ok_response_json()
         mock_resp = _mock_response(200, resp_json)
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         await provider.translate_batch(batch)
-        call_kwargs = mock_client.post.call_args
-        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        request = mock_client.requests[-1]
+        payload = json.loads(request.content)
         assert payload["response_format"] == {"type": "json_object"}
         # JSON mode only allows an object at the top level, so the example the same
         # request shows the model has to be that object: asked for a bare array under
@@ -690,14 +707,13 @@ class TestTranslateBatch:
         resp_json = _ok_response_json(model="anthropic/claude-haiku-4.5")
         mock_resp = _mock_response(200, resp_json)
 
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_resp
-        mock_client.is_closed = False
+        mock_client = _CompletionClient()
+        mock_client.response = mock_resp
         provider._client = mock_client
 
         await provider.translate_batch(batch, config_override=config)
-        call_kwargs = mock_client.post.call_args
-        payload = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
+        request = mock_client.requests[-1]
+        payload = json.loads(request.content)
         assert "response_format" not in payload
 
 
@@ -768,9 +784,14 @@ class TestProcessResponse:
 
     async def test_no_choices(self):
         provider = OpenRouterProvider(settings=_make_settings())
-        mock_resp = _mock_response(200, {"usage": {}, "choices": []})
-        with pytest.raises(InvalidResponseError, match="No choices"):
+        mock_resp = _mock_response(
+            200, {"usage": {"total_tokens": 8, "cost": 0.002}, "choices": []}
+        )
+        with pytest.raises(InvalidResponseError) as raised:
             await provider._process_response(mock_resp, "m")
+        assert raised.value.retryable
+        assert raised.value.tokens_used == 8
+        assert raised.value.cost == 0.002
 
     async def test_empty_content(self):
         provider = OpenRouterProvider(settings=_make_settings())
@@ -1213,9 +1234,8 @@ class TestEnsureModelParamsCache:
     async def test_retries_after_the_pause_and_then_applies_capabilities(self):
         """One failed fetch at startup must not send temperature to Luna forever."""
         provider = OpenRouterProvider(settings=_make_settings())
-        provider._client = AsyncMock()
-        provider._client.is_closed = False
-        provider._client.post.return_value = _mock_response(200, _ok_response_json())
+        provider._client = _CompletionClient()
+        provider._client.response = _mock_response(200, _ok_response_json())
         catalog_client = AsyncMock()
         catalog_client.get.side_effect = [
             httpx.ConnectError("down"),
@@ -1234,12 +1254,12 @@ class TestEnsureModelParamsCache:
         with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = catalog_client
             await provider.translate_batch(_make_batch(), model="openai/gpt-5.6-luna")
-            assert "temperature" in provider._client.post.call_args.kwargs["json"]
+            assert "temperature" in json.loads(provider._client.requests[-1].content)
             provider._model_params_retry_at = 0.0  # the pause has passed
             await provider.translate_batch(_make_batch(), model="openai/gpt-5.6-luna")
         assert catalog_client.get.await_count == 2
         assert provider._model_params_fetched is True
-        assert "temperature" not in provider._client.post.call_args.kwargs["json"]
+        assert "temperature" not in json.loads(provider._client.requests[-1].content)
 
     async def test_handles_non_200(self):
         provider = OpenRouterProvider(settings=_make_settings())

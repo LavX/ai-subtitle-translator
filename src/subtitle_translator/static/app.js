@@ -1,5 +1,5 @@
 import { GuiSession } from './session.mjs';
-import { safeName, uniqueName, routeModel, zip, parseCues, latestFirst } from './archive.mjs';
+import { safeName, uniqueName, routeModel, routingConfig, zip, parseCues, latestFirst } from './archive.mjs';
 
 const $ = (id) => document.getElementById(id);
 const sessionUrl = new URL('./session', window.location.href);
@@ -264,8 +264,13 @@ $('translate').addEventListener('click', async () => {
  if (issue) { notify(issue, true); return; }
  const provider = $('provider-only').value.trim().toLowerCase();
  if (provider && !/^[a-z0-9][a-z0-9/._-]{0,99}$/.test(provider)) { notify('Enter one OpenRouter provider ID, such as azure, or leave Provider empty.', true); return; }
- $('model').value = routeModel(model, $('routing').value);
- const settings = {sourceLanguage, targetLanguage, title: $('media-title').value.trim(), config: {model: routeModel(model, $('routing').value), requestTimeout: Number($('request-timeout').value), provider: {sort: $('routing').value}}};
+ let config;
+ try {
+  const tuning = Object.fromEntries([...$('smartfast-options').querySelectorAll('input')].map(input => [input.dataset.smartfast, input.value]));
+  config = routingConfig(model, $('routing').value, tuning);
+ } catch (error) { document.querySelector('.request-options').open = true; notify(error.message, true); return; }
+ $('model').value = config.model;
+ const settings = {sourceLanguage, targetLanguage, title: $('media-title').value.trim(), config: {...config, requestTimeout: Number($('request-timeout').value)}};
  if ($('service-tier').value !== 'auto') settings.config.serviceTier = $('service-tier').value;
  if (provider) { settings.config.provider.only = [provider]; settings.config.provider.allowFallbacks = false; }
  if ($('reasoning').value !== 'default') settings.config.reasoning = {effort: $('reasoning').value};
@@ -522,11 +527,20 @@ function renderModels() {
 }
 $('routing').addEventListener('change', () => {
  $('model').value = routeModel($('model').value, $('routing').value); renderModels(); updateModelDetails();
- updateTierHint();
+ updateRoutingOptions(); updateTierHint();
 });
 
+function updateRoutingOptions() {
+ const smartfast = $('routing').value === 'smartfast';
+ $('smartfast-options').hidden = !smartfast;
+ $('routing-hint').textContent = smartfast
+  ? 'Balances price and estimated speed within your limits. Keeps each job with an eligible provider when possible. Tune limits in Request options.'
+  : 'Choose how OpenRouter picks a provider.';
+}
 function updateTierHint() {
- $('service-tier-hint').textContent = $('service-tier').value === 'default'
+ $('service-tier-hint').textContent = $('routing').value === 'smartfast'
+  ? 'SmartFast does not automatically enable Flex or priority. Standard uses normal capacity. Follow routing permits another tier only when you enter its specific Provider ID.'
+  : $('service-tier').value === 'default'
   ? 'Standard keeps the provider on its normal processing queue even with lowest-price routing. Follow routing lets a :floor route use a provider\u2019s cheaper Flex queue, which can wait minutes per request.'
   : $('routing').value === 'floor'
    ? 'Allows discounted Flex capacity. Requests can be much slower or time out.'
@@ -537,7 +551,7 @@ function updateTierHint() {
 $('service-tier').addEventListener('change', updateTierHint);
 
 function selectedModel() {
- const id = $('model').value.trim().replace(/:(floor|nitro)$/, '');
+ const id = routeModel($('model').value, 'default');
  return modelCatalog.find(item => item.id === id);
 }
 function reasoningEfforts() {
@@ -545,7 +559,7 @@ function reasoningEfforts() {
 }
 function reasoningIssue() {
  const effort = $('reasoning').value;
- if (effort === 'none' && (selectedModel()?.reasoning?.mandatory === true || /:thinking(?::(?:floor|nitro))?$/.test($('model').value.trim()))) return 'This model requires reasoning. Choose Model default or a supported effort, or select another model.';
+ if (effort === 'none' && (selectedModel()?.reasoning?.mandatory === true || routeModel($('model').value, 'default').endsWith(':thinking'))) return 'This model requires reasoning. Choose Model default or a supported effort, or select another model.';
  if (!['none', 'default'].includes(effort) && !reasoningEfforts().includes(effort)) return 'The selected reasoning effort is not supported by this model’s catalog metadata. Choose another option.';
  return '';
 }

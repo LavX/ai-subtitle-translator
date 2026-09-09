@@ -539,8 +539,12 @@ class TestUsageSurvivesMixedOutcomes:
         result = await processor.process_batch(_make_batch(lines=lines), batch_index=0)
 
         assert result.success is False
-        assert "Max retries exceeded" in result.error
+        assert result.error == "Invalid API key"
+        assert calls == 2
+        assert result.retries == 1
+        assert result.translations == [{"index": "0", "content": "Hola"}]
         assert result.tokens_used == 5
+        assert result.cost == pytest.approx(0.001)
 
     @pytest.mark.asyncio
     async def test_partial_top_level_reply_counts_after_the_adaptive_split(self):

@@ -1,0 +1,5871 @@
+{
+  "image": "sha256:8016b53a143f6c53a23fef7df93df3f0613db91dfaeb0ca5d5b8e665d5f700ed",
+  "source_sha256": "7fe2750bd47f756868bc5f6ab3f78c286afbd0d2dc48e0ee8f261c17cb0caec0",
+  "source_cues": 1340,
+  "batch_size": 100,
+  "parallel_batches_per_job": 4,
+  "simultaneous_jobs": 16,
+  "temperature": 0.3,
+  "reasoning": null,
+  "request_timeout_seconds": 120,
+  "job_cap_seconds": 300,
+  "routing": "smartfast",
+  "started_utc": "2026-09-09T13:48:26.682337+00:00",
+  "finished_utc": "2026-09-09T13:53:28.489602+00:00",
+  "source_unchanged": true,
+  "method": "One English-to-Hungarian full-file queued-content job per model, all launched together through the 2.0.0 candidate. Bazarr-compatible payload and authentication; benchmark did not execute inside Bazarr.",
+  "limits": {
+    "medianPremiumPercent": 50,
+    "speedTolerancePercent": 20,
+    "sparsePremiumMultiplier": 3,
+    "maxPromptPrice": 1,
+    "maxCompletionPrice": 3,
+    "maxRequestPrice": 0
+  },
+  "cost_note": "Observed cost sums usage.cost from returned upstream responses. Missing or interrupted response usage makes this a lower bound. Zero forwarded completion requests establish zero completion charges.",
+  "progress_note": "completedLines is service-reported translated progress. Returned positions measure structure and may include source fallbacks for partial jobs. Running jobs stopped at the cap may expose progress without result lines.",
+  "results": [
+    {
+      "model": "google/gemini-2.5-flash-lite",
+      "category_ranks": [
+        3
+      ],
+      "status": "completed",
+      "client_seconds": 36.38319544799742,
+      "elapsedSeconds": 36.12,
+      "completedLines": 1340,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 12,
+      "full_structural_success": true,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 80580,
+      "totalCost": 0.021020700000000003,
+      "provider_requests": 14,
+      "responses_with_cost": 14,
+      "observed_cost": 0.0210207,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 80580,
+      "actual_providers": {
+        "Google AI Studio": 14
+      },
+      "http_statuses": {
+        "200": 14
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": 36.830189968202895,
+      "progress_cues_per_second": 36.830189968202895,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 14,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.555665094998403,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2826,
+            "completion_tokens": 3257,
+            "total_tokens": 6083,
+            "cost": 0.0015854,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.482485638996877,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2587,
+            "completion_tokens": 3058,
+            "total_tokens": 5645,
+            "cost": 0.0014819,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.740184393001982,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2727,
+            "completion_tokens": 3158,
+            "total_tokens": 5885,
+            "cost": 0.0015359,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.733477289999428,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2712,
+            "completion_tokens": 3191,
+            "total_tokens": 5903,
+            "cost": 0.0015476,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.387384527002723,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2850,
+            "completion_tokens": 3402,
+            "total_tokens": 6252,
+            "cost": 0.0016458,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.991031724002823,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2717,
+            "completion_tokens": 3199,
+            "total_tokens": 5916,
+            "cost": 0.0015513,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 10.949559030003002,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2788,
+            "completion_tokens": 3346,
+            "total_tokens": 6134,
+            "cost": 0.0016172,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 10.400341256001411,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2734,
+            "completion_tokens": 3235,
+            "total_tokens": 5969,
+            "cost": 0.0015674,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.188837465000688,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2735,
+            "completion_tokens": 3164,
+            "total_tokens": 5899,
+            "cost": 0.0015391,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.548688324997784,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2679,
+            "completion_tokens": 3099,
+            "total_tokens": 5778,
+            "cost": 0.0015075,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.909113126999728,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2894,
+            "completion_tokens": 3341,
+            "total_tokens": 6235,
+            "cost": 0.0016258,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.40047672199944,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2892,
+            "completion_tokens": 3312,
+            "total_tokens": 6204,
+            "cost": 0.001614,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.156768725999427,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2729,
+            "completion_tokens": 3182,
+            "total_tokens": 5911,
+            "cost": 0.0015457,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 3.8421967690010206,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-2.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 1501,
+            "completion_tokens": 1265,
+            "total_tokens": 2766,
+            "cost": 0.0006561,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "openai/gpt-4o-mini",
+      "category_ranks": [
+        9
+      ],
+      "status": "completed",
+      "client_seconds": 74.61299902800238,
+      "elapsedSeconds": 74.21,
+      "completedLines": 1340,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 20,
+      "full_structural_success": true,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 68246,
+      "totalCost": 0.025459949999999995,
+      "provider_requests": 14,
+      "responses_with_cost": 14,
+      "observed_cost": 0.02545995,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 68246,
+      "actual_providers": {
+        "OpenAI": 14
+      },
+      "http_statuses": {
+        "200": 14
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": 17.95933707874543,
+      "progress_cues_per_second": 17.95933707874543,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 14,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 18.23065630700148,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2601,
+            "completion_tokens": 2550,
+            "total_tokens": 5151,
+            "cost": 0.00192015,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 17.30847481299861,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2480,
+            "completion_tokens": 2456,
+            "total_tokens": 4936,
+            "cost": 0.0018456,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 17.6523139130004,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2501,
+            "completion_tokens": 2459,
+            "total_tokens": 4960,
+            "cost": 0.00185055,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 17.5205782539997,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2485,
+            "completion_tokens": 2503,
+            "total_tokens": 4988,
+            "cost": 0.00187455,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 17.794976741999562,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2634,
+            "completion_tokens": 2708,
+            "total_tokens": 5342,
+            "cost": 0.0020199,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 17.176295896002557,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2483,
+            "completion_tokens": 2463,
+            "total_tokens": 4946,
+            "cost": 0.00185025,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 19.140952261001075,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2571,
+            "completion_tokens": 2617,
+            "total_tokens": 5188,
+            "cost": 0.00195585,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 19.060687904999213,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2510,
+            "completion_tokens": 2523,
+            "total_tokens": 5033,
+            "cost": 0.0018903,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 20.981752895997488,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2487,
+            "completion_tokens": 2435,
+            "total_tokens": 4922,
+            "cost": 0.00183405,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 20.378943315998185,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2458,
+            "completion_tokens": 2366,
+            "total_tokens": 4824,
+            "cost": 0.0017883,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 21.08106477000183,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2672,
+            "completion_tokens": 2692,
+            "total_tokens": 5364,
+            "cost": 0.002016,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 19.538163449997228,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2646,
+            "completion_tokens": 2626,
+            "total_tokens": 5272,
+            "cost": 0.0019725,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 17.905107623999356,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 2508,
+            "completion_tokens": 2458,
+            "total_tokens": 4966,
+            "cost": 0.001851,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-4o-mini",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.072327089001192,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-4o-mini",
+          "usage": {
+            "prompt_tokens": 1381,
+            "completion_tokens": 973,
+            "total_tokens": 2354,
+            "cost": 0.00079095,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "openai/gpt-5.6-luna",
+      "category_ranks": [
+        1
+      ],
+      "status": "completed",
+      "client_seconds": 84.65357068199955,
+      "elapsedSeconds": 83.9,
+      "completedLines": 1340,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 18,
+      "full_structural_success": true,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 62515,
+      "totalCost": 0.04233305,
+      "provider_requests": 14,
+      "responses_with_cost": 14,
+      "observed_cost": 0.04233305,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 62515,
+      "actual_providers": {
+        "OpenAI": 14
+      },
+      "http_statuses": {
+        "200": 14
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": 15.829220069566812,
+      "progress_cues_per_second": 15.829220069566812,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 14,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 20.117612322999776,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2479,
+            "completion_tokens": 1976,
+            "total_tokens": 4455,
+            "cost": 0.0029908,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2476
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 194
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 19.577016928997182,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2600,
+            "completion_tokens": 1973,
+            "total_tokens": 4573,
+            "cost": 0.00301745,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2597
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 82
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 19.774207962997025,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2500,
+            "completion_tokens": 1952,
+            "total_tokens": 4452,
+            "cost": 0.00296725,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2497
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 180
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 21.010885346000578,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2484,
+            "completion_tokens": 2119,
+            "total_tokens": 4603,
+            "cost": 0.00316365,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2481
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 319
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 22.7556837359989,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2633,
+            "completion_tokens": 2192,
+            "total_tokens": 4825,
+            "cost": 0.0032885,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2630
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 148
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 17.99465520100057,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2482,
+            "completion_tokens": 1934,
+            "total_tokens": 4416,
+            "cost": 0.00294115,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2479
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 111
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 22.14634691000174,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2570,
+            "completion_tokens": 2111,
+            "total_tokens": 4681,
+            "cost": 0.00317555,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2567
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 113
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 21.44042759000149,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2509,
+            "completion_tokens": 2197,
+            "total_tokens": 4706,
+            "cost": 0.0032635,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2506
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 344
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 28.337670003998937,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2486,
+            "completion_tokens": 2196,
+            "total_tokens": 4682,
+            "cost": 0.00325655,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2483
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 450
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 20.072718289997283,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2457,
+            "completion_tokens": 1957,
+            "total_tokens": 4414,
+            "cost": 0.0029625,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2454
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 250
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 20.07767190100276,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2671,
+            "completion_tokens": 2134,
+            "total_tokens": 4805,
+            "cost": 0.0032284,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2668
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 88
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 20.163718007999705,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2645,
+            "completion_tokens": 2148,
+            "total_tokens": 4793,
+            "cost": 0.0032387,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2642
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 186
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 20.772380761998647,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 2507,
+            "completion_tokens": 2006,
+            "total_tokens": 4513,
+            "cost": 0.0030338,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 2504
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 277
+            }
+          }
+        },
+        {
+          "model": "openai/gpt-5.6-luna",
+          "provider_request": {
+            "only": [
+              "openai"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "openai/fast",
+              "openai/flex"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 14.27373584200177,
+          "provider": "OpenAI",
+          "response_model": "openai/gpt-5.6-luna",
+          "usage": {
+            "prompt_tokens": 1380,
+            "completion_tokens": 1217,
+            "total_tokens": 2597,
+            "cost": 0.00180525,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 1377
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 516
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "meta/muse-spark-1.2-contributor",
+      "category_ranks": [],
+      "status": "completed",
+      "client_seconds": 133.03139046300203,
+      "elapsedSeconds": 132.35,
+      "completedLines": 1340,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 12,
+      "full_structural_success": true,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 105451,
+      "totalCost": 0.0175103,
+      "provider_requests": 14,
+      "responses_with_cost": 14,
+      "observed_cost": 0.0175103,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 105451,
+      "actual_providers": {
+        "Meta": 14
+      },
+      "http_statuses": {
+        "200": 14
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 1250,
+      "returned_cues_per_second": 10.072810600086703,
+      "progress_cues_per_second": 10.072810600086703,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 14,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 34.419015270003,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2490,
+            "completion_tokens": 5227,
+            "total_tokens": 7717,
+            "cost": 0.0012944,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2560
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 38.882977765999385,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2609,
+            "completion_tokens": 5373,
+            "total_tokens": 7982,
+            "cost": 0.0013355,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2631
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 39.62597502599965,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2509,
+            "completion_tokens": 5238,
+            "total_tokens": 7747,
+            "cost": 0.0012985,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2675
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 36.15349922000314,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2496,
+            "completion_tokens": 5175,
+            "total_tokens": 7671,
+            "cost": 0.0012846,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2539
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 39.120964803998504,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2638,
+            "completion_tokens": 5724,
+            "total_tokens": 8362,
+            "cost": 0.0014086,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2821
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 32.657714252000005,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2497,
+            "completion_tokens": 5295,
+            "total_tokens": 7792,
+            "cost": 0.0013087,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2535
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 40.64423082700159,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2583,
+            "completion_tokens": 5567,
+            "total_tokens": 8150,
+            "cost": 0.00131045,
+            "prompt_tokens_details": {
+              "cached_tokens": 625,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2756
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 35.91569570000138,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2522,
+            "completion_tokens": 5454,
+            "total_tokens": 7976,
+            "cost": 0.001343,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2781
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 33.24977349300025,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2503,
+            "completion_tokens": 4778,
+            "total_tokens": 7281,
+            "cost": 0.0012059,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2086
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 30.7168394529981,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2475,
+            "completion_tokens": 4998,
+            "total_tokens": 7473,
+            "cost": 0.0012471,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2397
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 38.77757703200041,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2680,
+            "completion_tokens": 5587,
+            "total_tokens": 8267,
+            "cost": 0.00132415,
+            "prompt_tokens_details": {
+              "cached_tokens": 625,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2807
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 34.79117702199801,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2658,
+            "completion_tokens": 5503,
+            "total_tokens": 8161,
+            "cost": 0.0013664,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2681
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 28.684696828000597,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 2522,
+            "completion_tokens": 4893,
+            "total_tokens": 7415,
+            "cost": 0.0012308,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2222
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.2-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 13.511426102002588,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.2-contributor",
+          "usage": {
+            "prompt_tokens": 1392,
+            "completion_tokens": 2065,
+            "total_tokens": 3457,
+            "cost": 0.0005522,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 999
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "meta/muse-spark-1.3-contributor",
+      "category_ranks": [],
+      "status": "completed",
+      "client_seconds": 177.21027279400005,
+      "elapsedSeconds": 176.86,
+      "completedLines": 1340,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 13,
+      "full_structural_success": true,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 113619,
+      "totalCost": 0.019082650000000003,
+      "provider_requests": 14,
+      "responses_with_cost": 14,
+      "observed_cost": 0.01908265,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 113619,
+      "actual_providers": {
+        "Meta": 14
+      },
+      "http_statuses": {
+        "200": 14
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 1875,
+      "returned_cues_per_second": 7.561638379495624,
+      "progress_cues_per_second": 7.561638379495624,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 14,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 31.990188047999254,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2490,
+            "completion_tokens": 5431,
+            "total_tokens": 7921,
+            "cost": 0.0013352,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2816
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 57.012097109000024,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2609,
+            "completion_tokens": 6308,
+            "total_tokens": 8917,
+            "cost": 0.0015225,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3649
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 35.77082898599838,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2509,
+            "completion_tokens": 5365,
+            "total_tokens": 7874,
+            "cost": 0.0013239,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2790
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 47.85477000799801,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2496,
+            "completion_tokens": 5706,
+            "total_tokens": 8202,
+            "cost": 0.0013908,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2995
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 51.28224994199991,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2638,
+            "completion_tokens": 6118,
+            "total_tokens": 8756,
+            "cost": 0.0014874,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3236
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 50.29104935500072,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2497,
+            "completion_tokens": 5826,
+            "total_tokens": 8323,
+            "cost": 0.00135365,
+            "prompt_tokens_details": {
+              "cached_tokens": 625,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3278
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 55.851582903000235,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2583,
+            "completion_tokens": 5979,
+            "total_tokens": 8562,
+            "cost": 0.00139285,
+            "prompt_tokens_details": {
+              "cached_tokens": 625,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3271
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 54.45278935399983,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2522,
+            "completion_tokens": 7153,
+            "total_tokens": 9675,
+            "cost": 0.0016828,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4475
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 49.92364014999839,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2503,
+            "completion_tokens": 5817,
+            "total_tokens": 8320,
+            "cost": 0.0014137,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3086
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 45.689157378001255,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2475,
+            "completion_tokens": 5701,
+            "total_tokens": 8176,
+            "cost": 0.0013877,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3075
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 47.65106520500194,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2680,
+            "completion_tokens": 5959,
+            "total_tokens": 8639,
+            "cost": 0.0014598,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3217
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 27.630443621997983,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2658,
+            "completion_tokens": 5612,
+            "total_tokens": 8270,
+            "cost": 0.0013882,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2771
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 43.9958438270005,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 2522,
+            "completion_tokens": 5761,
+            "total_tokens": 8283,
+            "cost": 0.00134315,
+            "prompt_tokens_details": {
+              "cached_tokens": 625,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3089
+            }
+          }
+        },
+        {
+          "model": "meta/muse-spark-1.3-contributor",
+          "provider_request": {
+            "only": [
+              "meta"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 19.874235458999465,
+          "provider": "Meta",
+          "response_model": "meta/muse-spark-1.3-contributor",
+          "usage": {
+            "prompt_tokens": 1392,
+            "completion_tokens": 2309,
+            "total_tokens": 3701,
+            "cost": 0.000601,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1324
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "nvidia/nemotron-3.5-lightning:free",
+      "category_ranks": [],
+      "status": "failed",
+      "client_seconds": 2.403207616000145,
+      "elapsedSeconds": 1.52,
+      "completedLines": 0,
+      "totalLines": 1340,
+      "returned_cues": 0,
+      "unique_positions": 0,
+      "missing_cues": 1340,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 0,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": null,
+      "totalCost": null,
+      "provider_requests": 0,
+      "responses_with_cost": 0,
+      "observed_cost": null,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 0,
+      "actual_providers": {},
+      "http_statuses": {},
+      "session_count": 0,
+      "session_stable": null,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": null,
+      "returned_cues_per_second": null,
+      "progress_cues_per_second": 0.0,
+      "result_available": false,
+      "completion_cost_known_zero": true,
+      "responses_with_cache_usage": 0,
+      "cache_usage_complete": true,
+      "routing_receipts": []
+    },
+    {
+      "model": "inclusionai/ling-3.0-flash-fin:free",
+      "category_ranks": [],
+      "status": "failed",
+      "client_seconds": 2.4061426839980413,
+      "elapsedSeconds": 1.58,
+      "completedLines": 0,
+      "totalLines": 1340,
+      "returned_cues": 0,
+      "unique_positions": 0,
+      "missing_cues": 1340,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 0,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": null,
+      "totalCost": null,
+      "provider_requests": 0,
+      "responses_with_cost": 0,
+      "observed_cost": null,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 0,
+      "actual_providers": {},
+      "http_statuses": {},
+      "session_count": 0,
+      "session_stable": null,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": null,
+      "returned_cues_per_second": null,
+      "progress_cues_per_second": 0.0,
+      "result_available": false,
+      "completion_cost_known_zero": true,
+      "responses_with_cache_usage": 0,
+      "cache_usage_complete": true,
+      "routing_receipts": []
+    },
+    {
+      "model": "google/gemini-3.5-flash-lite",
+      "category_ranks": [
+        8
+      ],
+      "status": "partial",
+      "client_seconds": 10.310568210999918,
+      "elapsedSeconds": 9.93,
+      "completedLines": 310,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 1034,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 20701,
+      "totalCost": 0.027878100000000003,
+      "provider_requests": 4,
+      "responses_with_cost": 4,
+      "observed_cost": 0.0278781,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 20701,
+      "actual_providers": {
+        "Google AI Studio": 4
+      },
+      "http_statuses": {
+        "200": 4
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": 129.9637393960897,
+      "progress_cues_per_second": 30.06623821849836,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 4,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "google/gemini-3.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.238258498000505,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-3.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2587,
+            "completion_tokens": 3053,
+            "total_tokens": 5640,
+            "cost": 0.0084086,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.010779370000819,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-3.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2826,
+            "completion_tokens": 3317,
+            "total_tokens": 6143,
+            "cost": 0.0091403,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 1.489524460001121,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-3.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2727,
+            "completion_tokens": 267,
+            "total_tokens": 2994,
+            "cost": 0.0014856,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.5-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.375066191998485,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-3.5-flash-lite",
+          "usage": {
+            "prompt_tokens": 2712,
+            "completion_tokens": 3212,
+            "total_tokens": 5924,
+            "cost": 0.0088436,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "inception/mercury-2.5",
+      "category_ranks": [],
+      "status": "partial",
+      "client_seconds": 33.500027523001336,
+      "elapsedSeconds": 32.6,
+      "completedLines": 1098,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 254,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 104002,
+      "totalCost": 0.01180178,
+      "provider_requests": 12,
+      "responses_with_cost": 12,
+      "observed_cost": 0.01180178,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 104002,
+      "actual_providers": {
+        "Inception": 12
+      },
+      "http_statuses": {
+        "200": 12
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": 39.99996713674182,
+      "progress_cues_per_second": 32.776092474733225,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 12,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 7.6517500129994005,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2715,
+            "completion_tokens": 5570,
+            "total_tokens": 8285,
+            "cost": 0.0009441,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2433
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 7.6652867310003785,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2981,
+            "completion_tokens": 5714,
+            "total_tokens": 8695,
+            "cost": 0.00097634,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2486
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 11.265018096000858,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2792,
+            "completion_tokens": 5809,
+            "total_tokens": 8601,
+            "cost": 0.00098303,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2409
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 10.310560125002667,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2864,
+            "completion_tokens": 5196,
+            "total_tokens": 8060,
+            "cost": 0.00089396,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2474
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 11.756331778000458,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2962,
+            "completion_tokens": 5921,
+            "total_tokens": 8883,
+            "cost": 0.00100663,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2446
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 7.247539265001251,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2880,
+            "completion_tokens": 5238,
+            "total_tokens": 8118,
+            "cost": 0.0009009,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2489
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.262209771000926,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2871,
+            "completion_tokens": 5695,
+            "total_tokens": 8566,
+            "cost": 0.00096909,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2408
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 7.970438426000328,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2790,
+            "completion_tokens": 5539,
+            "total_tokens": 8329,
+            "cost": 0.00094245,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2393
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 10.010858893001569,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2873,
+            "completion_tokens": 8714,
+            "total_tokens": 11587,
+            "cost": 0.00142202,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2466
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 7.750520341000083,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2841,
+            "completion_tokens": 4263,
+            "total_tokens": 7104,
+            "cost": 0.00075309,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2491
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.454203278000932,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2972,
+            "completion_tokens": 5172,
+            "total_tokens": 8144,
+            "cost": 0.00089468,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2423
+            }
+          }
+        },
+        {
+          "model": "inception/mercury-2.5",
+          "provider_request": {
+            "only": [
+              "inception"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 12.246461411999917,
+          "provider": "Inception",
+          "response_model": "inception/mercury-2.5",
+          "usage": {
+            "prompt_tokens": 2991,
+            "completion_tokens": 6639,
+            "total_tokens": 9630,
+            "cost": 0.00111549,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2447
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "google/gemini-3.1-flash-lite",
+      "category_ranks": [
+        10
+      ],
+      "status": "completed",
+      "client_seconds": 44.55134324300161,
+      "elapsedSeconds": 43.39,
+      "completedLines": 1340,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 1,
+      "unchanged_cues": 13,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 81214,
+      "totalCost": 0.07513224999999998,
+      "provider_requests": 14,
+      "responses_with_cost": 14,
+      "observed_cost": 0.07513225,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 81214,
+      "actual_providers": {
+        "Google AI Studio": 4,
+        "Google": 10
+      },
+      "http_statuses": {
+        "200": 14
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": 30.077656529705088,
+      "progress_cues_per_second": 30.077656529705088,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 14,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.668502071999683,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2587,
+            "completion_tokens": 3038,
+            "total_tokens": 5625,
+            "cost": 0.00520375,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.276148873999773,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2826,
+            "completion_tokens": 3310,
+            "total_tokens": 6136,
+            "cost": 0.0056715,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.837884612999915,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2727,
+            "completion_tokens": 3158,
+            "total_tokens": 5885,
+            "cost": 0.00541875,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-ai-studio"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true,
+            "ignore": [
+              "google-ai-studio/flex",
+              "google-ai-studio/priority"
+            ]
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 8.560170116998052,
+          "provider": "Google AI Studio",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2712,
+            "completion_tokens": 3189,
+            "total_tokens": 5901,
+            "cost": 0.0054615,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 14.68703557399931,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2848,
+            "completion_tokens": 3456,
+            "total_tokens": 6304,
+            "cost": 0.005896,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 10.135291693997715,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2715,
+            "completion_tokens": 3258,
+            "total_tokens": 5973,
+            "cost": 0.00556575,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 10.408040798000002,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2786,
+            "completion_tokens": 3373,
+            "total_tokens": 6159,
+            "cost": 0.005756,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.887751524001942,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2732,
+            "completion_tokens": 3333,
+            "total_tokens": 6065,
+            "cost": 0.0056825,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.130010509001295,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2733,
+            "completion_tokens": 3209,
+            "total_tokens": 5942,
+            "cost": 0.00549675,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 9.511410699000407,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2677,
+            "completion_tokens": 3149,
+            "total_tokens": 5826,
+            "cost": 0.00539275,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 11.080507312999544,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2892,
+            "completion_tokens": 3490,
+            "total_tokens": 6382,
+            "cost": 0.005958,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 10.097973617001117,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2890,
+            "completion_tokens": 3391,
+            "total_tokens": 6281,
+            "cost": 0.005809,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 14.169877018000989,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 2727,
+            "completion_tokens": 3229,
+            "total_tokens": 5956,
+            "cost": 0.00552525,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        },
+        {
+          "model": "google/gemini-3.1-flash-lite",
+          "provider_request": {
+            "only": [
+              "google-vertex/global"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 6.108980653996696,
+          "provider": "Google",
+          "response_model": "google/gemini-3.1-flash-lite",
+          "usage": {
+            "prompt_tokens": 1499,
+            "completion_tokens": 1280,
+            "total_tokens": 2779,
+            "cost": 0.00229475,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "liquid/lfm-2.5-2.6b:free",
+      "category_ranks": [],
+      "status": "partial",
+      "client_seconds": 44.6303858680003,
+      "elapsedSeconds": 44.25,
+      "completedLines": 261,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 1,
+      "unchanged_cues": 1081,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 36576,
+      "totalCost": null,
+      "provider_requests": 4,
+      "responses_with_cost": 4,
+      "observed_cost": 0,
+      "observed_cost_complete": true,
+      "requests_without_cost": 0,
+      "interrupted_requests": 0,
+      "observed_total_tokens": 36576,
+      "actual_providers": {
+        "Liquid": 4
+      },
+      "http_statuses": {
+        "200": 4
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 1376,
+      "returned_cues_per_second": 30.024387509514483,
+      "progress_cues_per_second": 5.848033686554687,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 4,
+      "cache_usage_complete": true,
+      "routing_receipts": [
+        {
+          "model": "liquid/lfm-2.5-2.6b:free",
+          "provider_request": {
+            "only": [
+              "liquid/fp8"
+            ],
+            "max_price": {
+              "prompt": 0,
+              "completion": 0,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 40.25771651300238,
+          "provider": "Liquid",
+          "response_model": "liquid/lfm-2.5-2.6b:free",
+          "usage": {
+            "prompt_tokens": 2513,
+            "completion_tokens": 6857,
+            "total_tokens": 9370,
+            "cost": 0,
+            "prompt_tokens_details": {
+              "cached_tokens": 688,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4188
+            }
+          }
+        },
+        {
+          "model": "liquid/lfm-2.5-2.6b:free",
+          "provider_request": {
+            "only": [
+              "liquid/fp8"
+            ],
+            "max_price": {
+              "prompt": 0,
+              "completion": 0,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 43.675875810000434,
+          "provider": "Liquid",
+          "response_model": "liquid/lfm-2.5-2.6b:free",
+          "usage": {
+            "prompt_tokens": 2632,
+            "completion_tokens": 8192,
+            "total_tokens": 10824,
+            "cost": 0,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 6470
+            }
+          }
+        },
+        {
+          "model": "liquid/lfm-2.5-2.6b:free",
+          "provider_request": {
+            "only": [
+              "liquid/fp8"
+            ],
+            "max_price": {
+              "prompt": 0,
+              "completion": 0,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 37.51720244099852,
+          "provider": "Liquid",
+          "response_model": "liquid/lfm-2.5-2.6b:free",
+          "usage": {
+            "prompt_tokens": 2530,
+            "completion_tokens": 6552,
+            "total_tokens": 9082,
+            "cost": 0,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3864
+            }
+          }
+        },
+        {
+          "model": "liquid/lfm-2.5-2.6b:free",
+          "provider_request": {
+            "only": [
+              "liquid/fp8"
+            ],
+            "max_price": {
+              "prompt": 0,
+              "completion": 0,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 29.26184603299771,
+          "provider": "Liquid",
+          "response_model": "liquid/lfm-2.5-2.6b:free",
+          "usage": {
+            "prompt_tokens": 2524,
+            "completion_tokens": 4776,
+            "total_tokens": 7300,
+            "cost": 0,
+            "prompt_tokens_details": {
+              "cached_tokens": 688,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2593
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "qwen/qwen3.8-flash",
+      "category_ranks": [],
+      "status": "failed",
+      "client_seconds": 121.84395387900076,
+      "elapsedSeconds": 121.55,
+      "completedLines": 0,
+      "totalLines": 1340,
+      "returned_cues": 0,
+      "unique_positions": 0,
+      "missing_cues": 1340,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 0,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": null,
+      "totalCost": null,
+      "provider_requests": 4,
+      "responses_with_cost": 0,
+      "observed_cost": null,
+      "observed_cost_complete": false,
+      "requests_without_cost": 4,
+      "interrupted_requests": 3,
+      "observed_total_tokens": 0,
+      "actual_providers": {},
+      "http_statuses": {
+        "200": 3,
+        "429": 1
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": null,
+      "returned_cues_per_second": null,
+      "progress_cues_per_second": 0.0,
+      "result_available": false,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 0,
+      "cache_usage_complete": false,
+      "routing_receipts": [
+        {
+          "model": "qwen/qwen3.8-flash",
+          "provider_request": {
+            "only": [
+              "alibaba"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.45653891199981,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "qwen/qwen3.8-flash",
+          "provider_request": {
+            "only": [
+              "alibaba"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.95737011399979,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "qwen/qwen3.8-flash",
+          "provider_request": {
+            "only": [
+              "alibaba"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 429,
+          "seconds": 4.5851203269994585,
+          "provider_error_code": 429
+        },
+        {
+          "model": "qwen/qwen3.8-flash",
+          "provider_request": {
+            "only": [
+              "alibaba"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99830792500143,
+          "transport_error": "CancelledError"
+        }
+      ]
+    },
+    {
+      "model": "qwen/qwen3.7-flash",
+      "category_ranks": [
+        7
+      ],
+      "status": "failed",
+      "client_seconds": 121.84685843099942,
+      "elapsedSeconds": 121.54,
+      "completedLines": 0,
+      "totalLines": 1340,
+      "returned_cues": 0,
+      "unique_positions": 0,
+      "missing_cues": 1340,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 0,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": null,
+      "totalCost": null,
+      "provider_requests": 4,
+      "responses_with_cost": 0,
+      "observed_cost": null,
+      "observed_cost_complete": false,
+      "requests_without_cost": 4,
+      "interrupted_requests": 4,
+      "observed_total_tokens": 0,
+      "actual_providers": {},
+      "http_statuses": {
+        "200": 4
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": null,
+      "returned_cues_per_second": null,
+      "progress_cues_per_second": 0.0,
+      "result_available": false,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 0,
+      "cache_usage_complete": false,
+      "routing_receipts": [
+        {
+          "model": "qwen/qwen3.7-flash",
+          "provider_request": {
+            "only": [
+              "alibaba"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.48618598500252,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "qwen/qwen3.7-flash",
+          "provider_request": {
+            "only": [
+              "alibaba"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99173786999745,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "qwen/qwen3.7-flash",
+          "provider_request": {
+            "only": [
+              "alibaba"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.9909042190011,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "qwen/qwen3.7-flash",
+          "provider_request": {
+            "only": [
+              "alibaba"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99903382300181,
+          "transport_error": "CancelledError"
+        }
+      ]
+    },
+    {
+      "model": "dots-studio/dots-3-note-preview:free",
+      "category_ranks": [],
+      "status": "partial",
+      "client_seconds": 121.9959646089992,
+      "elapsedSeconds": 121.07,
+      "completedLines": 100,
+      "totalLines": 1340,
+      "returned_cues": 1340,
+      "unique_positions": 1340,
+      "missing_cues": 0,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 1241,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 15753,
+      "totalCost": null,
+      "provider_requests": 4,
+      "responses_with_cost": 2,
+      "observed_cost": 0,
+      "observed_cost_complete": false,
+      "requests_without_cost": 2,
+      "interrupted_requests": 2,
+      "observed_total_tokens": 15753,
+      "actual_providers": {
+        "AtlasCloud": 2
+      },
+      "http_statuses": {
+        "200": 4
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": 10.983969873878541,
+      "progress_cues_per_second": 0.8196992443192942,
+      "result_available": true,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 2,
+      "cache_usage_complete": false,
+      "routing_receipts": [
+        {
+          "model": "dots-studio/dots-3-note-preview:free",
+          "provider_request": {
+            "only": [
+              "atlas-cloud/fp8"
+            ],
+            "max_price": {
+              "prompt": 0,
+              "completion": 0,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 10.12328885900206,
+          "provider": "AtlasCloud",
+          "response_model": "dots-studio/dots-3-note-preview:free",
+          "usage": {
+            "prompt_tokens": 2177,
+            "completion_tokens": 535,
+            "total_tokens": 2712,
+            "cost": 0,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 535
+            }
+          }
+        },
+        {
+          "model": "dots-studio/dots-3-note-preview:free",
+          "provider_request": {
+            "only": [
+              "atlas-cloud/fp8"
+            ],
+            "max_price": {
+              "prompt": 0,
+              "completion": 0,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99712560800253,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "dots-studio/dots-3-note-preview:free",
+          "provider_request": {
+            "only": [
+              "atlas-cloud/fp8"
+            ],
+            "max_price": {
+              "prompt": 0,
+              "completion": 0,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99274330299886,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "dots-studio/dots-3-note-preview:free",
+          "provider_request": {
+            "only": [
+              "atlas-cloud/fp8"
+            ],
+            "max_price": {
+              "prompt": 0,
+              "completion": 0,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 96.23218441199788,
+          "provider": "AtlasCloud",
+          "response_model": "dots-studio/dots-3-note-preview:free",
+          "usage": {
+            "prompt_tokens": 2726,
+            "completion_tokens": 10315,
+            "total_tokens": 13041,
+            "cost": 0,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5801
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "z-ai/glm-5.3-flash",
+      "category_ranks": [
+        2
+      ],
+      "status": "client_timeout",
+      "client_seconds": 300.00187388799895,
+      "elapsedSeconds": 299.58,
+      "completedLines": 1240,
+      "totalLines": 1340,
+      "returned_cues": 0,
+      "unique_positions": 0,
+      "missing_cues": 1340,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 0,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 61169,
+      "totalCost": 0.013150649999999998,
+      "provider_requests": 17,
+      "responses_with_cost": 13,
+      "observed_cost": 0.01315065,
+      "observed_cost_complete": false,
+      "requests_without_cost": 4,
+      "interrupted_requests": 2,
+      "observed_total_tokens": 61169,
+      "actual_providers": {
+        "Wafer": 13
+      },
+      "http_statuses": {
+        "200": 15,
+        "429": 2
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": null,
+      "progress_cues_per_second": 4.133307515482169,
+      "result_available": false,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 13,
+      "cache_usage_complete": false,
+      "routing_receipts": [
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 61.91555940000035,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2527,
+            "completion_tokens": 2235,
+            "total_tokens": 4762,
+            "cost": 0.00103495,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 80.63452797399805,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2645,
+            "completion_tokens": 2317,
+            "total_tokens": 4962,
+            "cost": 0.00107545,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 66.79201560099682,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2606,
+            "completion_tokens": 2267,
+            "total_tokens": 4873,
+            "cost": 0.00105405,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 91.47949591200086,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2605,
+            "completion_tokens": 2594,
+            "total_tokens": 5199,
+            "cost": 0.0011684,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 56.62299476299813,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2756,
+            "completion_tokens": 2184,
+            "total_tokens": 4940,
+            "cost": 0.00104,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 71.65923864399883,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2631,
+            "completion_tokens": 2646,
+            "total_tokens": 5277,
+            "cost": 0.0011892,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99990390300081,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 65.63594609899883,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2651,
+            "completion_tokens": 2407,
+            "total_tokens": 5058,
+            "cost": 0.00110755,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 53.218301879001956,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2635,
+            "completion_tokens": 1876,
+            "total_tokens": 4511,
+            "cost": 0.0009201,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 60.95382828400034,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2595,
+            "completion_tokens": 1816,
+            "total_tokens": 4411,
+            "cost": 0.0008951,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 79.45761192300051,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2714,
+            "completion_tokens": 2715,
+            "total_tokens": 5429,
+            "cost": 0.00122165,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 57.93845946500005,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2703,
+            "completion_tokens": 1976,
+            "total_tokens": 4679,
+            "cost": 0.0009619,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 68.20037829300054,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 2553,
+            "completion_tokens": 2208,
+            "total_tokens": 4761,
+            "cost": 0.0010281,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 429,
+          "seconds": 0.38847123000232386,
+          "provider_error_code": 429
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "modal/fp8"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 88.09481675200004,
+          "transport_error": "TimeoutError"
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "modal/fp8"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 429,
+          "seconds": 0.7252965599982417,
+          "provider_error_code": 429
+        },
+        {
+          "model": "z-ai/glm-5.3-flash",
+          "provider_request": {
+            "only": [
+              "wafer"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 26.51521555599902,
+          "provider": "Wafer",
+          "response_model": "z-ai/glm-5.3-flash",
+          "usage": {
+            "prompt_tokens": 1413,
+            "completion_tokens": 894,
+            "total_tokens": 2307,
+            "cost": 0.0004542,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash-0731",
+      "category_ranks": [
+        5,
+        6
+      ],
+      "status": "client_timeout",
+      "client_seconds": 300.0020589070009,
+      "elapsedSeconds": 299.53,
+      "completedLines": 200,
+      "totalLines": 1340,
+      "returned_cues": 0,
+      "unique_positions": 0,
+      "missing_cues": 1340,
+      "duplicate_positions": 0,
+      "empty_cues": 0,
+      "unchanged_cues": 0,
+      "full_structural_success": false,
+      "timestamps_and_indices_preserved": true,
+      "source_unchanged": true,
+      "tokensUsed": 30863,
+      "totalCost": 0.01743258,
+      "provider_requests": 14,
+      "responses_with_cost": 4,
+      "observed_cost": 0.01743258,
+      "observed_cost_complete": false,
+      "requests_without_cost": 10,
+      "interrupted_requests": 10,
+      "observed_total_tokens": 47942,
+      "actual_providers": {
+        "Reka": 4
+      },
+      "http_statuses": {
+        "200": 14
+      },
+      "session_count": 1,
+      "session_stable": true,
+      "routing_payloads_unchanged": true,
+      "all_requests_price_bounded": true,
+      "cache_read_tokens": 0,
+      "returned_cues_per_second": null,
+      "progress_cues_per_second": 0.6666620913491763,
+      "result_available": false,
+      "completion_cost_known_zero": false,
+      "responses_with_cache_usage": 4,
+      "cache_usage_complete": false,
+      "routing_receipts": [
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.38768753200202,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.78281541999968,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99876434500038,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.9987174559974,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "reka/fp4"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 101.35833221000212,
+          "provider": "Reka",
+          "response_model": "deepseek/deepseek-v4-flash-0731",
+          "usage": {
+            "prompt_tokens": 2612,
+            "completion_tokens": 12427,
+            "total_tokens": 15039,
+            "cost": 0.00848914,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 7297
+            }
+          }
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "reka/fp4"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 105.74981851600023,
+          "provider": "Reka",
+          "response_model": "deepseek/deepseek-v4-flash-0731",
+          "usage": {
+            "prompt_tokens": 2728,
+            "completion_tokens": 13096,
+            "total_tokens": 15824,
+            "cost": 0.00894344,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 8330
+            }
+          }
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "reka/fp4"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99384373099747,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "reka/fp4"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 119.99845791300322,
+          "transport_error": "CancelledError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "reka/fp4"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 76.06746057999771,
+          "provider": "Reka",
+          "response_model": "deepseek/deepseek-v4-flash-0731",
+          "usage": {
+            "prompt_tokens": 2424,
+            "completion_tokens": 6804,
+            "total_tokens": 9228,
+            "cost": 0,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 6804
+            }
+          }
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "reka/fp4"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 59.94964862300185,
+          "provider": "Reka",
+          "response_model": "deepseek/deepseek-v4-flash-0731",
+          "usage": {
+            "prompt_tokens": 2235,
+            "completion_tokens": 5616,
+            "total_tokens": 7851,
+            "cost": 0,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5616
+            }
+          }
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 58.797182564998366,
+          "transport_error": "TimeoutError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 58.310133261999,
+          "transport_error": "TimeoutError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 12.567699700000958,
+          "transport_error": "TimeoutError"
+        },
+        {
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "provider_request": {
+            "only": [
+              "makora"
+            ],
+            "max_price": {
+              "prompt": 1,
+              "completion": 3,
+              "request": 0
+            },
+            "allow_fallbacks": true,
+            "require_parameters": true
+          },
+          "service_tier": null,
+          "price_guard_passed": true,
+          "forwarded": true,
+          "payload_unchanged": true,
+          "http_status": 200,
+          "seconds": 1.3525872829995933,
+          "transport_error": "TimeoutError"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,728 @@
+{
+  "verdict": "PASS",
+  "models_checked": 8,
+  "image": "sha256:0801c1d14faf99b7b1586d1188ab7ed53d10286ef0588a8e08c6269455e381b9",
+  "scope": "First cold request per model, independent arithmetic, no product router imported or executed",
+  "limitations": [
+    "Advertised estimates are not measured future performance.",
+    "Later requests may use affinity, learned speed, cooldowns, cache savings, or refreshed metadata.",
+    "Estimated request tokens are workload estimates, not billed tokenizer counts."
+  ],
+  "results": [
+    {
+      "model": "z-ai/glm-5.3-flash",
+      "actual_endpoint": "modal/fp8",
+      "expected_endpoint": "modal/fp8",
+      "input_tokens_estimated": 3213,
+      "output_tokens_estimated": 3936,
+      "authenticated_endpoint_count": 26,
+      "eligible_endpoints": {
+        "gmicloud/fp8": {
+          "cold_cost_usd": "0.001224975",
+          "prompt_usd_per_million": "0.075000000",
+          "completion_usd_per_million": "0.25000000",
+          "latency_p50_ms": 5973.5,
+          "throughput_p50_tokens_per_second": 19,
+          "estimated_seconds": "213.1313947368421052631578947"
+        },
+        "deepinfra/fp4": {
+          "cold_cost_usd": "0.001224975",
+          "prompt_usd_per_million": "0.075000000",
+          "completion_usd_per_million": "0.25000000",
+          "latency_p50_ms": 1640,
+          "throughput_p50_tokens_per_second": 25,
+          "estimated_seconds": "159.08"
+        },
+        "z-ai/fp8": {
+          "cold_cost_usd": "0.001224975",
+          "prompt_usd_per_million": "0.075000000",
+          "completion_usd_per_million": "0.25000000",
+          "latency_p50_ms": 4666,
+          "throughput_p50_tokens_per_second": 31,
+          "estimated_seconds": "131.6337419354838709677419355"
+        },
+        "relace/fp4": {
+          "cold_cost_usd": "0.00146997",
+          "prompt_usd_per_million": "0.09000000",
+          "completion_usd_per_million": "0.3000000",
+          "latency_p50_ms": 1349.5,
+          "throughput_p50_tokens_per_second": 47,
+          "estimated_seconds": "85.09418085106382978723404255"
+        },
+        "wafer": {
+          "cold_cost_usd": "0.00169890",
+          "prompt_usd_per_million": "0.1000000",
+          "completion_usd_per_million": "0.35000000",
+          "latency_p50_ms": 1174,
+          "throughput_p50_tokens_per_second": 15,
+          "estimated_seconds": "263.574"
+        },
+        "novita/fp8": {
+          "cold_cost_usd": "0.002155956",
+          "prompt_usd_per_million": "0.132000000",
+          "completion_usd_per_million": "0.44000000",
+          "latency_p50_ms": 4496.5,
+          "throughput_p50_tokens_per_second": 29,
+          "estimated_seconds": "140.2206379310344827586206897"
+        },
+        "streamlake/fp8": {
+          "cold_cost_usd": "0.002204955",
+          "prompt_usd_per_million": "0.135000000",
+          "completion_usd_per_million": "0.45000000",
+          "latency_p50_ms": 4379,
+          "throughput_p50_tokens_per_second": 30,
+          "estimated_seconds": "135.579"
+        },
+        "makora": {
+          "cold_cost_usd": "0.00229974",
+          "prompt_usd_per_million": "0.14000000",
+          "completion_usd_per_million": "0.47000000",
+          "latency_p50_ms": 507,
+          "throughput_p50_tokens_per_second": 102,
+          "estimated_seconds": "39.09523529411764705882352941"
+        },
+        "modal/fp8": {
+          "cold_cost_usd": "0.002449705005",
+          "prompt_usd_per_million": "0.149985000000",
+          "completion_usd_per_million": "0.49995000000",
+          "latency_p50_ms": 430,
+          "throughput_p50_tokens_per_second": 129,
+          "estimated_seconds": "30.94162790697674418604651163"
+        },
+        "coreweave/fp8": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 1310,
+          "throughput_p50_tokens_per_second": 45,
+          "estimated_seconds": "88.77666666666666666666666667"
+        },
+        "sail-research/fp8": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 2056,
+          "throughput_p50_tokens_per_second": 25,
+          "estimated_seconds": "159.496"
+        },
+        "nextbit/fp8": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 3454,
+          "throughput_p50_tokens_per_second": 23,
+          "estimated_seconds": "174.5844347826086956521739130"
+        },
+        "fireworks": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 1812.5,
+          "throughput_p50_tokens_per_second": 47,
+          "estimated_seconds": "85.55718085106382978723404255"
+        },
+        "phala/fp8": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 2781,
+          "throughput_p50_tokens_per_second": 92,
+          "estimated_seconds": "45.56360869565217391304347826"
+        },
+        "friendli": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 6338,
+          "throughput_p50_tokens_per_second": 105,
+          "estimated_seconds": "43.82371428571428571428571429"
+        },
+        "siliconflow/fp8": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 3113,
+          "throughput_p50_tokens_per_second": 27,
+          "estimated_seconds": "148.8907777777777777777777778"
+        },
+        "digitalocean": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 2454,
+          "throughput_p50_tokens_per_second": 16,
+          "estimated_seconds": "248.454"
+        },
+        "together": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 9234.5,
+          "throughput_p50_tokens_per_second": 107,
+          "estimated_seconds": "46.01954672897196261682242991"
+        },
+        "reka/fp8": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 1988.5,
+          "throughput_p50_tokens_per_second": 34,
+          "estimated_seconds": "117.7532058823529411764705882"
+        },
+        "baseten/fp8": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 695,
+          "throughput_p50_tokens_per_second": 130,
+          "estimated_seconds": "30.97192307692307692307692308"
+        },
+        "venice": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 1330,
+          "throughput_p50_tokens_per_second": 22,
+          "estimated_seconds": "180.2390909090909090909090909"
+        },
+        "io-net/fp8": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 1795,
+          "throughput_p50_tokens_per_second": 14,
+          "estimated_seconds": "282.9378571428571428571428571"
+        },
+        "cloudflare": {
+          "cold_cost_usd": "0.00244995",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 1084,
+          "throughput_p50_tokens_per_second": 55,
+          "estimated_seconds": "72.64763636363636363636363636"
+        },
+        "morph/fp8": {
+          "cold_cost_usd": "0.006591732",
+          "prompt_usd_per_million": "0.388000000",
+          "completion_usd_per_million": "1.358000000",
+          "latency_p50_ms": 2460,
+          "throughput_p50_tokens_per_second": 49,
+          "estimated_seconds": "82.78653061224489795918367347"
+        }
+      },
+      "cold_cost_ceiling_usd": "0.003674925",
+      "price_pool": [
+        "gmicloud/fp8",
+        "deepinfra/fp4",
+        "z-ai/fp8",
+        "relace/fp4",
+        "wafer",
+        "novita/fp8",
+        "streamlake/fp8",
+        "makora",
+        "modal/fp8",
+        "coreweave/fp8",
+        "sail-research/fp8",
+        "nextbit/fp8",
+        "fireworks",
+        "phala/fp8",
+        "friendli",
+        "siliconflow/fp8",
+        "digitalocean",
+        "together",
+        "reka/fp8",
+        "baseten/fp8",
+        "venice",
+        "io-net/fp8",
+        "cloudflare"
+      ],
+      "fast_pool": [
+        "modal/fp8",
+        "baseten/fp8"
+      ],
+      "balanced_pool": [
+        "modal/fp8",
+        "baseten/fp8"
+      ],
+      "fastest_seconds": "30.94162790697674418604651163",
+      "speed_ceiling_seconds": "37.12995348837209302325581396",
+      "selected_estimated_seconds": "30.94162790697674418604651163",
+      "selected_cold_cost_usd": "0.002449705005",
+      "excluded": {
+        "crusoe/fp4": "invalid_or_unhealthy",
+        "parasail/fp8": "invalid_or_unhealthy",
+        "morph/fp8": "price_outlier"
+      },
+      "choice_matches": true
+    },
+    {
+      "model": "deepseek/deepseek-v4-flash-0731",
+      "actual_endpoint": "reka/fp4",
+      "expected_endpoint": "reka/fp4",
+      "input_tokens_estimated": 3213,
+      "output_tokens_estimated": 3936,
+      "authenticated_endpoint_count": 29,
+      "eligible_endpoints": {
+        "open-inference/fp8": {
+          "cold_cost_usd": "0.00079041",
+          "prompt_usd_per_million": "0.05000000",
+          "completion_usd_per_million": "0.16000000",
+          "latency_p50_ms": 2692.5,
+          "throughput_p50_tokens_per_second": 15,
+          "estimated_seconds": "265.0925"
+        },
+        "deepinfra/fp8": {
+          "cold_cost_usd": "0.00090126",
+          "prompt_usd_per_million": "0.06000000",
+          "completion_usd_per_million": "0.18000000",
+          "latency_p50_ms": 854.5,
+          "throughput_p50_tokens_per_second": 18,
+          "estimated_seconds": "219.5211666666666666666666667"
+        },
+        "relace/fp4": {
+          "cold_cost_usd": "0.000917325",
+          "prompt_usd_per_million": "0.065000000",
+          "completion_usd_per_million": "0.18000000",
+          "latency_p50_ms": 1331,
+          "throughput_p50_tokens_per_second": 20,
+          "estimated_seconds": "198.131"
+        },
+        "sail-research/fp4": {
+          "cold_cost_usd": "0.000917325",
+          "prompt_usd_per_million": "0.065000000",
+          "completion_usd_per_million": "0.18000000",
+          "latency_p50_ms": 1313,
+          "throughput_p50_tokens_per_second": 23,
+          "estimated_seconds": "172.4434347826086956521739130"
+        },
+        "makora": {
+          "cold_cost_usd": "0.001056690",
+          "prompt_usd_per_million": "0.09000000",
+          "completion_usd_per_million": "0.195000000",
+          "latency_p50_ms": 712,
+          "throughput_p50_tokens_per_second": 47,
+          "estimated_seconds": "84.45668085106382978723404255"
+        },
+        "reka/fp4": {
+          "cold_cost_usd": "0.00295119",
+          "prompt_usd_per_million": "0.11000000",
+          "completion_usd_per_million": "0.66000000",
+          "latency_p50_ms": 640,
+          "throughput_p50_tokens_per_second": 74,
+          "estimated_seconds": "53.82918918918918918918918919"
+        },
+        "morph/bf16": {
+          "cold_cost_usd": "0.001764366294",
+          "prompt_usd_per_million": "0.123438000000",
+          "completion_usd_per_million": "0.3475000000",
+          "latency_p50_ms": 1953,
+          "throughput_p50_tokens_per_second": 3,
+          "estimated_seconds": "1313.953"
+        },
+        "inceptron/fp4": {
+          "cold_cost_usd": "0.00151977",
+          "prompt_usd_per_million": "0.13000000",
+          "completion_usd_per_million": "0.28000000",
+          "latency_p50_ms": 731,
+          "throughput_p50_tokens_per_second": 42,
+          "estimated_seconds": "94.44528571428571428571428571"
+        },
+        "coreweave/fp8": {
+          "cold_cost_usd": "0.00151977",
+          "prompt_usd_per_million": "0.13000000",
+          "completion_usd_per_million": "0.28000000",
+          "latency_p50_ms": 627,
+          "throughput_p50_tokens_per_second": 49,
+          "estimated_seconds": "80.95353061224489795918367347"
+        },
+        "streamlake/fp8": {
+          "cold_cost_usd": "0.001982772",
+          "prompt_usd_per_million": "0.132000000",
+          "completion_usd_per_million": "0.396000000",
+          "latency_p50_ms": 2291,
+          "throughput_p50_tokens_per_second": 37,
+          "estimated_seconds": "108.6693783783783783783783784"
+        },
+        "together": {
+          "cold_cost_usd": "0.00155190",
+          "prompt_usd_per_million": "0.14000000",
+          "completion_usd_per_million": "0.28000000",
+          "latency_p50_ms": 635,
+          "throughput_p50_tokens_per_second": 41,
+          "estimated_seconds": "96.635"
+        },
+        "parasail/fp8": {
+          "cold_cost_usd": "0.00155190",
+          "prompt_usd_per_million": "0.14000000",
+          "completion_usd_per_million": "0.28000000",
+          "latency_p50_ms": 875,
+          "throughput_p50_tokens_per_second": 29,
+          "estimated_seconds": "136.5991379310344827586206897"
+        },
+        "mancer/fp8": {
+          "cold_cost_usd": "0.002498145",
+          "prompt_usd_per_million": "0.165000000",
+          "completion_usd_per_million": "0.5000000",
+          "latency_p50_ms": 783,
+          "throughput_p50_tokens_per_second": 14,
+          "estimated_seconds": "281.9258571428571428571428571"
+        },
+        "venice": {
+          "cold_cost_usd": "0.001939875",
+          "prompt_usd_per_million": "0.175000000",
+          "completion_usd_per_million": "0.35000000",
+          "latency_p50_ms": 1075,
+          "throughput_p50_tokens_per_second": 21,
+          "estimated_seconds": "188.5035714285714285714285714"
+        },
+        "alibaba": {
+          "cold_cost_usd": "0.002643696",
+          "prompt_usd_per_million": "0.176000000",
+          "completion_usd_per_million": "0.528000000",
+          "latency_p50_ms": 1019,
+          "throughput_p50_tokens_per_second": 59,
+          "estimated_seconds": "67.73086440677966101694915254"
+        },
+        "fireworks": {
+          "cold_cost_usd": "0.00330462",
+          "prompt_usd_per_million": "0.22000000",
+          "completion_usd_per_million": "0.66000000",
+          "latency_p50_ms": 931,
+          "throughput_p50_tokens_per_second": 79,
+          "estimated_seconds": "50.75378481012658227848101266"
+        },
+        "siliconflow/fp8": {
+          "cold_cost_usd": "0.00330462",
+          "prompt_usd_per_million": "0.22000000",
+          "completion_usd_per_million": "0.66000000",
+          "latency_p50_ms": 1736,
+          "throughput_p50_tokens_per_second": 38,
+          "estimated_seconds": "105.3149473684210526315789474"
+        },
+        "deepseek": {
+          "cold_cost_usd": "0.00330462",
+          "prompt_usd_per_million": "0.22000000",
+          "completion_usd_per_million": "0.66000000",
+          "latency_p50_ms": 880,
+          "throughput_p50_tokens_per_second": 84,
+          "estimated_seconds": "47.73714285714285714285714286"
+        },
+        "gmicloud/fp8": {
+          "cold_cost_usd": "0.004296006",
+          "prompt_usd_per_million": "0.286000000",
+          "completion_usd_per_million": "0.858000000",
+          "latency_p50_ms": 2472,
+          "throughput_p50_tokens_per_second": 66,
+          "estimated_seconds": "62.10836363636363636363636364"
+        },
+        "nextbit/fp8": {
+          "cold_cost_usd": "0.005287392",
+          "prompt_usd_per_million": "0.352000000",
+          "completion_usd_per_million": "1.056000000",
+          "latency_p50_ms": 2177,
+          "throughput_p50_tokens_per_second": 47,
+          "estimated_seconds": "85.92168085106382978723404255"
+        },
+        "novita/fp8": {
+          "cold_cost_usd": "0.0061465932",
+          "prompt_usd_per_million": "0.4092000000",
+          "completion_usd_per_million": "1.2276000000",
+          "latency_p50_ms": 1733,
+          "throughput_p50_tokens_per_second": 76,
+          "estimated_seconds": "53.52247368421052631578947368"
+        },
+        "phala": {
+          "cold_cost_usd": "0.00660924",
+          "prompt_usd_per_million": "0.44000000",
+          "completion_usd_per_million": "1.32000000",
+          "latency_p50_ms": 1038.5,
+          "throughput_p50_tokens_per_second": 27.5,
+          "estimated_seconds": "144.1657727272727272727272727"
+        },
+        "baidu/fp8": {
+          "cold_cost_usd": "0.00660924",
+          "prompt_usd_per_million": "0.44000000",
+          "completion_usd_per_million": "1.32000000",
+          "latency_p50_ms": 609,
+          "throughput_p50_tokens_per_second": 158,
+          "estimated_seconds": "25.52039240506329113924050633"
+        },
+        "atlas-cloud/fp4": {
+          "cold_cost_usd": "0.00660924",
+          "prompt_usd_per_million": "0.44000000",
+          "completion_usd_per_million": "1.32000000",
+          "latency_p50_ms": 1115,
+          "throughput_p50_tokens_per_second": 50.5,
+          "estimated_seconds": "79.05559405940594059405940594"
+        },
+        "cloudflare": {
+          "cold_cost_usd": "0.00660924",
+          "prompt_usd_per_million": "0.44000000",
+          "completion_usd_per_million": "1.32000000",
+          "latency_p50_ms": 1500,
+          "throughput_p50_tokens_per_second": 50,
+          "estimated_seconds": "80.22"
+        }
+      },
+      "cold_cost_ceiling_usd": "0.0037472175",
+      "price_pool": [
+        "open-inference/fp8",
+        "deepinfra/fp8",
+        "relace/fp4",
+        "sail-research/fp4",
+        "makora",
+        "reka/fp4",
+        "morph/bf16",
+        "inceptron/fp4",
+        "coreweave/fp8",
+        "streamlake/fp8",
+        "together",
+        "parasail/fp8",
+        "mancer/fp8",
+        "venice",
+        "alibaba",
+        "fireworks",
+        "siliconflow/fp8",
+        "deepseek"
+      ],
+      "fast_pool": [
+        "reka/fp4",
+        "fireworks",
+        "deepseek"
+      ],
+      "balanced_pool": [
+        "reka/fp4"
+      ],
+      "fastest_seconds": "47.73714285714285714285714286",
+      "speed_ceiling_seconds": "57.28457142857142857142857143",
+      "selected_estimated_seconds": "53.82918918918918918918918919",
+      "selected_cold_cost_usd": "0.00295119",
+      "excluded": {
+        "digitalocean": "invalid_or_unhealthy",
+        "wafer/fast": "service_tier",
+        "baseten/fp8": "invalid_or_unhealthy",
+        "gmicloud/fp8": "price_outlier",
+        "nextbit/fp8": "price_outlier",
+        "novita/fp8": "price_outlier",
+        "phala": "price_outlier",
+        "baidu/fp8": "price_outlier",
+        "atlas-cloud/fp4": "price_outlier",
+        "cloudflare": "price_outlier"
+      },
+      "choice_matches": true
+    },
+    {
+      "model": "qwen/qwen3.7-flash",
+      "actual_endpoint": "alibaba",
+      "expected_endpoint": "alibaba",
+      "input_tokens_estimated": 3213,
+      "output_tokens_estimated": 3936,
+      "authenticated_endpoint_count": 1,
+      "eligible_endpoints": {
+        "alibaba": {
+          "cold_cost_usd": "0.000633774",
+          "prompt_usd_per_million": "0.03000000",
+          "completion_usd_per_million": "0.13000000",
+          "latency_p50_ms": 741,
+          "throughput_p50_tokens_per_second": 35,
+          "estimated_seconds": "113.1981428571428571428571429"
+        }
+      },
+      "cold_cost_ceiling_usd": "0.001901322",
+      "price_pool": [
+        "alibaba"
+      ],
+      "fast_pool": [
+        "alibaba"
+      ],
+      "balanced_pool": [
+        "alibaba"
+      ],
+      "fastest_seconds": "113.1981428571428571428571429",
+      "speed_ceiling_seconds": "135.8377714285714285714285715",
+      "selected_estimated_seconds": "113.1981428571428571428571429",
+      "selected_cold_cost_usd": "0.000633774",
+      "excluded": {},
+      "choice_matches": true
+    },
+    {
+      "model": "qwen/qwen3.8-flash",
+      "actual_endpoint": "makora/fp4",
+      "expected_endpoint": "makora/fp4",
+      "input_tokens_estimated": 3213,
+      "output_tokens_estimated": 3936,
+      "authenticated_endpoint_count": 2,
+      "eligible_endpoints": {
+        "makora/fp4": {
+          "cold_cost_usd": "0.00233187",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.47000000",
+          "latency_p50_ms": 647.5,
+          "throughput_p50_tokens_per_second": 113,
+          "estimated_seconds": "35.47935840707964601769911504"
+        },
+        "alibaba": {
+          "cold_cost_usd": "0.00249252",
+          "prompt_usd_per_million": "0.15000000",
+          "completion_usd_per_million": "0.47000000",
+          "latency_p50_ms": 2257,
+          "throughput_p50_tokens_per_second": 40,
+          "estimated_seconds": "100.657"
+        }
+      },
+      "cold_cost_ceiling_usd": "0.00699561",
+      "price_pool": [
+        "makora/fp4",
+        "alibaba"
+      ],
+      "fast_pool": [
+        "makora/fp4"
+      ],
+      "balanced_pool": [
+        "makora/fp4"
+      ],
+      "fastest_seconds": "35.47935840707964601769911504",
+      "speed_ceiling_seconds": "42.57523008849557522123893805",
+      "selected_estimated_seconds": "35.47935840707964601769911504",
+      "selected_cold_cost_usd": "0.00233187",
+      "excluded": {},
+      "choice_matches": true
+    },
+    {
+      "model": "inclusionai/ling-3.0-flash-fin:free",
+      "actual_endpoint": "novita",
+      "expected_endpoint": "novita",
+      "input_tokens_estimated": 3443,
+      "output_tokens_estimated": 4388,
+      "authenticated_endpoint_count": 1,
+      "eligible_endpoints": {
+        "novita": {
+          "cold_cost_usd": "0",
+          "prompt_usd_per_million": "0",
+          "completion_usd_per_million": "0",
+          "latency_p50_ms": 1315,
+          "throughput_p50_tokens_per_second": 129,
+          "estimated_seconds": "35.33050387596899224806201550"
+        }
+      },
+      "cold_cost_ceiling_usd": "0",
+      "price_pool": [
+        "novita"
+      ],
+      "fast_pool": [
+        "novita"
+      ],
+      "balanced_pool": [
+        "novita"
+      ],
+      "fastest_seconds": "35.33050387596899224806201550",
+      "speed_ceiling_seconds": "42.39660465116279069767441860",
+      "selected_estimated_seconds": "35.33050387596899224806201550",
+      "selected_cold_cost_usd": "0",
+      "excluded": {},
+      "choice_matches": true
+    },
+    {
+      "model": "dots-studio/dots-3-note-preview:free",
+      "actual_endpoint": "atlas-cloud/fp8",
+      "expected_endpoint": "atlas-cloud/fp8",
+      "input_tokens_estimated": 3213,
+      "output_tokens_estimated": 3936,
+      "authenticated_endpoint_count": 1,
+      "eligible_endpoints": {
+        "atlas-cloud/fp8": {
+          "cold_cost_usd": "0",
+          "prompt_usd_per_million": "0",
+          "completion_usd_per_million": "0",
+          "latency_p50_ms": 1396.5,
+          "throughput_p50_tokens_per_second": 51,
+          "estimated_seconds": "78.57297058823529411764705882"
+        }
+      },
+      "cold_cost_ceiling_usd": "0",
+      "price_pool": [
+        "atlas-cloud/fp8"
+      ],
+      "fast_pool": [
+        "atlas-cloud/fp8"
+      ],
+      "balanced_pool": [
+        "atlas-cloud/fp8"
+      ],
+      "fastest_seconds": "78.57297058823529411764705882",
+      "speed_ceiling_seconds": "94.28756470588235294117647058",
+      "selected_estimated_seconds": "78.57297058823529411764705882",
+      "selected_cold_cost_usd": "0",
+      "excluded": {},
+      "choice_matches": true
+    },
+    {
+      "model": "liquid/lfm-2.5-2.6b:free",
+      "actual_endpoint": "liquid/fp8",
+      "expected_endpoint": "liquid/fp8",
+      "input_tokens_estimated": 3213,
+      "output_tokens_estimated": 3936,
+      "authenticated_endpoint_count": 1,
+      "eligible_endpoints": {
+        "liquid/fp8": {
+          "cold_cost_usd": "0",
+          "prompt_usd_per_million": "0",
+          "completion_usd_per_million": "0",
+          "latency_p50_ms": 658,
+          "throughput_p50_tokens_per_second": 110,
+          "estimated_seconds": "36.43981818181818181818181818"
+        }
+      },
+      "cold_cost_ceiling_usd": "0",
+      "price_pool": [
+        "liquid/fp8"
+      ],
+      "fast_pool": [
+        "liquid/fp8"
+      ],
+      "balanced_pool": [
+        "liquid/fp8"
+      ],
+      "fastest_seconds": "36.43981818181818181818181818",
+      "speed_ceiling_seconds": "43.72778181818181818181818182",
+      "selected_estimated_seconds": "36.43981818181818181818181818",
+      "selected_cold_cost_usd": "0",
+      "excluded": {},
+      "choice_matches": true
+    },
+    {
+      "model": "nvidia/nemotron-3.5-lightning:free",
+      "actual_endpoint": "nvidia/nvfp4",
+      "expected_endpoint": "nvidia/nvfp4",
+      "input_tokens_estimated": 3213,
+      "output_tokens_estimated": 3936,
+      "authenticated_endpoint_count": 1,
+      "eligible_endpoints": {
+        "nvidia/nvfp4": {
+          "cold_cost_usd": "0",
+          "prompt_usd_per_million": "0",
+          "completion_usd_per_million": "0",
+          "latency_p50_ms": 13484.5,
+          "throughput_p50_tokens_per_second": 10,
+          "estimated_seconds": "407.0845"
+        }
+      },
+      "cold_cost_ceiling_usd": "0",
+      "price_pool": [
+        "nvidia/nvfp4"
+      ],
+      "fast_pool": [
+        "nvidia/nvfp4"
+      ],
+      "balanced_pool": [
+        "nvidia/nvfp4"
+      ],
+      "fastest_seconds": "407.0845",
+      "speed_ceiling_seconds": "488.50140",
+      "selected_estimated_seconds": "407.0845",
+      "selected_cold_cost_usd": "0",
+      "excluded": {},
+      "choice_matches": true
+    }
+  ]
+}

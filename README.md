@@ -90,12 +90,14 @@ Add that setting to `.env` for the supplied Compose setup, then run `docker comp
 
 1. Enter your **OpenRouter API key** and click **Connect**. No service token or encryption key is needed in the GUI. Connection checks use OpenRouter's [key endpoint](https://openrouter.ai/docs/api_reference/limits), without making a translation request.
 2. Optionally select **Remember on this device** to save and reuse the validated key in this browser. **Forget saved key** removes it and disconnects. Unchecking Remember also removes the saved copy.
-3. Add UTF-8 `.srt` files, choose the source and target languages, and select a model or enter a custom ID. Luna is preselected, with the full OpenRouter catalog available. Choose Lowest price (`:floor`, the default), Fastest (`:nitro`), or OpenRouter default routing. **Service tier** starts at **Standard**, which keeps that routing preference while disabling automatic Flex and priority tier selection. **Follow routing** allows discounted Flex with `:floor` or priority capacity with `:nitro`.
+3. Add UTF-8 `.srt` files, choose the source and target languages, and select a model or enter a custom ID. Luna is preselected, with the full OpenRouter catalog available. Choose Lowest price (`:floor`, the default), Fastest (`:nitro`), SmartFast (price + speed), or OpenRouter default routing. **Service tier** starts at **Standard**, which keeps that routing preference while disabling automatic Flex and priority tier selection. **Follow routing** allows discounted Flex with `:floor` or priority capacity with `:nitro`. SmartFast uses standard capacity unless you explicitly choose another tier through a provider restriction or the API.
 4. Translate the batch, follow each file's progress and reported cost, then download individual SRTs or the ready results as a ZIP.
 
 The preview supports side-by-side comparison, subtitle italics/bold/underline, cue search, direct cue entry and keyboard navigation. Partial downloads show translated-cue coverage separately from completed batches. **Request options** sets a provider deadline of 2, 5 or 10 minutes; the UI starts at 2 minutes, and a request that stalls is retried once at the same size before the batch is split. A longer deadline gives slow routes more time, but does not guarantee provider availability. Flex capacity can be much slower or unavailable. Standard capacity can cost more than the catalog price and the historical `:floor` estimates below. See [OpenRouter service tiers](https://openrouter.ai/docs/guides/features/service-tiers) and [service compatibility](#subtitle-translation-leaderboard).
 
 To select a specific provider, open **Request options** and enter its OpenRouter ID in **Provider**, for example `azure`. The request is restricted to that provider with fallbacks disabled, so it must serve the selected model. Leave it empty for automatic selection. Routing and tier settings still apply, but a tier-specific endpoint ID can change the eligible tier and price. This can help when one provider is slow, but does not guarantee availability.
+
+**SmartFast** filters providers by price and estimated request time, then keeps each job with an eligible provider when possible. Selecting it reveals five controls in **Request options**: median premium (50%), speed tolerance (20%), sparse pool multiplier (3), maximum input price ($1 per million tokens), and maximum output price ($3 per million tokens). These are quoted rate limits, not a total bill budget. Cache hits and faster translations are not guaranteed. See [SmartFast routing](docs/smartfast.md) for selection rules, API examples and Bazarr+ model suffix usage. The full-file SmartFast benchmark below is separate from the historical routing comparisons.
 
 **Reasoning** starts at **Off**, which explicitly disables reasoning for subtitle translation. **Model default** omits the setting, and catalog-supported effort levels are available when reported. A model that declares mandatory reasoning cannot use Off. Changing models keeps your explicit selection and explains incompatible choices before you submit. Custom model IDs remain usable with Off or Model default; the backend checks metadata when available.
 
@@ -240,6 +242,138 @@ Luna, 24 × 40 min = $0.000455175 × 14,400 / 20 = $0.327726
 Use the same formula with any model's cost per 20 cues in the leaderboard. For an actual file, substitute its cue count. For multiple target languages or seasons, sum their estimates; multiplying by their count is a rough shortcut when the volumes are similar.
 
 These are **API-cost extrapolations, not measured full-episode or movie bills**. They assume similar text length per cue, 20-cue batches, unchanged provider prices and reasoning settings, and no failed attempts or retries. Unknown charges from timed-out requests are excluded. Cue length, target language, batch size, reasoning volume, retries, caching and promotions can change the bill beyond the density range. Hosting and any account-level fees or taxes are not included. Request latency does not scale directly into movie runtime because parallelism and batch sizing change it.
+
+<!-- smartfast-sdk-benchmark:start -->
+### SmartFast with the official SDK and ten-minute requests, September 9, 2026
+
+**1/8 models in the repeated eight-model cohort returned a structurally complete file.** These eight jobs launched together with a 600-second cap each, using the same 1,340-cue English Matrix subtitle file for Hungarian translation through the actual 2.0.0 RC encrypted queued-content API. Each job used 100-cue batches, four parallel batches, temperature 0.3, unspecified reasoning and a stable opaque session. Each encrypted request explicitly set requestTimeout to 600 seconds, and the service used the same 600-second default. The external 600-second job cap bounded work even though the root recovery budget was 1,800 seconds. The observer allowed 605 seconds of read inactivity within the absolute remaining job window. This is the Bazarr+ wire format and authentication flow; the harness did not run inside Bazarr.
+
+Completion requests now use the [official OpenRouter Python SDK](https://openrouter.ai/docs/client-sdks/python/overview), pinned to 1.1.133. The SDK constructs and dispatches requests with its retries disabled; the translator retains its response parsing, recovery rules and cancellation. The migration preserves reasoning fields missing from this SDK schema. Prices and authenticated endpoint metrics were captured before completion admission. Latency scoring retains the earlier milliseconds-to-seconds correction.
+
+SmartFast kept its median +50% price cutoff, sparse-pool 3x limit, 20% estimated speed band and $1 input / $3 output per million token ceilings. Free variants retained exact zero price caps. Affinity can retain an eligible provider until three successful slow observations, so this is not an absolute-fastest guarantee on every request. This repeats the preceding eight-model cohort with a changed SDK, request deadline and Retry-After handling. Changing endpoint conditions and these combined changes prevent attributing timing differences to the SDK alone.
+
+| Model | Result | Progress cues | Returned cues | Seconds | Requests | Service tokens | Cache-read tokens | Observed cost, USD |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `qwen/qwen3.7-flash` | Complete | 1340 | 1340 | 590.412 | 24 | 235127 | 2560 | $0.026018 |
+| `inclusionai/ling-3.0-flash-fin:free` | Failed | 0 | 0 | 92.788 | 14 | unknown | unknown | unknown |
+| `nvidia/nemotron-3.5-lightning:free` | 600s cap | 0 | 0 | 600.012 | 7 | unknown | 0 | $0.000000* |
+| `dots-studio/dots-3-note-preview:free` | 600s cap | 0 | 0 | 600.014 | 32 | unknown | 7680 | $0.000000* |
+| `liquid/lfm-2.5-2.6b:free` | 600s cap | 484 | 0 | 600.017 | 86 | 147871 | 46000 | $0.000000* |
+| `qwen/qwen3.8-flash` | 600s cap | 800 | 0 | 600.020 | 17 | 145303 | 2048 | $0.060812* |
+| `deepseek/deepseek-v4-flash-0731` | 600s cap | 500 | 0 | 600.022 | 9 | 251175 | 0 | $0.159868* |
+| `z-ai/glm-5.3-flash` | 600s cap | 600 | 0 | 600.023 | 31 | 127921 | 0 | $0.043054* |
+
+Observed response charges totaled **$0.28975240**, with **79 requests missing cost values**. An asterisk marks a lower bound. Service counters include finished roots, while observed usage includes returned responses from work still in progress. Missing usage is unknown, including for an interrupted free request. Cache counts are actual response usage, not inferred savings.
+
+The observer forwarded upstream Retry-After headers unchanged. Receipts record their presence and normalized delay, while response status and body bytes pass through unchanged. Diagnostic failures are isolated from response delivery and recorded separately.
+
+Progress cues count service-reported translated work. Returned cues describe result structure and may include original-text fallbacks for partial jobs. A capped running job can report progress without exposing result lines. Complete structure and preserved timestamps do not establish translation quality. HTTP 200 headers and keepalive bytes do not establish a completed response.
+
+Raw results: [JSON](docs/benchmarks/2026-09-09-smartfast-sdk.json), [CSV](docs/benchmarks/2026-09-09-smartfast-sdk.csv), [price preflight](docs/benchmarks/2026-09-09-smartfast-sdk-prices.json), [authenticated endpoint metrics](docs/benchmarks/2026-09-09-smartfast-sdk-endpoints.json), [routing and stall diagnosis](docs/benchmarks/2026-09-09-smartfast-sdk-diagnosis.md). Prior numeric artifacts remain unchanged.
+<!-- smartfast-sdk-benchmark:end -->
+
+<!-- smartfast-tenminute-benchmark:start -->
+### Ten-minute SmartFast retry after latency correction, September 9, 2026
+
+**1/8 previously unfinished models returned a structurally complete file.** These eight jobs launched together with a 600-second cap each, using the same 1,340-cue English Matrix subtitle file for Hungarian translation through the actual 2.0.0 RC encrypted queued-content API. Each job used 100-cue batches, four parallel batches, temperature 0.3, unspecified reasoning and a stable opaque session. Individual request deadlines remained 120 seconds, and each root retained its existing 360-second recovery budget. This is the Bazarr+ wire format and authentication flow; the harness did not run inside Bazarr.
+
+Before this retry, a confirmed speed-scoring defect was corrected: catalog latency is milliseconds and now converts to seconds before adding output-token generation time. The earlier tables retain measurements made before that correction. Their speed selections are not validated by this run. See the [official endpoint schema](https://openrouter.ai/openapi.json). Prices and authenticated endpoint metrics were captured, and the production request body passed unchanged through an observer that records header/body timing, keepalive bytes, output counts and reported usage.
+
+SmartFast kept its median +50% price cutoff, sparse-pool 3x limit, 20% estimated speed band and $1 input / $3 output per million token ceilings. Free variants retained exact zero price caps. Affinity can retain an eligible provider until three successful slow observations, so this is not an absolute-fastest guarantee on every request. The smaller eight-model cohort, longer deadline and corrected ranking make this a separate diagnostic run, not a controlled timing comparison.
+
+| Model | Result | Progress cues | Returned cues | Seconds | Requests | Service tokens | Cache-read tokens | Observed cost, USD |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `deepseek/deepseek-v4-flash-0731` | Complete | 1340 | 1340 | 218.023 | 14 | 218281 | 0 | $0.124135 |
+| `inclusionai/ling-3.0-flash-fin:free` | Failed | 0 | 0 | 92.002 | 14 | unknown | unknown | unknown |
+| `z-ai/glm-5.3-flash` | 600s cap | 400 | 0 | 600.002 | 54 | 40044 | 0 | $0.016347* |
+| `qwen/qwen3.7-flash` | 600s cap | 200 | 0 | 600.118 | 22 | 51808 | 0 | $0.002737* |
+| `qwen/qwen3.8-flash` | 600s cap | 400 | 0 | 600.120 | 38 | 30807 | 640 | $0.010860* |
+| `dots-studio/dots-3-note-preview:free` | 600s cap | 417 | 0 | 600.123 | 73 | 166860 | 18432 | $0.000000* |
+| `liquid/lfm-2.5-2.6b:free` | 600s cap | 501 | 0 | 600.125 | 103 | 157041 | 55536 | $0.000000* |
+| `nvidia/nemotron-3.5-lightning:free` | 600s cap | 0 | 0 | 600.126 | 20 | unknown | unknown | unknown |
+
+Observed response charges totaled **$0.15407905**, with **164 requests missing cost values**. An asterisk marks a lower bound. Service counters include finished roots, while observed usage includes returned responses from work still in progress. Missing usage is unknown, including for an interrupted free request. Cache counts are actual response usage, not inferred savings.
+
+The observer did not preserve upstream Retry-After headers. Rate-limit responses are recorded, but exact retry timing can differ from a direct Bazarr+ connection. The diagnosis details this limitation.
+
+Progress cues count service-reported translated work. Returned cues describe result structure and may include original-text fallbacks for partial jobs. A capped running job can report progress without exposing result lines. Complete structure and preserved timestamps do not establish translation quality. HTTP 200 headers and keepalive bytes do not establish a completed response.
+
+Raw results: [JSON](docs/benchmarks/2026-09-09-smartfast-tenminute.json), [CSV](docs/benchmarks/2026-09-09-smartfast-tenminute.csv), [price preflight](docs/benchmarks/2026-09-09-smartfast-tenminute-prices.json), [authenticated endpoint metrics](docs/benchmarks/2026-09-09-smartfast-tenminute-endpoints.json), [routing and stall diagnosis](docs/benchmarks/2026-09-09-smartfast-tenminute-diagnosis.md). Prior numeric artifacts remain unchanged.
+<!-- smartfast-tenminute-benchmark:end -->
+
+<!-- smartfast-recovery-benchmark:start -->
+### Full-file SmartFast rerun after routing correction, September 9, 2026
+
+**8/16 models returned a structurally complete file within five minutes.** All 16 jobs launched together, each receiving the same 1,340-cue English Matrix subtitle file for Hungarian translation. The corrected 2.0.0 candidate ran 100-cue batches with four parallel batches per job, temperature 0.3 and reasoning unspecified. Requests used the encrypted API-key override, `X-Auth-Token`, zero-based cue positions, Movie context, `POST /api/v1/jobs/translate/content` and status polling, matching the Bazarr+ wire flow. This harness did not execute inside Bazarr or change its settings.
+
+Every model used `:smartfast`. Provider prices were queried first. Defaults were median +50%, up to 20% slower estimated request time, 3x cheapest for sparse pools, and $1 input / $3 output per million token ceilings. Free variants required zero prices. A transparent observer preserved the production request body and recorded routing and usage. A 300-second watchdog stopped the isolated candidate; upstream response deadlines also enforced the cap. Qwen 3.5 remained excluded, and DeepSeek V4 Flash used the requested 0731 ID.
+
+| Model | Result | Progress cues | Returned cues | Seconds | Requests | Service tokens | Cache-read tokens | Observed cost, USD |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `google/gemini-3.5-flash-lite` | Complete | 1340 | 1340 | 36.587 | 14 | 80831 | 0 | $0.119861 |
+| `google/gemini-3.1-flash-lite` | Complete | 1340 | 1340 | 36.618 | 19 | 83992 | 0 | $0.075068 |
+| `google/gemini-2.5-flash-lite` | Complete | 1340 | 1340 | 41.525 | 17 | 82846 | 0 | $0.021324 |
+| `inception/mercury-2.5` | Complete | 1340 | 1340 | 44.680 | 14 | 114725 | 0 | $0.012936 |
+| `openai/gpt-4o-mini` | Complete | 1340 | 1340 | 72.734 | 15 | 68891 | 0 | $0.025552 |
+| `openai/gpt-5.6-luna` | Complete | 1340 | 1340 | 75.553 | 14 | 62753 | 0 | $0.042619 |
+| `meta/muse-spark-1.2-contributor` | Complete | 1340 | 1340 | 137.173 | 14 | 105740 | 0 | $0.017691 |
+| `meta/muse-spark-1.3-contributor` | Complete | 1340 | 1340 | 166.383 | 14 | 109940 | 1875 | $0.018347 |
+| `inclusionai/ling-3.0-flash-fin:free` | Failed | 0 | 0 | 91.944 | 14 | unknown | unknown | unknown |
+| `z-ai/glm-5.3-flash` | 300s cap | 0 | 0 | 300.001 | 17 | unknown | unknown | unknown |
+| `dots-studio/dots-3-note-preview:free` | 300s cap | 200 | 0 | 300.001 | 22 | 30467 | 3072 | $0.000000* |
+| `deepseek/deepseek-v4-flash-0731` | 300s cap | 100 | 0 | 300.002 | 17 | 15656 | 0 | $0.002039* |
+| `qwen/qwen3.8-flash` | 300s cap | 200 | 0 | 300.002 | 22 | 17716 | 0 | $0.008751* |
+| `liquid/lfm-2.5-2.6b:free` | 300s cap | 400 | 0 | 300.003 | 63 | 120513 | 40176 | $0.000000* |
+| `qwen/qwen3.7-flash` | 300s cap | 200 | 0 | 300.004 | 12 | 31920 | 5120 | $0.002592* |
+| `nvidia/nemotron-3.5-lightning:free` | 300s cap | 0 | 0 | 300.009 | 8 | unknown | unknown | unknown |
+
+Observed charges totaled **$0.34677928**, with **87 forwarded requests missing a cost value**. An asterisk marks a lower-bound cost, excluding unknown charges from interrupted or missing-usage responses. Service token/cost counters and observed response usage are separate measurements. A free endpoint can still fail capability, health or rate-limit checks.
+
+Progress cues are the service's reported translated count; returned cues measure recovered result structure. A job stopped while processing can report progress without exposing result lines. Partial results may contain original-text fallbacks. Complete structure and unchanged timings do not establish translation accuracy. This was one parallel run, not repeated trials or an isolated provider-speed test; shared load and account rate limits affect results. Cache-read counts are actual returned usage, not an inferred cache guarantee.
+
+This run uses the corrected router: partial, invalid and blank output can recover without quarantining a healthy endpoint, while temporary provider cooldowns retry within existing limits. Native JSON mode is optional: otherwise eligible endpoints without it receive the same translation instructions without the unsupported response_format field. The original run below is preserved. This is a fresh parallel measurement, so differences also reflect provider load, endpoint availability and model output variability.
+
+The JSON-mode fallback was exercised live: all 14 Ling requests and all eight Nemotron requests omitted `response_format` and kept zero price caps. Ling received OpenRouter HTTP 404 responses stating "All providers have been ignored"; the request routing did not contain an `ignore` field. Nemotron returned HTTP 200 headers but no completed response bodies before the request/job deadlines. These are recorded separately from the resolved capability rejection.
+
+Raw numeric receipts: [JSON](docs/benchmarks/2026-09-09-smartfast-recovery.json), [CSV](docs/benchmarks/2026-09-09-smartfast-recovery.csv), [provider price preflight](docs/benchmarks/2026-09-09-smartfast-recovery-prices.json). The JSON includes exact timing, routing, provider attribution, cost-completeness flags and source/image hashes. Earlier tables below retain their original routes and settings and are not directly comparable.
+<!-- smartfast-recovery-benchmark:end -->
+
+<!-- smartfast-parallel-benchmark:start -->
+### Historical full-file SmartFast benchmark, September 9, 2026
+
+**5/16 models returned a structurally complete file within five minutes.** All 16 jobs launched together, each receiving the same 1,340-cue English Matrix subtitle file for Hungarian translation. The actual 2.0.0 candidate ran 100-cue batches with four parallel batches per job, temperature 0.3 and reasoning unspecified. Requests used the encrypted API-key override, `X-Auth-Token`, zero-based cue positions, Movie context, `POST /api/v1/jobs/translate/content` and status polling, matching the Bazarr+ wire flow. This harness did not execute inside Bazarr or change its settings.
+
+Every model used `:smartfast`. Provider prices were queried first. Defaults were median +50%, up to 20% slower estimated request time, 3x cheapest for sparse pools, and $1 input / $3 output per million token ceilings. Free variants required zero prices. A transparent observer preserved the production request body and recorded routing and usage. A 300-second watchdog stopped the isolated candidate; upstream response deadlines also enforced the cap. Qwen 3.5 remained excluded, and DeepSeek V4 Flash used the requested 0731 ID.
+
+| Model | Result | Progress cues | Returned cues | Seconds | Requests | Service tokens | Cache-read tokens | Observed cost, USD |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `google/gemini-2.5-flash-lite` | Complete | 1340 | 1340 | 36.383 | 14 | 80580 | 0 | $0.021021 |
+| `openai/gpt-4o-mini` | Complete | 1340 | 1340 | 74.613 | 14 | 68246 | 0 | $0.025460 |
+| `openai/gpt-5.6-luna` | Complete | 1340 | 1340 | 84.654 | 14 | 62515 | 0 | $0.042333 |
+| `meta/muse-spark-1.2-contributor` | Complete | 1340 | 1340 | 133.031 | 14 | 105451 | 1250 | $0.017510 |
+| `meta/muse-spark-1.3-contributor` | Complete | 1340 | 1340 | 177.210 | 14 | 113619 | 1875 | $0.019083 |
+| `nvidia/nemotron-3.5-lightning:free` | Failed | 0 | 0 | 2.403 | 0 | unknown | unknown | $0.000000 |
+| `inclusionai/ling-3.0-flash-fin:free` | Failed | 0 | 0 | 2.406 | 0 | unknown | unknown | $0.000000 |
+| `google/gemini-3.5-flash-lite` | Partial | 310 | 1340 | 10.311 | 4 | 20701 | 0 | $0.027878 |
+| `inception/mercury-2.5` | Partial | 1098 | 1340 | 33.500 | 12 | 104002 | 0 | $0.011802 |
+| `google/gemini-3.1-flash-lite` | Complete API, 1 blank cue(s) | 1340 | 1340 | 44.551 | 14 | 81214 | 0 | $0.075132 |
+| `liquid/lfm-2.5-2.6b:free` | Partial | 261 | 1340 | 44.630 | 4 | 36576 | 1376 | $0.000000 |
+| `qwen/qwen3.8-flash` | Failed | 0 | 0 | 121.844 | 4 | unknown | unknown | unknown |
+| `qwen/qwen3.7-flash` | Failed | 0 | 0 | 121.847 | 4 | unknown | unknown | unknown |
+| `dots-studio/dots-3-note-preview:free` | Partial | 100 | 1340 | 121.996 | 4 | 15753 | 0 | $0.000000* |
+| `z-ai/glm-5.3-flash` | 300s cap | 1240 | 0 | 300.002 | 17 | 61169 | 0 | $0.013151* |
+| `deepseek/deepseek-v4-flash-0731` | 300s cap | 200 | 0 | 300.002 | 14 | 30863 | 0 | $0.017433* |
+
+Observed charges totaled **$0.27080201**, with **24 forwarded requests missing a cost value**. An asterisk marks a lower-bound cost, excluding unknown charges from interrupted or missing-usage responses. Service token/cost counters and observed response usage are separate measurements. A free endpoint can still fail capability, health or rate-limit checks.
+
+Progress cues are the service's reported translated count; returned cues measure recovered result structure. A job stopped while processing can report progress without exposing result lines. Partial results may contain original-text fallbacks. Complete structure and unchanged timings do not establish translation accuracy. This was one parallel run, not repeated trials or an isolated provider-speed test; shared load and account rate limits affect results. Cache-read counts are actual returned usage, not an inferred cache guarantee.
+
+**Historical SmartFast limitation exposed by this run:** the measured candidate could quarantine an endpoint after partial HTTP 200 output and fail immediately when no other endpoint remained. This affected several partial results, including Mercury. These numbers describe that implementation and are not evidence that the models cannot translate the full file.
+
+The subsequent recovery correction keeps incomplete or invalid output in bounded recovery, retries missing or blank cues, and reserves endpoint quarantine for transport failures and upstream errors. A sole endpoint, including a free endpoint, can be retried after its cooldown within the existing deadline. Native JSON response mode is optional: endpoints without it receive the same JSON translation instructions and output validation, with the unsupported field omitted. Free variants retain zero price caps on every retry. Local regression tests verify this behavior; these benchmark numbers precede the correction. The separate corrected rerun above records the later live measurement.
+
+Raw numeric receipts: [JSON](docs/benchmarks/2026-09-09-smartfast-parallel.json), [CSV](docs/benchmarks/2026-09-09-smartfast-parallel.csv), [provider price preflight](docs/benchmarks/2026-09-09-smartfast-parallel-prices.json). The JSON includes exact timing, routing, provider attribution, cost-completeness flags and source/image hashes. Earlier tables below retain their original routes and settings and are not directly comparable.
+<!-- smartfast-parallel-benchmark:end -->
 
 ### Full benchmark results
 
@@ -489,11 +623,14 @@ Provider routing (`provider.sort`) decides which OpenRouter provider serves the 
 | `latency` | `provider.sort: latency` | Lowest latency first |
 | `nitro` | `model:nitro` slug shortcut | Fastest, and priority-tier endpoints become eligible |
 | `floor` | `model:floor` slug shortcut | Cheapest, and flex-tier endpoints become eligible |
+| `smartfast` | Filtered `provider.only`, mandatory `max_price`, and `session_id` | Price limits, estimated speed and affinity for each job; see [SmartFast](docs/smartfast.md) |
 | `default` | nothing | OpenRouter's own load balancing |
 
-`nitro` and `floor` are supersets of the matching sort. OpenRouter does not stack slug variants, so on a slug that already carries one (`:thinking`, `:free`, ...) they fall back to the plain `throughput`/`price` sort. A `:nitro` or `:floor` typed straight into the model id is honoured as-is and no competing sort is sent. `provider.order`, `only`, `ignore` and `allowFallbacks` are passed through unchanged.
+`nitro` and `floor` are supersets of the matching sort. OpenRouter does not stack slug variants, so on a slug that already carries one (`:thinking`, `:free`, ...) they fall back to the plain `throughput`/`price` sort. A `:nitro` or `:floor` typed straight into the model id is honoured as-is and no competing sort is sent. For these existing routes, `provider.order`, `only`, `ignore` and `allowFallbacks` are passed through unchanged.
 
-Per-request `config.serviceTier` accepts `default` (standard capacity), `flex`, or `priority`. It is forwarded as OpenRouter's top-level `service_tier`. Setting `default` prevents route shortcuts from admitting Flex and priority tiers, while retaining their price or throughput sorting. Omitting it preserves OpenRouter's routing-based tier selection. The GUI explicitly selects standard capacity for new submissions; existing API clients retain their current behavior.
+SmartFast accepts `config.provider.sort: "smartfast"` or a trailing `:smartfast` on the model ID. The translator removes that local suffix before calling OpenRouter and preserves underlying variants, including `model:free:smartfast` and `model:thinking:smartfast`. Tune it with `config.provider.smartFast`; the [SmartFast guide](docs/smartfast.md) lists all fields and bounds. Manual provider order, stacked routing shortcuts and a competing sort are rejected. Explicit `only`, `ignore` and `allowFallbacks: false` restrictions remain effective within SmartFast's limits.
+
+Per-request `config.serviceTier` accepts `default` (standard capacity), `flex`, or `priority`. It is forwarded as OpenRouter's top-level `service_tier`. Setting `default` prevents route shortcuts from admitting Flex and priority tiers, while retaining their price or throughput sorting. Outside SmartFast, omitting it preserves OpenRouter's routing-based tier selection. SmartFast uses standard endpoints when it is omitted, unless an explicit `only` restriction selects another tier. The GUI explicitly selects standard capacity for new submissions; existing API clients retain their current behavior.
 
 ## Configuration
 
@@ -587,7 +724,7 @@ Reasoning configuration uses explicit catalog effort metadata when available, th
 - For effort-based models, the service forwards the requested effort, for example `{"reasoning": {"effort": "low"}}`
 - When the catalog declares supported efforts, an explicit effort is forwarded unchanged or rejected before a translation request if unsupported. This metadata takes priority over older token-budget model overrides. Without effort metadata, token-budget models accept `{"reasoning": {"maxTokens": N}}`; an `effort` value alone keeps the existing fallback behavior
 - `effort: "none"` or `enabled: false` sends `reasoning: {"effort": "none"}` to OpenRouter. Omitted reasoning settings retain model defaults. Models declaring mandatory reasoning in `/models` metadata reject explicit disable before a translation request is sent. Disable also conflicts with an explicitly selected thinking variant.
-- `response_format: json_object` is sent when reasoning is omitted or explicitly disabled. JSON mode only allows an object at the top level, so the prompt asks for `{"translations": [...]}`; asking for a bare array under JSON mode made some models (DeepSeek V4 Flash among them) answer with a single translated line per batch. The parser also accepts a wrapper under any single list-valued key.
+- `response_format: json_object` is sent when reasoning is omitted or explicitly disabled. SmartFast also requires every endpoint allowed for that request to support this optional field, otherwise it omits the field and keeps the same JSON instructions, cue validation and bounded recovery. JSON mode only allows an object at the top level, so the prompt asks for `{"translations": [...]}`; asking for a bare array under JSON mode made some models (DeepSeek V4 Flash among them) answer with a single translated line per batch. The parser also accepts a wrapper under any single list-valued key.
 - `response_format: json_object` is skipped when reasoning is enabled (some models misbehave with reasoning and JSON mode together)
 
 </details>

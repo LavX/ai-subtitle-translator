@@ -1,0 +1,2142 @@
+[
+  {
+    "model": "openai/gpt-5.6-luna",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "openai/flex",
+        "provider_name": "OpenAI",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.0000006",
+          "web_search": "0.01",
+          "input_cache_read": "0.00000001",
+          "input_cache_write": "0.000000125",
+          "discount": 0,
+          "overrides": [
+            {
+              "min_prompt_tokens": 272000,
+              "prompt": "0.0000002",
+              "completion": "0.0000009",
+              "input_cache_read": "0.00000002",
+              "input_cache_write": "0.00000025"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "azure",
+        "provider_name": "Azure",
+        "status": -5,
+        "pricing": {
+          "prompt": "0.0000002",
+          "completion": "0.0000012",
+          "web_search": "0.01",
+          "input_cache_read": "0.00000002",
+          "input_cache_write": "0.00000025",
+          "discount": 0,
+          "overrides": [
+            {
+              "min_prompt_tokens": 272000,
+              "prompt": "0.0000004",
+              "completion": "0.0000018",
+              "input_cache_read": "0.00000004",
+              "input_cache_write": "0.0000005"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "openai",
+        "provider_name": "OpenAI",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000002",
+          "completion": "0.0000012",
+          "web_search": "0.01",
+          "input_cache_read": "0.00000002",
+          "input_cache_write": "0.00000025",
+          "discount": 0,
+          "overrides": [
+            {
+              "min_prompt_tokens": 272000,
+              "prompt": "0.0000004",
+              "completion": "0.0000018",
+              "input_cache_read": "0.00000004",
+              "input_cache_write": "0.0000005"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "azure/us",
+        "provider_name": "Azure",
+        "status": -5,
+        "pricing": {
+          "prompt": "0.00000022",
+          "completion": "0.00000132",
+          "web_search": "0.01",
+          "input_cache_read": "0.000000022",
+          "input_cache_write": "0.000000275",
+          "discount": 0,
+          "overrides": [
+            {
+              "min_prompt_tokens": 272000,
+              "prompt": "0.00000044",
+              "completion": "0.00000198",
+              "input_cache_read": "0.000000044",
+              "input_cache_write": "0.00000055"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "amazon-bedrock/us-east-1",
+        "provider_name": "Amazon Bedrock",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000022",
+          "completion": "0.00000132",
+          "web_search": "0.01",
+          "input_cache_read": "0.000000022",
+          "input_cache_write": "0.000000275",
+          "discount": 0,
+          "overrides": [
+            {
+              "min_prompt_tokens": 272000,
+              "prompt": "0.00000044",
+              "completion": "0.00000198",
+              "input_cache_read": "0.000000044",
+              "input_cache_write": "0.00000055"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "azure/eu",
+        "provider_name": "Azure",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000022",
+          "completion": "0.00000132",
+          "web_search": "0.01",
+          "input_cache_read": "0.000000022",
+          "input_cache_write": "0.000000275",
+          "discount": 0,
+          "overrides": [
+            {
+              "min_prompt_tokens": 272000,
+              "prompt": "0.00000044",
+              "completion": "0.00000198",
+              "input_cache_read": "0.000000044",
+              "input_cache_write": "0.00000055"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "openai/fast",
+        "provider_name": "OpenAI",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000004",
+          "completion": "0.0000024",
+          "web_search": "0.01",
+          "input_cache_read": "0.00000004",
+          "input_cache_write": "0.0000005",
+          "discount": 0,
+          "overrides": [
+            {
+              "min_prompt_tokens": 272000,
+              "prompt": "0.0000008",
+              "completion": "0.0000036",
+              "input_cache_read": "0.00000008",
+              "input_cache_write": "0.000001"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "openai",
+        "amazon-bedrock/us-east-1",
+        "azure/eu"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput",
+      "ignore": [
+        "openai/fast",
+        "openai/flex"
+      ]
+    },
+    "model_sent": "openai/gpt-5.6-luna",
+    "response_format_present": false,
+    "response_format": null,
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "z-ai/glm-5.3-flash",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "gmicloud/fp8",
+        "provider_name": "GMICloud",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000075",
+          "completion": "0.00000025",
+          "input_cache_read": "0.000000015",
+          "discount": 0.5
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "deepinfra/fp4",
+        "provider_name": "DeepInfra",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000075",
+          "completion": "0.00000025",
+          "input_cache_read": "0.000000015",
+          "discount": 0.5
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "z-ai/fp8",
+        "provider_name": "Z.AI",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000075",
+          "completion": "0.00000025",
+          "input_cache_read": "0.000000015",
+          "discount": 0.5
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "relace/fp4",
+        "provider_name": "Relace",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000009",
+          "completion": "0.0000003",
+          "input_cache_read": "0.000000018",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "wafer",
+        "provider_name": "Wafer",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.00000035",
+          "input_cache_read": "0.00000002",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "novita/fp8",
+        "provider_name": "Novita",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000132",
+          "completion": "0.00000044",
+          "input_cache_read": "0.0000000264",
+          "discount": 0.12
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "streamlake/fp8",
+        "provider_name": "StreamLake",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000135",
+          "completion": "0.00000045",
+          "input_cache_read": "0.000000027",
+          "discount": 0.1
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "makora",
+        "provider_name": "Makora",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000014",
+          "completion": "0.00000047",
+          "input_cache_read": "0.000000024",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "modal/fp8",
+        "provider_name": "Modal",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000149985",
+          "completion": "0.00000049995",
+          "input_cache_read": "0.000000029997",
+          "discount": 0.6667
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "crusoe/fp4",
+        "provider_name": "Crusoe",
+        "status": -2,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "coreweave/fp8",
+        "provider_name": "CoreWeave",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000005",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "sail-research/fp8",
+        "provider_name": "Sail Research",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "nextbit/fp8",
+        "provider_name": "NextBit",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "fireworks",
+        "provider_name": "Fireworks",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "phala/fp8",
+        "provider_name": "Phala",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "friendli",
+        "provider_name": "Friendli",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "siliconflow/fp8",
+        "provider_name": "SiliconFlow",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "digitalocean",
+        "provider_name": "DigitalOcean",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "together",
+        "provider_name": "Together",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "reka/fp8",
+        "provider_name": "Reka",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "parasail/fp8",
+        "provider_name": "Parasail",
+        "status": -2,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "baseten/fp8",
+        "provider_name": "BaseTen",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "venice",
+        "provider_name": "Venice",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "io-net/fp8",
+        "provider_name": "Io Net",
+        "status": -2,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "cloudflare",
+        "provider_name": "Cloudflare",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000005",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "morph/fp8",
+        "provider_name": "Morph",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000388",
+          "completion": "0.000001358",
+          "input_cache_read": "0.0000000776",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "gmicloud/fp8",
+        "deepinfra/fp4",
+        "z-ai/fp8",
+        "relace/fp4",
+        "wafer",
+        "novita/fp8",
+        "streamlake/fp8",
+        "makora",
+        "modal/fp8",
+        "coreweave/fp8",
+        "sail-research/fp8",
+        "nextbit/fp8",
+        "fireworks",
+        "phala/fp8",
+        "friendli",
+        "siliconflow/fp8",
+        "digitalocean",
+        "together",
+        "reka/fp8",
+        "baseten/fp8",
+        "venice",
+        "cloudflare"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "z-ai/glm-5.3-flash",
+    "response_format_present": false,
+    "response_format": null,
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "google/gemini-2.5-flash-lite",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "google-vertex/eu",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.0000004",
+          "image": "0.0000001",
+          "audio": "0.0000003",
+          "input_audio_cache": "0.00000003",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000004",
+          "input_cache_read": "0.00000001",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.0000004",
+          "image": "0.0000001",
+          "audio": "0.0000003",
+          "input_audio_cache": "0.00000003",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000004",
+          "input_cache_read": "0.00000001",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio/flex",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000005",
+          "completion": "0.0000002",
+          "image": "0.00000005",
+          "audio": "0.00000015",
+          "input_audio_cache": "0.000000015",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000002",
+          "input_cache_read": "0.000000005",
+          "input_cache_write": "0.0000000416666666666667",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.0000004",
+          "image": "0.0000001",
+          "audio": "0.0000003",
+          "input_audio_cache": "0.00000003",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000004",
+          "input_cache_read": "0.00000001",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio/priority",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000018",
+          "completion": "0.00000072",
+          "image": "0.00000018",
+          "audio": "0.00000054",
+          "input_audio_cache": "0.000000054",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000072",
+          "input_cache_read": "0.000000018",
+          "input_cache_write": "0.00000015",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "google-vertex/eu",
+        "google-vertex",
+        "google-ai-studio"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput",
+      "ignore": [
+        "google-ai-studio/flex",
+        "google-ai-studio/priority"
+      ]
+    },
+    "model_sent": "google/gemini-2.5-flash-lite",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "deepseek/deepseek-v4-flash-0731",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "open-inference/fp8",
+        "provider_name": "OpenInference",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000005",
+          "completion": "0.00000016",
+          "input_cache_read": "0.000000013",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "deepinfra/fp8",
+        "provider_name": "DeepInfra",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000006",
+          "completion": "0.00000018",
+          "input_cache_read": "0.000000015",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "relace/fp4",
+        "provider_name": "Relace",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000065",
+          "completion": "0.00000018",
+          "input_cache_read": "0.000000016",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "sail-research/fp4",
+        "provider_name": "Sail Research",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000065",
+          "completion": "0.00000018",
+          "input_cache_read": "0.00000002",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "digitalocean",
+        "provider_name": "DigitalOcean",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000079996",
+          "completion": "0.000000252",
+          "input_cache_read": "0.0000000252",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "makora",
+        "provider_name": "Makora",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000009",
+          "completion": "0.000000195",
+          "input_cache_read": "0.0000000196",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "wafer/fast",
+        "provider_name": "Wafer",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.00000025",
+          "input_cache_read": "0.00000005",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "reka/fp4",
+        "provider_name": "Reka",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000011",
+          "completion": "0.00000066",
+          "input_cache_read": "0.000000007",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "morph/bf16",
+        "provider_name": "Morph",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000123438",
+          "completion": "0.0000003475",
+          "input_cache_read": "0.00000003125",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "baseten/fp8",
+        "provider_name": "BaseTen",
+        "status": -2,
+        "pricing": {
+          "prompt": "0.00000013",
+          "completion": "0.00000026",
+          "input_cache_read": "0.000000028",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "baseten/fp8",
+        "provider_name": "BaseTen",
+        "status": -2,
+        "pricing": {
+          "prompt": "0.00000013",
+          "completion": "0.00000026",
+          "input_cache_read": "0.000000028",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "inceptron/fp4",
+        "provider_name": "Inceptron",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000013",
+          "completion": "0.00000028",
+          "input_cache_read": "0.000000025",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "coreweave/fp8",
+        "provider_name": "CoreWeave",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000013",
+          "completion": "0.00000028",
+          "input_cache_read": "0.00000007",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "streamlake/fp8",
+        "provider_name": "StreamLake",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000132",
+          "completion": "0.000000396",
+          "input_cache_read": "0.0000000042",
+          "discount": 0.7
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "together",
+        "provider_name": "Together",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000014",
+          "completion": "0.00000028",
+          "input_cache_read": "0.00000003",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "parasail/fp8",
+        "provider_name": "Parasail",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000014",
+          "completion": "0.00000028",
+          "input_cache_read": "0.00000005",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "mancer/fp8",
+        "provider_name": "Mancer 2",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000165",
+          "completion": "0.0000005",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "venice",
+        "provider_name": "Venice",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000175",
+          "completion": "0.00000035",
+          "input_cache_read": "0.000000035",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "alibaba",
+        "provider_name": "Alibaba",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000176",
+          "completion": "0.000000528",
+          "input_cache_read": "0.0000000176",
+          "discount": 0,
+          "overrides": [
+            {
+              "utc_start": 0,
+              "utc_end": 1400,
+              "prompt": "0.000000352",
+              "completion": "0.000001056",
+              "input_cache_read": "0.0000000352"
+            },
+            {
+              "utc_start": 1400,
+              "utc_end": 0,
+              "prompt": "0.000000176",
+              "completion": "0.000000528",
+              "input_cache_read": "0.0000000176"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "fireworks",
+        "provider_name": "Fireworks",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000022",
+          "completion": "0.00000066",
+          "input_cache_read": "0.000000007",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "siliconflow/fp8",
+        "provider_name": "SiliconFlow",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000022",
+          "completion": "0.00000066",
+          "input_cache_read": "0.000000028",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "deepseek",
+        "provider_name": "DeepSeek",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000022",
+          "completion": "0.00000066",
+          "input_cache_read": "0.000000007",
+          "discount": 0,
+          "overrides": [
+            {
+              "utc_days": [
+                "saturday",
+                "sunday"
+              ],
+              "prompt": "0.00000022",
+              "completion": "0.00000066",
+              "input_cache_read": "0.000000007"
+            },
+            {
+              "utc_start": 0,
+              "utc_end": 100,
+              "utc_days": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday"
+              ],
+              "prompt": "0.00000022",
+              "completion": "0.00000066",
+              "input_cache_read": "0.000000007"
+            },
+            {
+              "utc_start": 100,
+              "utc_end": 400,
+              "utc_days": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday"
+              ],
+              "prompt": "0.00000044",
+              "completion": "0.00000132",
+              "input_cache_read": "0.000000014"
+            },
+            {
+              "utc_start": 400,
+              "utc_end": 600,
+              "utc_days": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday"
+              ],
+              "prompt": "0.00000022",
+              "completion": "0.00000066",
+              "input_cache_read": "0.000000007"
+            },
+            {
+              "utc_start": 600,
+              "utc_end": 1000,
+              "utc_days": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday"
+              ],
+              "prompt": "0.00000044",
+              "completion": "0.00000132",
+              "input_cache_read": "0.000000014"
+            },
+            {
+              "utc_start": 1000,
+              "utc_end": 0,
+              "utc_days": [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday"
+              ],
+              "prompt": "0.00000022",
+              "completion": "0.00000066",
+              "input_cache_read": "0.000000007"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "gmicloud/fp8",
+        "provider_name": "GMICloud",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000286",
+          "completion": "0.000000858",
+          "input_cache_read": "0.0000000091",
+          "discount": 0.35
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "nextbit/fp8",
+        "provider_name": "NextBit",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000352",
+          "completion": "0.000001056",
+          "input_cache_read": "0.000000012",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "novita/fp8",
+        "provider_name": "Novita",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000004092",
+          "completion": "0.0000012276",
+          "input_cache_read": "0.00000002604",
+          "discount": 0.07
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "phala",
+        "provider_name": "Phala",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000044",
+          "completion": "0.00000132",
+          "input_cache_read": "0.000000028",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "baidu/fp8",
+        "provider_name": "Baidu",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000044",
+          "completion": "0.00000132",
+          "input_cache_read": "0.000000014",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "atlas-cloud/fp4",
+        "provider_name": "AtlasCloud",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000044",
+          "completion": "0.00000132",
+          "input_cache_read": "0.000000028",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "cloudflare",
+        "provider_name": "Cloudflare",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000044",
+          "completion": "0.00000132",
+          "input_cache_read": "0.000000014",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "open-inference/fp8",
+        "deepinfra/fp8",
+        "relace/fp4",
+        "sail-research/fp4",
+        "digitalocean",
+        "makora",
+        "reka/fp4",
+        "morph/bf16",
+        "inceptron/fp4",
+        "coreweave/fp8",
+        "streamlake/fp8",
+        "together",
+        "parasail/fp8",
+        "mancer/fp8",
+        "venice",
+        "alibaba",
+        "fireworks",
+        "siliconflow/fp8",
+        "deepseek"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "deepseek/deepseek-v4-flash-0731",
+    "response_format_present": false,
+    "response_format": null,
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "qwen/qwen3.7-flash",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "alibaba",
+        "provider_name": "Alibaba",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000003",
+          "completion": "0.00000013",
+          "input_cache_read": "0.000000006",
+          "input_cache_write": "0.000000038",
+          "discount": 0,
+          "overrides": [
+            {
+              "min_prompt_tokens": 32000,
+              "prompt": "0.0000001",
+              "completion": "0.0000004",
+              "input_cache_read": "0.00000002",
+              "input_cache_write": "0.000000125"
+            },
+            {
+              "min_prompt_tokens": 256000,
+              "prompt": "0.0000002",
+              "completion": "0.0000008",
+              "input_cache_read": "0.00000004",
+              "input_cache_write": "0.00000025"
+            }
+          ]
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "alibaba"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "qwen/qwen3.7-flash",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "google/gemini-3.5-flash-lite",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "google-vertex/global/flex",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.00000125",
+          "image": "0.00000015",
+          "audio": "0.00000015",
+          "input_audio_cache": "0.000000015",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000125",
+          "input_cache_read": "0.000000015",
+          "input_cache_write": "0.0000000416666666666667",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio/flex",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.00000125",
+          "image": "0.00000015",
+          "audio": "0.00000015",
+          "input_audio_cache": "0.000000015",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000125",
+          "input_cache_read": "0.000000015",
+          "input_cache_write": "0.0000000416666666666667",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000003",
+          "completion": "0.0000025",
+          "image": "0.0000003",
+          "audio": "0.0000003",
+          "input_audio_cache": "0.00000003",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000025",
+          "input_cache_read": "0.00000003",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex/global",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000003",
+          "completion": "0.0000025",
+          "image": "0.0000003",
+          "audio": "0.0000003",
+          "input_audio_cache": "0.00000003",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000025",
+          "input_cache_read": "0.00000003",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex/eu",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000033",
+          "completion": "0.00000275",
+          "image": "0.00000033",
+          "audio": "0.00000033",
+          "input_audio_cache": "0.000000033",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000275",
+          "input_cache_read": "0.000000033",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex/us",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000033",
+          "completion": "0.00000275",
+          "image": "0.00000033",
+          "audio": "0.00000033",
+          "input_audio_cache": "0.000000033",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000275",
+          "input_cache_read": "0.000000033",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex/global/priority",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000054",
+          "completion": "0.0000045",
+          "image": "0.00000054",
+          "audio": "0.00000054",
+          "input_audio_cache": "0.000000054",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000045",
+          "input_cache_read": "0.000000054",
+          "input_cache_write": "0.00000015",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio/priority",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000054",
+          "completion": "0.0000045",
+          "image": "0.00000054",
+          "audio": "0.00000054",
+          "input_audio_cache": "0.000000054",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000045",
+          "input_cache_read": "0.000000054",
+          "input_cache_write": "0.00000015",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "google-ai-studio"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput",
+      "ignore": [
+        "google-ai-studio/flex",
+        "google-ai-studio/priority"
+      ]
+    },
+    "model_sent": "google/gemini-3.5-flash-lite",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "openai/gpt-4o-mini",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "azure",
+        "provider_name": "Azure",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000006",
+          "input_cache_read": "0.000000075",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "openai",
+        "provider_name": "OpenAI",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.0000006",
+          "input_cache_read": "0.000000075",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "azure/swedencentral",
+        "provider_name": "Azure",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000165",
+          "completion": "0.00000066",
+          "input_cache_read": "0.0000000825",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "azure",
+        "openai",
+        "azure/swedencentral"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "openai/gpt-4o-mini",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "google/gemini-3.1-flash-lite",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "google-vertex/global/flex",
+        "provider_name": "Google",
+        "status": -5,
+        "pricing": {
+          "prompt": "0.000000125",
+          "completion": "0.00000075",
+          "image": "0.000000125",
+          "audio": "0.00000025",
+          "input_audio_cache": "0.000000025",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000075",
+          "input_cache_read": "0.0000000125",
+          "input_cache_write": "0.0000000416666666666667",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio/flex",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000125",
+          "completion": "0.00000075",
+          "image": "0.000000125",
+          "audio": "0.00000025",
+          "input_audio_cache": "0.000000025",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000075",
+          "input_cache_read": "0.0000000125",
+          "input_cache_write": "0.0000000416666666666667",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000025",
+          "completion": "0.0000015",
+          "image": "0.00000025",
+          "audio": "0.0000005",
+          "input_audio_cache": "0.00000005",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000015",
+          "input_cache_read": "0.000000025",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex/global",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000025",
+          "completion": "0.0000015",
+          "image": "0.00000025",
+          "audio": "0.0000005",
+          "input_audio_cache": "0.00000005",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000015",
+          "input_cache_read": "0.000000025",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex/eu",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000275",
+          "completion": "0.00000165",
+          "image": "0.000000275",
+          "audio": "0.00000055",
+          "input_audio_cache": "0.000000055",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000165",
+          "input_cache_read": "0.0000000275",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex/us",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.000000275",
+          "completion": "0.00000165",
+          "image": "0.000000275",
+          "audio": "0.00000055",
+          "input_audio_cache": "0.000000055",
+          "web_search": "0.014",
+          "internal_reasoning": "0.00000165",
+          "input_cache_read": "0.0000000275",
+          "input_cache_write": "0.0000000833333333333333",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-vertex/global/priority",
+        "provider_name": "Google",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000045",
+          "completion": "0.0000027",
+          "image": "0.00000045",
+          "audio": "0.0000009",
+          "input_audio_cache": "0.00000009",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000027",
+          "input_cache_read": "0.000000045",
+          "input_cache_write": "0.00000015",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "google-ai-studio/priority",
+        "provider_name": "Google AI Studio",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000045",
+          "completion": "0.0000027",
+          "image": "0.00000045",
+          "audio": "0.0000009",
+          "input_audio_cache": "0.00000009",
+          "web_search": "0.014",
+          "internal_reasoning": "0.0000027",
+          "input_cache_read": "0.000000045",
+          "input_cache_write": "0.00000015",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "google-ai-studio",
+        "google-vertex/global",
+        "google-vertex/eu",
+        "google-vertex/us"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput",
+      "ignore": [
+        "google-ai-studio/flex",
+        "google-ai-studio/priority"
+      ]
+    },
+    "model_sent": "google/gemini-3.1-flash-lite",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "inception/mercury-2.5",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "inception",
+        "provider_name": "Inception",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000004",
+          "completion": "0.00000015",
+          "input_cache_read": "0.000000004",
+          "discount": 0.8
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "inception"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "inception/mercury-2.5",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "qwen/qwen3.8-flash",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "makora/fp4",
+        "provider_name": "Makora",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.00000047",
+          "input_cache_read": "0.000000016",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      },
+      {
+        "tag": "alibaba",
+        "provider_name": "Alibaba",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.00000015",
+          "completion": "0.00000047",
+          "input_cache_read": "0.000000016",
+          "input_cache_write": "0.0000002",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "makora/fp4",
+        "alibaba"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "qwen/qwen3.8-flash",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "meta/muse-spark-1.3-contributor",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "meta",
+        "provider_name": "Meta",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.0000002",
+          "web_search": "0.0025",
+          "input_cache_read": "0.000000002",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "meta"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "meta/muse-spark-1.3-contributor",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "inclusionai/ling-3.0-flash-fin:free",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "novita",
+        "provider_name": "Novita",
+        "status": 0,
+        "pricing": {
+          "prompt": "0",
+          "completion": "0",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "novita"
+      ],
+      "max_price": {
+        "prompt": 0,
+        "completion": 0,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "inclusionai/ling-3.0-flash-fin:free",
+    "response_format_present": false,
+    "response_format": null,
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "meta/muse-spark-1.2-contributor",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "meta",
+        "provider_name": "Meta",
+        "status": 0,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.0000002",
+          "web_search": "0.0025",
+          "input_cache_read": "0.000000002",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "meta"
+      ],
+      "max_price": {
+        "prompt": 1,
+        "completion": 3,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "meta/muse-spark-1.2-contributor",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "dots-studio/dots-3-note-preview:free",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "atlas-cloud/fp8",
+        "provider_name": "AtlasCloud",
+        "status": 0,
+        "pricing": {
+          "prompt": "0",
+          "completion": "0",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "atlas-cloud/fp8"
+      ],
+      "max_price": {
+        "prompt": 0,
+        "completion": 0,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "dots-studio/dots-3-note-preview:free",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "liquid/lfm-2.5-2.6b:free",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "liquid/fp8",
+        "provider_name": "Liquid",
+        "status": 0,
+        "pricing": {
+          "prompt": "0",
+          "completion": "0",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "liquid/fp8"
+      ],
+      "max_price": {
+        "prompt": 0,
+        "completion": 0,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "liquid/lfm-2.5-2.6b:free",
+    "response_format_present": true,
+    "response_format": {
+      "type": "json_object"
+    },
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "response_format",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  },
+  {
+    "model": "nvidia/nemotron-3.5-lightning:free",
+    "catalog_http": 200,
+    "prices": [
+      {
+        "tag": "nvidia/nvfp4",
+        "provider_name": "Nvidia",
+        "status": 0,
+        "pricing": {
+          "prompt": "0",
+          "completion": "0",
+          "discount": 0
+        },
+        "latency_last_30m": null,
+        "throughput_last_30m": null
+      }
+    ],
+    "provider": {
+      "only": [
+        "nvidia/nvfp4"
+      ],
+      "max_price": {
+        "prompt": 0,
+        "completion": 0,
+        "request": 0
+      },
+      "allow_fallbacks": true,
+      "require_parameters": true,
+      "sort": "throughput"
+    },
+    "model_sent": "nvidia/nemotron-3.5-lightning:free",
+    "response_format_present": false,
+    "response_format": null,
+    "session_present": true,
+    "request_parameters": [
+      "model",
+      "provider",
+      "temperature",
+      "usage"
+    ],
+    "eligible": true
+  }
+]

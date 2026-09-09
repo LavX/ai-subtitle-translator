@@ -2,9 +2,13 @@
 
 import re
 from datetime import datetime
+from hashlib import sha256
 from typing import Any, Literal
+from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+
+from subtitle_translator.providers.smartfast import SmartFastPolicy
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07")
 _DANGEROUS_CONTROL_CHARS = frozenset(
@@ -54,7 +58,7 @@ class ReasoningConfig(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-PROVIDER_SORT_VALUES = ("default", "throughput", "price", "latency", "nitro", "floor")
+PROVIDER_SORT_VALUES = ("default", "throughput", "price", "latency", "nitro", "floor", "smartfast")
 
 
 class ProviderConfig(BaseModel):
@@ -75,7 +79,8 @@ class ProviderConfig(BaseModel):
         description=(
             "Provider routing: 'throughput', 'price' or 'latency' set provider.sort; "
             "'nitro' and 'floor' use the OpenRouter slug shortcuts (which also unlock "
-            "the priority/flex tiers); 'default' keeps OpenRouter's load balancing"
+            "the priority/flex tiers); 'smartfast' selects a price-bounded fast provider pool; "
+            "'default' keeps OpenRouter's load balancing"
         ),
     )
     only: list[str] | None = Field(
@@ -83,6 +88,10 @@ class ProviderConfig(BaseModel):
     )
     ignore: list[str] | None = Field(
         default=None, max_length=20, description="List of provider slugs to skip"
+    )
+
+    smart_fast: SmartFastPolicy | None = Field(
+        default=None, alias="smartFast", description="SmartFast price and speed policy"
     )
 
     model_config = {"populate_by_name": True}
@@ -104,6 +113,18 @@ class ProviderConfig(BaseModel):
 
 class TranslationConfig(BaseModel):
     """Per-request configuration that can override defaults."""
+
+    _smartfast_session_id: str | None = PrivateAttr(default=None)
+
+    def for_operation(self, job_id: str | None = None) -> "TranslationConfig":
+        """Copy options and bind an opaque internal identity to one operation."""
+        config = self.model_copy()
+        config._smartfast_session_id = (
+            sha256(f"translation-job:{job_id}".encode()).hexdigest()
+            if job_id is not None
+            else uuid4().hex
+        )
+        return config
 
     api_key: str | None = Field(
         default=None,

@@ -22,8 +22,32 @@ export function uniqueName(name, used) {
  return result;
 }
 export function routeModel(model, routing) {
- const value = model.trim().replace(/:(nitro|floor)$/, '');
+ const value = model.trim().replace(/:(nitro|floor|smartfast)$/, '');
+ if (routing === 'smartfast') return `${value}:smartfast`;
  return routing === 'default' || value.includes(':') ? value : `${value}:${routing}`;
+}
+export function routingConfig(model, routing, smartFast) {
+ const config = {model: routeModel(model, routing), provider: {sort: routing}};
+ if (routing === 'smartfast' && smartFast) {
+  const fields = {
+   medianPremiumPercent: ['Median premium', 0, 1000],
+   speedTolerancePercent: ['Speed tolerance', 0, 1000],
+   sparsePremiumMultiplier: ['Sparse pool multiplier', 1, 100],
+   maxPromptPrice: ['Maximum input price', 0, 1000],
+   maxCompletionPrice: ['Maximum output price', 0, 1000],
+  };
+  const policy = {};
+  for (const [field, value] of Object.entries(smartFast)) {
+   if (!Object.hasOwn(fields, field)) throw new Error('Unknown SmartFast option.');
+   const [label, min, max] = fields[field], number = Number(value);
+   if (!['string', 'number'].includes(typeof value) || String(value).trim() === '' || !Number.isFinite(number) || number < min || number > max) {
+    throw new Error(`${label} must be a number from ${min} to ${max}.`);
+   }
+   policy[field] = number;
+  }
+  config.provider.smartFast = policy;
+ }
+ return config;
 }
 export function floorModel(model) { return routeModel(model, 'floor'); }
 export function zip(files) {
