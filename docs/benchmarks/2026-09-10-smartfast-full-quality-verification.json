@@ -1,0 +1,1175 @@
+{
+  "runtime": {
+    "models": 16,
+    "launch_spread_seconds": 0.07872236399998656,
+    "forwarded_requests_checked": 284,
+    "source_unchanged": true,
+    "existing_containers_preserved": 38,
+    "unique_job_sessions": 16,
+    "all_price_session_body_deadline_checks_passed": true,
+    "structurally_complete": 10,
+    "observed_forwarded_sessions": 15,
+    "zero_forwarded_models": [
+      "dots-studio/dots-3-note-preview:free"
+    ]
+  },
+  "first_choices": {
+    "verdict": "PASS",
+    "models_checked": 15,
+    "image": "sha256:542b47021da49553f2721b2ddc4714deb1d8f277b895b46297ce93b540248dad",
+    "scope": "First cold request per model, independent arithmetic, no product router imported or executed",
+    "limitations": [
+      "Advertised estimates are not measured future performance.",
+      "Later requests may use affinity, learned speed, cooldowns, cache savings, or refreshed metadata.",
+      "Estimated request tokens are workload estimates, not billed tokenizer counts."
+    ],
+    "results": [
+      {
+        "model": "openai/gpt-5.6-luna",
+        "actual_endpoint": "amazon-bedrock/us-east-1",
+        "expected_endpoint": "amazon-bedrock/us-east-1",
+        "input_tokens_estimated": 3213,
+        "output_tokens_estimated": 3936,
+        "authenticated_endpoint_count": 7,
+        "eligible_endpoints": {
+          "azure": {
+            "cold_cost_usd": "0.00552645",
+            "prompt_usd_per_million": "0.2000000",
+            "completion_usd_per_million": "1.2000000",
+            "latency_p50_ms": 3799.5,
+            "throughput_p50_tokens_per_second": 33,
+            "estimated_seconds": "123.0722272727272727272727273"
+          },
+          "openai": {
+            "cold_cost_usd": "0.00552645",
+            "prompt_usd_per_million": "0.2000000",
+            "completion_usd_per_million": "1.2000000",
+            "latency_p50_ms": 2184,
+            "throughput_p50_tokens_per_second": 74,
+            "estimated_seconds": "55.37318918918918918918918919"
+          },
+          "azure/us": {
+            "cold_cost_usd": "0.006079095",
+            "prompt_usd_per_million": "0.22000000",
+            "completion_usd_per_million": "1.32000000",
+            "latency_p50_ms": 3918,
+            "throughput_p50_tokens_per_second": 31,
+            "estimated_seconds": "130.8857419354838709677419355"
+          },
+          "amazon-bedrock/us-east-1": {
+            "cold_cost_usd": "0.006079095",
+            "prompt_usd_per_million": "0.22000000",
+            "completion_usd_per_million": "1.32000000",
+            "latency_p50_ms": 563,
+            "throughput_p50_tokens_per_second": 126,
+            "estimated_seconds": "31.80109523809523809523809524"
+          },
+          "azure/eu": {
+            "cold_cost_usd": "0.006079095",
+            "prompt_usd_per_million": "0.22000000",
+            "completion_usd_per_million": "1.32000000",
+            "latency_p50_ms": 1730.5,
+            "throughput_p50_tokens_per_second": 59,
+            "estimated_seconds": "68.44236440677966101694915254"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.0091186425",
+        "price_pool": [
+          "azure",
+          "openai",
+          "azure/us",
+          "amazon-bedrock/us-east-1",
+          "azure/eu"
+        ],
+        "fast_pool": [
+          "amazon-bedrock/us-east-1"
+        ],
+        "balanced_pool": [
+          "amazon-bedrock/us-east-1"
+        ],
+        "fastest_seconds": "31.80109523809523809523809524",
+        "speed_ceiling_seconds": "38.16131428571428571428571429",
+        "selected_estimated_seconds": "31.80109523809523809523809524",
+        "selected_cold_cost_usd": "0.006079095",
+        "excluded": {
+          "openai/flex": "service_tier",
+          "openai/fast": "service_tier"
+        },
+        "choice_matches": true
+      },
+      {
+        "model": "z-ai/glm-5.3-flash",
+        "actual_endpoint": "baseten/fp8",
+        "expected_endpoint": "baseten/fp8",
+        "input_tokens_estimated": 3443,
+        "output_tokens_estimated": 4388,
+        "authenticated_endpoint_count": 26,
+        "eligible_endpoints": {
+          "deepinfra/fp4": {
+            "cold_cost_usd": "0.001355225",
+            "prompt_usd_per_million": "0.075000000",
+            "completion_usd_per_million": "0.25000000",
+            "latency_p50_ms": 2473,
+            "throughput_p50_tokens_per_second": 13,
+            "estimated_seconds": "340.0114615384615384615384615"
+          },
+          "z-ai/fp8": {
+            "cold_cost_usd": "0.001355225",
+            "prompt_usd_per_million": "0.075000000",
+            "completion_usd_per_million": "0.25000000",
+            "latency_p50_ms": 4718,
+            "throughput_p50_tokens_per_second": 30,
+            "estimated_seconds": "150.9846666666666666666666667"
+          },
+          "relace/fp4": {
+            "cold_cost_usd": "0.00162627",
+            "prompt_usd_per_million": "0.09000000",
+            "completion_usd_per_million": "0.3000000",
+            "latency_p50_ms": 1746,
+            "throughput_p50_tokens_per_second": 49,
+            "estimated_seconds": "91.29702040816326530612244898"
+          },
+          "wafer": {
+            "cold_cost_usd": "0.00188010",
+            "prompt_usd_per_million": "0.1000000",
+            "completion_usd_per_million": "0.35000000",
+            "latency_p50_ms": 1332.5,
+            "throughput_p50_tokens_per_second": 19,
+            "estimated_seconds": "232.2798684210526315789473684"
+          },
+          "gmicloud/fp8": {
+            "cold_cost_usd": "0.0020328375",
+            "prompt_usd_per_million": "0.1125000000",
+            "completion_usd_per_million": "0.375000000",
+            "latency_p50_ms": 3011,
+            "throughput_p50_tokens_per_second": 28,
+            "estimated_seconds": "159.7252857142857142857142857"
+          },
+          "novita/fp8": {
+            "cold_cost_usd": "0.002385196",
+            "prompt_usd_per_million": "0.132000000",
+            "completion_usd_per_million": "0.44000000",
+            "latency_p50_ms": 4236.5,
+            "throughput_p50_tokens_per_second": 30,
+            "estimated_seconds": "150.5031666666666666666666667"
+          },
+          "streamlake/fp8": {
+            "cold_cost_usd": "0.002439405",
+            "prompt_usd_per_million": "0.135000000",
+            "completion_usd_per_million": "0.45000000",
+            "latency_p50_ms": 4345.5,
+            "throughput_p50_tokens_per_second": 30,
+            "estimated_seconds": "150.6121666666666666666666667"
+          },
+          "makora": {
+            "cold_cost_usd": "0.00254438",
+            "prompt_usd_per_million": "0.14000000",
+            "completion_usd_per_million": "0.47000000",
+            "latency_p50_ms": 645,
+            "throughput_p50_tokens_per_second": 80,
+            "estimated_seconds": "55.495"
+          },
+          "modal/fp8": {
+            "cold_cost_usd": "0.002710178955",
+            "prompt_usd_per_million": "0.149985000000",
+            "completion_usd_per_million": "0.49995000000",
+            "latency_p50_ms": 1070,
+            "throughput_p50_tokens_per_second": 70,
+            "estimated_seconds": "63.75571428571428571428571429"
+          },
+          "crusoe/fp4": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 801,
+            "throughput_p50_tokens_per_second": 142,
+            "estimated_seconds": "31.70240845070422535211267606"
+          },
+          "coreweave/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 1233,
+            "throughput_p50_tokens_per_second": 52,
+            "estimated_seconds": "85.61761538461538461538461538"
+          },
+          "sail-research/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 1499.5,
+            "throughput_p50_tokens_per_second": 26,
+            "estimated_seconds": "170.2687307692307692307692308"
+          },
+          "nextbit/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 4855,
+            "throughput_p50_tokens_per_second": 19,
+            "estimated_seconds": "235.8023684210526315789473684"
+          },
+          "fireworks": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 1156,
+            "throughput_p50_tokens_per_second": 76,
+            "estimated_seconds": "58.89284210526315789473684211"
+          },
+          "phala/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 3939,
+            "throughput_p50_tokens_per_second": 27,
+            "estimated_seconds": "166.4575185185185185185185185"
+          },
+          "friendli": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 1117,
+            "throughput_p50_tokens_per_second": 85,
+            "estimated_seconds": "52.74052941176470588235294118"
+          },
+          "siliconflow/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 2856,
+            "throughput_p50_tokens_per_second": 28,
+            "estimated_seconds": "159.5702857142857142857142857"
+          },
+          "digitalocean": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 3068,
+            "throughput_p50_tokens_per_second": 18,
+            "estimated_seconds": "246.8457777777777777777777778"
+          },
+          "together": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 767,
+            "throughput_p50_tokens_per_second": 67,
+            "estimated_seconds": "66.25953731343283582089552239"
+          },
+          "reka/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 1357,
+            "throughput_p50_tokens_per_second": 62,
+            "estimated_seconds": "72.13119354838709677419354839"
+          },
+          "parasail/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 1411,
+            "throughput_p50_tokens_per_second": 53,
+            "estimated_seconds": "84.20345283018867924528301887"
+          },
+          "baseten/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 660,
+            "throughput_p50_tokens_per_second": 130,
+            "estimated_seconds": "34.41384615384615384615384615"
+          },
+          "venice": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 3354,
+            "throughput_p50_tokens_per_second": 15,
+            "estimated_seconds": "295.8873333333333333333333333"
+          },
+          "io-net/fp8": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 1761,
+            "throughput_p50_tokens_per_second": 16,
+            "estimated_seconds": "276.011"
+          },
+          "cloudflare": {
+            "cold_cost_usd": "0.00271045",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 884,
+            "throughput_p50_tokens_per_second": 64,
+            "estimated_seconds": "69.4465"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.004065675",
+        "price_pool": [
+          "deepinfra/fp4",
+          "z-ai/fp8",
+          "relace/fp4",
+          "wafer",
+          "gmicloud/fp8",
+          "novita/fp8",
+          "streamlake/fp8",
+          "makora",
+          "modal/fp8",
+          "crusoe/fp4",
+          "coreweave/fp8",
+          "sail-research/fp8",
+          "nextbit/fp8",
+          "fireworks",
+          "phala/fp8",
+          "friendli",
+          "siliconflow/fp8",
+          "digitalocean",
+          "together",
+          "reka/fp8",
+          "parasail/fp8",
+          "baseten/fp8",
+          "venice",
+          "io-net/fp8",
+          "cloudflare"
+        ],
+        "fast_pool": [
+          "crusoe/fp4",
+          "baseten/fp8"
+        ],
+        "balanced_pool": [
+          "crusoe/fp4",
+          "baseten/fp8"
+        ],
+        "fastest_seconds": "31.70240845070422535211267606",
+        "speed_ceiling_seconds": "38.04289014084507042253521127",
+        "selected_estimated_seconds": "34.41384615384615384615384615",
+        "selected_cold_cost_usd": "0.00271045",
+        "excluded": {
+          "morph/fp8": "invalid_or_unhealthy"
+        },
+        "choice_matches": true
+      },
+      {
+        "model": "google/gemini-2.5-flash-lite",
+        "actual_endpoint": "google-ai-studio",
+        "expected_endpoint": "google-ai-studio",
+        "input_tokens_estimated": 3213,
+        "output_tokens_estimated": 3936,
+        "authenticated_endpoint_count": 5,
+        "eligible_endpoints": {
+          "google-vertex/eu": {
+            "cold_cost_usd": "0.0018957",
+            "prompt_usd_per_million": "0.1000000",
+            "completion_usd_per_million": "0.4000000",
+            "latency_p50_ms": 429,
+            "throughput_p50_tokens_per_second": 90,
+            "estimated_seconds": "44.16233333333333333333333333"
+          },
+          "google-vertex": {
+            "cold_cost_usd": "0.0018957",
+            "prompt_usd_per_million": "0.1000000",
+            "completion_usd_per_million": "0.4000000",
+            "latency_p50_ms": 1114,
+            "throughput_p50_tokens_per_second": 71,
+            "estimated_seconds": "56.55061971830985915492957746"
+          },
+          "google-ai-studio": {
+            "cold_cost_usd": "0.0018957",
+            "prompt_usd_per_million": "0.1000000",
+            "completion_usd_per_million": "0.4000000",
+            "latency_p50_ms": 574,
+            "throughput_p50_tokens_per_second": 144,
+            "estimated_seconds": "27.90733333333333333333333333"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.0056871",
+        "price_pool": [
+          "google-vertex/eu",
+          "google-vertex",
+          "google-ai-studio"
+        ],
+        "fast_pool": [
+          "google-ai-studio"
+        ],
+        "balanced_pool": [
+          "google-ai-studio"
+        ],
+        "fastest_seconds": "27.90733333333333333333333333",
+        "speed_ceiling_seconds": "33.48880000000000000000000000",
+        "selected_estimated_seconds": "27.90733333333333333333333333",
+        "selected_cold_cost_usd": "0.0018957",
+        "excluded": {
+          "google-ai-studio/flex": "service_tier",
+          "google-ai-studio/priority": "service_tier"
+        },
+        "choice_matches": true
+      },
+      {
+        "model": "deepseek/deepseek-v4-flash-0731",
+        "actual_endpoint": "coreweave/fp8",
+        "expected_endpoint": "coreweave/fp8",
+        "input_tokens_estimated": 3213,
+        "output_tokens_estimated": 3936,
+        "authenticated_endpoint_count": 28,
+        "eligible_endpoints": {
+          "open-inference/fp8": {
+            "cold_cost_usd": "0.00079041",
+            "prompt_usd_per_million": "0.05000000",
+            "completion_usd_per_million": "0.16000000",
+            "latency_p50_ms": 1940,
+            "throughput_p50_tokens_per_second": 18,
+            "estimated_seconds": "220.6066666666666666666666667"
+          },
+          "deepinfra/fp8": {
+            "cold_cost_usd": "0.00090126",
+            "prompt_usd_per_million": "0.06000000",
+            "completion_usd_per_million": "0.18000000",
+            "latency_p50_ms": 928,
+            "throughput_p50_tokens_per_second": 26,
+            "estimated_seconds": "152.3126153846153846153846154"
+          },
+          "relace/fp4": {
+            "cold_cost_usd": "0.000917325",
+            "prompt_usd_per_million": "0.065000000",
+            "completion_usd_per_million": "0.18000000",
+            "latency_p50_ms": 975.5,
+            "throughput_p50_tokens_per_second": 35,
+            "estimated_seconds": "113.4326428571428571428571429"
+          },
+          "sail-research/fp4": {
+            "cold_cost_usd": "0.000917325",
+            "prompt_usd_per_million": "0.065000000",
+            "completion_usd_per_million": "0.18000000",
+            "latency_p50_ms": 911,
+            "throughput_p50_tokens_per_second": 38,
+            "estimated_seconds": "104.4899473684210526315789474"
+          },
+          "digitalocean": {
+            "cold_cost_usd": "0.001248899148",
+            "prompt_usd_per_million": "0.079996000000",
+            "completion_usd_per_million": "0.252000000",
+            "latency_p50_ms": 968,
+            "throughput_p50_tokens_per_second": 21,
+            "estimated_seconds": "188.3965714285714285714285714"
+          },
+          "makora": {
+            "cold_cost_usd": "0.001056690",
+            "prompt_usd_per_million": "0.09000000",
+            "completion_usd_per_million": "0.195000000",
+            "latency_p50_ms": 792.5,
+            "throughput_p50_tokens_per_second": 61,
+            "estimated_seconds": "65.31709016393442622950819672"
+          },
+          "reka/fp4": {
+            "cold_cost_usd": "0.00295119",
+            "prompt_usd_per_million": "0.11000000",
+            "completion_usd_per_million": "0.66000000",
+            "latency_p50_ms": 942.5,
+            "throughput_p50_tokens_per_second": 82,
+            "estimated_seconds": "48.9425"
+          },
+          "morph/bf16": {
+            "cold_cost_usd": "0.001764366294",
+            "prompt_usd_per_million": "0.123438000000",
+            "completion_usd_per_million": "0.3475000000",
+            "latency_p50_ms": 1963,
+            "throughput_p50_tokens_per_second": 4,
+            "estimated_seconds": "985.963"
+          },
+          "inceptron/fp4": {
+            "cold_cost_usd": "0.00151977",
+            "prompt_usd_per_million": "0.13000000",
+            "completion_usd_per_million": "0.28000000",
+            "latency_p50_ms": 651,
+            "throughput_p50_tokens_per_second": 59,
+            "estimated_seconds": "67.36286440677966101694915254"
+          },
+          "coreweave/fp8": {
+            "cold_cost_usd": "0.00151977",
+            "prompt_usd_per_million": "0.13000000",
+            "completion_usd_per_million": "0.28000000",
+            "latency_p50_ms": 435,
+            "throughput_p50_tokens_per_second": 104,
+            "estimated_seconds": "38.28115384615384615384615385"
+          },
+          "streamlake/fp8": {
+            "cold_cost_usd": "0.001982772",
+            "prompt_usd_per_million": "0.132000000",
+            "completion_usd_per_million": "0.396000000",
+            "latency_p50_ms": 2699,
+            "throughput_p50_tokens_per_second": 34,
+            "estimated_seconds": "118.4637058823529411764705882"
+          },
+          "together": {
+            "cold_cost_usd": "0.00155190",
+            "prompt_usd_per_million": "0.14000000",
+            "completion_usd_per_million": "0.28000000",
+            "latency_p50_ms": 766,
+            "throughput_p50_tokens_per_second": 47,
+            "estimated_seconds": "84.51068085106382978723404255"
+          },
+          "parasail/fp8": {
+            "cold_cost_usd": "0.00155190",
+            "prompt_usd_per_million": "0.14000000",
+            "completion_usd_per_million": "0.28000000",
+            "latency_p50_ms": 655,
+            "throughput_p50_tokens_per_second": 44,
+            "estimated_seconds": "90.10954545454545454545454545"
+          },
+          "mancer/fp8": {
+            "cold_cost_usd": "0.002498145",
+            "prompt_usd_per_million": "0.165000000",
+            "completion_usd_per_million": "0.5000000",
+            "latency_p50_ms": 802,
+            "throughput_p50_tokens_per_second": 21,
+            "estimated_seconds": "188.2305714285714285714285714"
+          },
+          "venice": {
+            "cold_cost_usd": "0.001939875",
+            "prompt_usd_per_million": "0.175000000",
+            "completion_usd_per_million": "0.35000000",
+            "latency_p50_ms": 944.5,
+            "throughput_p50_tokens_per_second": 36,
+            "estimated_seconds": "110.2778333333333333333333333"
+          },
+          "fireworks": {
+            "cold_cost_usd": "0.00330462",
+            "prompt_usd_per_million": "0.22000000",
+            "completion_usd_per_million": "0.66000000",
+            "latency_p50_ms": 901.5,
+            "throughput_p50_tokens_per_second": 54,
+            "estimated_seconds": "73.79038888888888888888888889"
+          },
+          "siliconflow/fp8": {
+            "cold_cost_usd": "0.00330462",
+            "prompt_usd_per_million": "0.22000000",
+            "completion_usd_per_million": "0.66000000",
+            "latency_p50_ms": 1955,
+            "throughput_p50_tokens_per_second": 46,
+            "estimated_seconds": "87.52021739130434782608695652"
+          },
+          "gmicloud/fp8": {
+            "cold_cost_usd": "0.004296006",
+            "prompt_usd_per_million": "0.286000000",
+            "completion_usd_per_million": "0.858000000",
+            "latency_p50_ms": 2220,
+            "throughput_p50_tokens_per_second": 46,
+            "estimated_seconds": "87.78521739130434782608695652"
+          },
+          "nextbit/fp8": {
+            "cold_cost_usd": "0.005287392",
+            "prompt_usd_per_million": "0.352000000",
+            "completion_usd_per_million": "1.056000000",
+            "latency_p50_ms": 2114,
+            "throughput_p50_tokens_per_second": 48,
+            "estimated_seconds": "84.114"
+          },
+          "alibaba": {
+            "cold_cost_usd": "0.005287392",
+            "prompt_usd_per_million": "0.352000000",
+            "completion_usd_per_million": "1.056000000",
+            "latency_p50_ms": 1115,
+            "throughput_p50_tokens_per_second": 65,
+            "estimated_seconds": "61.66884615384615384615384615"
+          },
+          "novita/fp8": {
+            "cold_cost_usd": "0.0061465932",
+            "prompt_usd_per_million": "0.4092000000",
+            "completion_usd_per_million": "1.2276000000",
+            "latency_p50_ms": 1707,
+            "throughput_p50_tokens_per_second": 82,
+            "estimated_seconds": "49.707"
+          },
+          "phala": {
+            "cold_cost_usd": "0.00660924",
+            "prompt_usd_per_million": "0.44000000",
+            "completion_usd_per_million": "1.32000000",
+            "latency_p50_ms": 1049,
+            "throughput_p50_tokens_per_second": 37,
+            "estimated_seconds": "107.4273783783783783783783784"
+          },
+          "baidu/fp8": {
+            "cold_cost_usd": "0.00660924",
+            "prompt_usd_per_million": "0.44000000",
+            "completion_usd_per_million": "1.32000000",
+            "latency_p50_ms": 6881,
+            "throughput_p50_tokens_per_second": 45,
+            "estimated_seconds": "94.34766666666666666666666667"
+          },
+          "cloudflare": {
+            "cold_cost_usd": "0.00660924",
+            "prompt_usd_per_million": "0.44000000",
+            "completion_usd_per_million": "1.32000000",
+            "latency_p50_ms": 1753,
+            "throughput_p50_tokens_per_second": 45,
+            "estimated_seconds": "89.21966666666666666666666667"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.00294198525",
+        "price_pool": [
+          "open-inference/fp8",
+          "deepinfra/fp8",
+          "relace/fp4",
+          "sail-research/fp4",
+          "digitalocean",
+          "makora",
+          "morph/bf16",
+          "inceptron/fp4",
+          "coreweave/fp8",
+          "streamlake/fp8",
+          "together",
+          "parasail/fp8",
+          "mancer/fp8",
+          "venice"
+        ],
+        "fast_pool": [
+          "coreweave/fp8"
+        ],
+        "balanced_pool": [
+          "coreweave/fp8"
+        ],
+        "fastest_seconds": "38.28115384615384615384615385",
+        "speed_ceiling_seconds": "45.93738461538461538461538462",
+        "selected_estimated_seconds": "38.28115384615384615384615385",
+        "selected_cold_cost_usd": "0.00151977",
+        "excluded": {
+          "wafer/fast": "service_tier",
+          "baseten/fp8": "invalid_or_unhealthy",
+          "atlas-cloud/fp4": "invalid_or_unhealthy",
+          "reka/fp4": "price_outlier",
+          "fireworks": "price_outlier",
+          "siliconflow/fp8": "price_outlier",
+          "gmicloud/fp8": "price_outlier",
+          "nextbit/fp8": "price_outlier",
+          "alibaba": "price_outlier",
+          "novita/fp8": "price_outlier",
+          "phala": "price_outlier",
+          "baidu/fp8": "price_outlier",
+          "cloudflare": "price_outlier"
+        },
+        "choice_matches": true
+      },
+      {
+        "model": "qwen/qwen3.7-flash",
+        "actual_endpoint": "alibaba",
+        "expected_endpoint": "alibaba",
+        "input_tokens_estimated": 3213,
+        "output_tokens_estimated": 3936,
+        "authenticated_endpoint_count": 1,
+        "eligible_endpoints": {
+          "alibaba": {
+            "cold_cost_usd": "0.000633774",
+            "prompt_usd_per_million": "0.03000000",
+            "completion_usd_per_million": "0.13000000",
+            "latency_p50_ms": 801,
+            "throughput_p50_tokens_per_second": 52,
+            "estimated_seconds": "76.49330769230769230769230769"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.001901322",
+        "price_pool": [
+          "alibaba"
+        ],
+        "fast_pool": [
+          "alibaba"
+        ],
+        "balanced_pool": [
+          "alibaba"
+        ],
+        "fastest_seconds": "76.49330769230769230769230769",
+        "speed_ceiling_seconds": "91.79196923076923076923076923",
+        "selected_estimated_seconds": "76.49330769230769230769230769",
+        "selected_cold_cost_usd": "0.000633774",
+        "excluded": {},
+        "choice_matches": true
+      },
+      {
+        "model": "google/gemini-3.5-flash-lite",
+        "actual_endpoint": "google-ai-studio",
+        "expected_endpoint": "google-ai-studio",
+        "input_tokens_estimated": 3307,
+        "output_tokens_estimated": 4128,
+        "authenticated_endpoint_count": 8,
+        "eligible_endpoints": {
+          "google-ai-studio": {
+            "cold_cost_usd": "0.0113121",
+            "prompt_usd_per_million": "0.3000000",
+            "completion_usd_per_million": "2.5000000",
+            "latency_p50_ms": 786,
+            "throughput_p50_tokens_per_second": 70,
+            "estimated_seconds": "59.75742857142857142857142857"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.0339363",
+        "price_pool": [
+          "google-ai-studio"
+        ],
+        "fast_pool": [
+          "google-ai-studio"
+        ],
+        "balanced_pool": [
+          "google-ai-studio"
+        ],
+        "fastest_seconds": "59.75742857142857142857142857",
+        "speed_ceiling_seconds": "71.70891428571428571428571428",
+        "selected_estimated_seconds": "59.75742857142857142857142857",
+        "selected_cold_cost_usd": "0.0113121",
+        "excluded": {
+          "google-vertex/global/flex": "invalid_or_unhealthy",
+          "google-ai-studio/flex": "service_tier",
+          "google-vertex/global": "capability",
+          "google-vertex/eu": "capability",
+          "google-vertex/us": "capability",
+          "google-vertex/global/priority": "service_tier",
+          "google-ai-studio/priority": "service_tier"
+        },
+        "choice_matches": true
+      },
+      {
+        "model": "openai/gpt-4o-mini",
+        "actual_endpoint": "azure/swedencentral",
+        "expected_endpoint": "azure/swedencentral",
+        "input_tokens_estimated": 3313,
+        "output_tokens_estimated": 4134,
+        "authenticated_endpoint_count": 3,
+        "eligible_endpoints": {
+          "azure": {
+            "cold_cost_usd": "0.00297735",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.6000000",
+            "latency_p50_ms": 1619,
+            "throughput_p50_tokens_per_second": 25,
+            "estimated_seconds": "166.979"
+          },
+          "openai": {
+            "cold_cost_usd": "0.00297735",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.6000000",
+            "latency_p50_ms": 526,
+            "throughput_p50_tokens_per_second": 57,
+            "estimated_seconds": "73.05231578947368421052631579"
+          },
+          "azure/swedencentral": {
+            "cold_cost_usd": "0.003275085",
+            "prompt_usd_per_million": "0.165000000",
+            "completion_usd_per_million": "0.66000000",
+            "latency_p50_ms": 955,
+            "throughput_p50_tokens_per_second": 70.5,
+            "estimated_seconds": "59.59329787234042553191489362"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.00893205",
+        "price_pool": [
+          "azure",
+          "openai",
+          "azure/swedencentral"
+        ],
+        "fast_pool": [
+          "azure/swedencentral"
+        ],
+        "balanced_pool": [
+          "azure/swedencentral"
+        ],
+        "fastest_seconds": "59.59329787234042553191489362",
+        "speed_ceiling_seconds": "71.51195744680851063829787234",
+        "selected_estimated_seconds": "59.59329787234042553191489362",
+        "selected_cold_cost_usd": "0.003275085",
+        "excluded": {},
+        "choice_matches": true
+      },
+      {
+        "model": "google/gemini-3.1-flash-lite",
+        "actual_endpoint": "google-vertex/eu",
+        "expected_endpoint": "google-vertex/eu",
+        "input_tokens_estimated": 3313,
+        "output_tokens_estimated": 4134,
+        "authenticated_endpoint_count": 8,
+        "eligible_endpoints": {
+          "google-ai-studio": {
+            "cold_cost_usd": "0.00702925",
+            "prompt_usd_per_million": "0.25000000",
+            "completion_usd_per_million": "1.5000000",
+            "latency_p50_ms": 632,
+            "throughput_p50_tokens_per_second": 71,
+            "estimated_seconds": "58.85735211267605633802816901"
+          },
+          "google-vertex/global": {
+            "cold_cost_usd": "0.00702925",
+            "prompt_usd_per_million": "0.25000000",
+            "completion_usd_per_million": "1.5000000",
+            "latency_p50_ms": 890,
+            "throughput_p50_tokens_per_second": 62,
+            "estimated_seconds": "67.56741935483870967741935484"
+          },
+          "google-vertex/eu": {
+            "cold_cost_usd": "0.007732175",
+            "prompt_usd_per_million": "0.275000000",
+            "completion_usd_per_million": "1.65000000",
+            "latency_p50_ms": 2275.5,
+            "throughput_p50_tokens_per_second": 187,
+            "estimated_seconds": "24.38245187165775401069518717"
+          },
+          "google-vertex/us": {
+            "cold_cost_usd": "0.007732175",
+            "prompt_usd_per_million": "0.275000000",
+            "completion_usd_per_million": "1.65000000",
+            "latency_p50_ms": 879.5,
+            "throughput_p50_tokens_per_second": 34.5,
+            "estimated_seconds": "120.7055869565217391304347826"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.02108775",
+        "price_pool": [
+          "google-ai-studio",
+          "google-vertex/global",
+          "google-vertex/eu",
+          "google-vertex/us"
+        ],
+        "fast_pool": [
+          "google-vertex/eu"
+        ],
+        "balanced_pool": [
+          "google-vertex/eu"
+        ],
+        "fastest_seconds": "24.38245187165775401069518717",
+        "speed_ceiling_seconds": "29.25894224598930481283422460",
+        "selected_estimated_seconds": "24.38245187165775401069518717",
+        "selected_cold_cost_usd": "0.007732175",
+        "excluded": {
+          "google-vertex/global/flex": "invalid_or_unhealthy",
+          "google-ai-studio/flex": "service_tier",
+          "google-vertex/global/priority": "service_tier",
+          "google-ai-studio/priority": "service_tier"
+        },
+        "choice_matches": true
+      },
+      {
+        "model": "inception/mercury-2.5",
+        "actual_endpoint": "inception",
+        "expected_endpoint": "inception",
+        "input_tokens_estimated": 3313,
+        "output_tokens_estimated": 4134,
+        "authenticated_endpoint_count": 1,
+        "eligible_endpoints": {
+          "inception": {
+            "cold_cost_usd": "0.00075262",
+            "prompt_usd_per_million": "0.04000000",
+            "completion_usd_per_million": "0.15000000",
+            "latency_p50_ms": 383,
+            "throughput_p50_tokens_per_second": 62,
+            "estimated_seconds": "67.06041935483870967741935484"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.00225786",
+        "price_pool": [
+          "inception"
+        ],
+        "fast_pool": [
+          "inception"
+        ],
+        "balanced_pool": [
+          "inception"
+        ],
+        "fastest_seconds": "67.06041935483870967741935484",
+        "speed_ceiling_seconds": "80.47250322580645161290322581",
+        "selected_estimated_seconds": "67.06041935483870967741935484",
+        "selected_cold_cost_usd": "0.00075262",
+        "excluded": {},
+        "choice_matches": true
+      },
+      {
+        "model": "qwen/qwen3.8-flash",
+        "actual_endpoint": "makora/fp4",
+        "expected_endpoint": "makora/fp4",
+        "input_tokens_estimated": 3313,
+        "output_tokens_estimated": 4134,
+        "authenticated_endpoint_count": 2,
+        "eligible_endpoints": {
+          "makora/fp4": {
+            "cold_cost_usd": "0.00243993",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.47000000",
+            "latency_p50_ms": 1174.5,
+            "throughput_p50_tokens_per_second": 113,
+            "estimated_seconds": "37.75857079646017699115044248"
+          },
+          "alibaba": {
+            "cold_cost_usd": "0.00260558",
+            "prompt_usd_per_million": "0.15000000",
+            "completion_usd_per_million": "0.47000000",
+            "latency_p50_ms": 1730,
+            "throughput_p50_tokens_per_second": 53,
+            "estimated_seconds": "79.73"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.00731979",
+        "price_pool": [
+          "makora/fp4",
+          "alibaba"
+        ],
+        "fast_pool": [
+          "makora/fp4"
+        ],
+        "balanced_pool": [
+          "makora/fp4"
+        ],
+        "fastest_seconds": "37.75857079646017699115044248",
+        "speed_ceiling_seconds": "45.31028495575221238938053098",
+        "selected_estimated_seconds": "37.75857079646017699115044248",
+        "selected_cold_cost_usd": "0.00243993",
+        "excluded": {},
+        "choice_matches": true
+      },
+      {
+        "model": "meta/muse-spark-1.3-contributor",
+        "actual_endpoint": "meta",
+        "expected_endpoint": "meta",
+        "input_tokens_estimated": 3443,
+        "output_tokens_estimated": 4388,
+        "authenticated_endpoint_count": 1,
+        "eligible_endpoints": {
+          "meta": {
+            "cold_cost_usd": "0.0012219",
+            "prompt_usd_per_million": "0.1000000",
+            "completion_usd_per_million": "0.2000000",
+            "latency_p50_ms": 4101.5,
+            "throughput_p50_tokens_per_second": 75,
+            "estimated_seconds": "62.60816666666666666666666667"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.0036657",
+        "price_pool": [
+          "meta"
+        ],
+        "fast_pool": [
+          "meta"
+        ],
+        "balanced_pool": [
+          "meta"
+        ],
+        "fastest_seconds": "62.60816666666666666666666667",
+        "speed_ceiling_seconds": "75.12980000000000000000000000",
+        "selected_estimated_seconds": "62.60816666666666666666666667",
+        "selected_cold_cost_usd": "0.0012219",
+        "excluded": {},
+        "choice_matches": true
+      },
+      {
+        "model": "inclusionai/ling-3.0-flash-fin:free",
+        "actual_endpoint": "novita",
+        "expected_endpoint": "novita",
+        "input_tokens_estimated": 3313,
+        "output_tokens_estimated": 4134,
+        "authenticated_endpoint_count": 1,
+        "eligible_endpoints": {
+          "novita": {
+            "cold_cost_usd": "0",
+            "prompt_usd_per_million": "0",
+            "completion_usd_per_million": "0",
+            "latency_p50_ms": 1300,
+            "throughput_p50_tokens_per_second": 138,
+            "estimated_seconds": "31.25652173913043478260869565"
+          }
+        },
+        "cold_cost_ceiling_usd": "0",
+        "price_pool": [
+          "novita"
+        ],
+        "fast_pool": [
+          "novita"
+        ],
+        "balanced_pool": [
+          "novita"
+        ],
+        "fastest_seconds": "31.25652173913043478260869565",
+        "speed_ceiling_seconds": "37.50782608695652173913043478",
+        "selected_estimated_seconds": "31.25652173913043478260869565",
+        "selected_cold_cost_usd": "0",
+        "excluded": {},
+        "choice_matches": true
+      },
+      {
+        "model": "meta/muse-spark-1.2-contributor",
+        "actual_endpoint": "meta",
+        "expected_endpoint": "meta",
+        "input_tokens_estimated": 3213,
+        "output_tokens_estimated": 3936,
+        "authenticated_endpoint_count": 1,
+        "eligible_endpoints": {
+          "meta": {
+            "cold_cost_usd": "0.0011085",
+            "prompt_usd_per_million": "0.1000000",
+            "completion_usd_per_million": "0.2000000",
+            "latency_p50_ms": 3486.5,
+            "throughput_p50_tokens_per_second": 131,
+            "estimated_seconds": "33.53230152671755725190839695"
+          }
+        },
+        "cold_cost_ceiling_usd": "0.0033255",
+        "price_pool": [
+          "meta"
+        ],
+        "fast_pool": [
+          "meta"
+        ],
+        "balanced_pool": [
+          "meta"
+        ],
+        "fastest_seconds": "33.53230152671755725190839695",
+        "speed_ceiling_seconds": "40.23876183206106870229007634",
+        "selected_estimated_seconds": "33.53230152671755725190839695",
+        "selected_cold_cost_usd": "0.0011085",
+        "excluded": {},
+        "choice_matches": true
+      },
+      {
+        "model": "liquid/lfm-2.5-2.6b:free",
+        "actual_endpoint": "liquid/fp8",
+        "expected_endpoint": "liquid/fp8",
+        "input_tokens_estimated": 3213,
+        "output_tokens_estimated": 3936,
+        "authenticated_endpoint_count": 1,
+        "eligible_endpoints": {
+          "liquid/fp8": {
+            "cold_cost_usd": "0",
+            "prompt_usd_per_million": "0",
+            "completion_usd_per_million": "0",
+            "latency_p50_ms": 629,
+            "throughput_p50_tokens_per_second": 89,
+            "estimated_seconds": "44.85371910112359550561797753"
+          }
+        },
+        "cold_cost_ceiling_usd": "0",
+        "price_pool": [
+          "liquid/fp8"
+        ],
+        "fast_pool": [
+          "liquid/fp8"
+        ],
+        "balanced_pool": [
+          "liquid/fp8"
+        ],
+        "fastest_seconds": "44.85371910112359550561797753",
+        "speed_ceiling_seconds": "53.82446292134831460674157304",
+        "selected_estimated_seconds": "44.85371910112359550561797753",
+        "selected_cold_cost_usd": "0",
+        "excluded": {},
+        "choice_matches": true
+      },
+      {
+        "model": "nvidia/nemotron-3.5-lightning:free",
+        "actual_endpoint": "nvidia/nvfp4",
+        "expected_endpoint": "nvidia/nvfp4",
+        "input_tokens_estimated": 3313,
+        "output_tokens_estimated": 4134,
+        "authenticated_endpoint_count": 1,
+        "eligible_endpoints": {
+          "nvidia/nvfp4": {
+            "cold_cost_usd": "0",
+            "prompt_usd_per_million": "0",
+            "completion_usd_per_million": "0",
+            "latency_p50_ms": 11408,
+            "throughput_p50_tokens_per_second": 9,
+            "estimated_seconds": "470.7413333333333333333333333"
+          }
+        },
+        "cold_cost_ceiling_usd": "0",
+        "price_pool": [
+          "nvidia/nvfp4"
+        ],
+        "fast_pool": [
+          "nvidia/nvfp4"
+        ],
+        "balanced_pool": [
+          "nvidia/nvfp4"
+        ],
+        "fastest_seconds": "470.7413333333333333333333333",
+        "speed_ceiling_seconds": "564.8896000000000000000000000",
+        "selected_estimated_seconds": "470.7413333333333333333333333",
+        "selected_cold_cost_usd": "0",
+        "excluded": {},
+        "choice_matches": true
+      }
+    ]
+  },
+  "image": {
+    "matching_files": 33,
+    "missing": [],
+    "changed": [],
+    "extra": [],
+    "source_hashes": {
+      "web.py": "d1bd183d569421007e790508594ef4503bfbdcb084810f5089d6e8ce698e5621",
+      "ui_api.py": "1fe721feb8b723c4db1557e671aff4e3b9460e06708fc0d77cdc67be68407c09",
+      "main.py": "df00cab6843dc58970862fad325d6bae6e5b33b13f082ebdbc8dcf75abbe8653",
+      "gui.py": "51f4dfe67098953db9fb0d24fa15d69913902696a147b83aa695a26ed528c076",
+      "crypto.py": "6b3b58e20eb750ebbc6a6f997db8f31754de6243da9e55c6798ebd7e2caa0415",
+      "config.py": "847aefc5798463e7d3ea1f3ae006f590d2bd898c45ab0e583a6ac2f85e76d384",
+      "cli.py": "24686c56825620d81a81eb36199273b222519d5305fab5832675b645d2f5a6be",
+      "__init__.py": "164145a18803c4e935bfdcfbc2c70818226f6997973472cfcfd85d8c961a9794",
+      "static/session.mjs": "82f377511e4400ab7eabfd9b1703990f1f5ab7d34ac3f173b8b731abcd5cd12d",
+      "static/outfit.woff2": "c9e52d041266987d3f2785a94c43f6a08775dea16ac6b0ef3e8b259652234d30",
+      "static/outfit-OFL.txt": "e2a6bbb2589b85bac1690ec8f220b22a9c3af9bfda56df6391f7ab491c7a039f",
+      "static/index.html": "dd909e9cce9d1e04f5d04c04a3ecf474d56238abdf3dafcb8c0d6a76a7e6fc5f",
+      "static/archive.mjs": "c0a0fde2734a87337ca7d0aac5b34a80f625e37fe2af20b4fc1295aed9fc77b9",
+      "static/app.js": "ad7f0325978da7afed22edefc5aa725334acba86d05b4e2ff1ba4f1c391c987c",
+      "static/app.css": "02c526e40f6fedc695c4ec404c07795f9fd838e3b862886f4d061b09829d0d82",
+      "queue/worker.py": "f86c84ef5463945ac0d1cf2876f53ce43e089b96ce0607222ce77e24c0f4a557",
+      "queue/job_store.py": "4cbe4f3423cff7440e681073139bb337a9e392f8e44883b1d58ff7505c60632b",
+      "queue/job_manager.py": "0cbaa41c640413400638527205372d17073a6f11ecb2c2dad2fc43cf1a8f8087",
+      "queue/job_events.py": "3312a4e77a924ba35815437080c135ac31ac4c570e534c9065e371356c0128a9",
+      "queue/__init__.py": "dc4be365d0569722436ae38db8dc2cc7475b545970d8d81edf88a1d66585c722",
+      "providers/openrouter_sdk.py": "df7d8a0cee7797a2bdf8484fc4d86f4aa994ab582e3240d0026376f35b642087",
+      "providers/smartfast.py": "8349092aa93c6cdb11de3071a00d82389332683aae19995ad6522628fd7b5f19",
+      "providers/openrouter.py": "c1bc06853fa597b270267c107fccc9a71b002a4b1cd805a8d0d2e62a8dbbc5d6",
+      "providers/base.py": "f95472abd418f492c2e4c5b4e0342319fd421437dd311786835f65d6b6c02c40",
+      "providers/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "core/translator.py": "d75be114d87da46ef8f4da28d2bf002fcfa7b28270833bc172b105d944f3e32f",
+      "core/srt_parser.py": "2c1c2269dac8a3bba0000f676a1de88898c6f9afeed00de12cc6f20c3bc25b58",
+      "core/batch_sizing.py": "4dba84999c9d47181175fab1eb7602170560b4db90fef2ea85c0a128086a46e3",
+      "core/batch_processor.py": "7876d3869508d7cdf7c769d82b23d12285852761cbd931bc3b6bc81057a77321",
+      "core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "api/routes.py": "4b7c88d6f3fd1e854105f6472f2e029cd8bd97cc1bd7f7a0918d1788098b7ea1",
+      "api/models.py": "011e449938aae631be40ca40366fd0f573bf45c8de47d7ce018a044c3fe494a3",
+      "api/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "installed_hashes": {
+      "__init__.py": "164145a18803c4e935bfdcfbc2c70818226f6997973472cfcfd85d8c961a9794",
+      "cli.py": "24686c56825620d81a81eb36199273b222519d5305fab5832675b645d2f5a6be",
+      "config.py": "847aefc5798463e7d3ea1f3ae006f590d2bd898c45ab0e583a6ac2f85e76d384",
+      "crypto.py": "6b3b58e20eb750ebbc6a6f997db8f31754de6243da9e55c6798ebd7e2caa0415",
+      "gui.py": "51f4dfe67098953db9fb0d24fa15d69913902696a147b83aa695a26ed528c076",
+      "main.py": "df00cab6843dc58970862fad325d6bae6e5b33b13f082ebdbc8dcf75abbe8653",
+      "ui_api.py": "1fe721feb8b723c4db1557e671aff4e3b9460e06708fc0d77cdc67be68407c09",
+      "web.py": "d1bd183d569421007e790508594ef4503bfbdcb084810f5089d6e8ce698e5621",
+      "api/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "api/models.py": "011e449938aae631be40ca40366fd0f573bf45c8de47d7ce018a044c3fe494a3",
+      "api/routes.py": "4b7c88d6f3fd1e854105f6472f2e029cd8bd97cc1bd7f7a0918d1788098b7ea1",
+      "core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "core/batch_processor.py": "7876d3869508d7cdf7c769d82b23d12285852761cbd931bc3b6bc81057a77321",
+      "core/batch_sizing.py": "4dba84999c9d47181175fab1eb7602170560b4db90fef2ea85c0a128086a46e3",
+      "core/srt_parser.py": "2c1c2269dac8a3bba0000f676a1de88898c6f9afeed00de12cc6f20c3bc25b58",
+      "core/translator.py": "d75be114d87da46ef8f4da28d2bf002fcfa7b28270833bc172b105d944f3e32f",
+      "providers/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "providers/base.py": "f95472abd418f492c2e4c5b4e0342319fd421437dd311786835f65d6b6c02c40",
+      "providers/openrouter.py": "c1bc06853fa597b270267c107fccc9a71b002a4b1cd805a8d0d2e62a8dbbc5d6",
+      "providers/openrouter_sdk.py": "df7d8a0cee7797a2bdf8484fc4d86f4aa994ab582e3240d0026376f35b642087",
+      "providers/smartfast.py": "8349092aa93c6cdb11de3071a00d82389332683aae19995ad6522628fd7b5f19",
+      "queue/__init__.py": "dc4be365d0569722436ae38db8dc2cc7475b545970d8d81edf88a1d66585c722",
+      "queue/job_events.py": "3312a4e77a924ba35815437080c135ac31ac4c570e534c9065e371356c0128a9",
+      "queue/job_manager.py": "0cbaa41c640413400638527205372d17073a6f11ecb2c2dad2fc43cf1a8f8087",
+      "queue/job_store.py": "4cbe4f3423cff7440e681073139bb337a9e392f8e44883b1d58ff7505c60632b",
+      "queue/worker.py": "f86c84ef5463945ac0d1cf2876f53ce43e089b96ce0607222ce77e24c0f4a557",
+      "static/app.css": "02c526e40f6fedc695c4ec404c07795f9fd838e3b862886f4d061b09829d0d82",
+      "static/app.js": "ad7f0325978da7afed22edefc5aa725334acba86d05b4e2ff1ba4f1c391c987c",
+      "static/archive.mjs": "c0a0fde2734a87337ca7d0aac5b34a80f625e37fe2af20b4fc1295aed9fc77b9",
+      "static/index.html": "dd909e9cce9d1e04f5d04c04a3ecf474d56238abdf3dafcb8c0d6a76a7e6fc5f",
+      "static/outfit-OFL.txt": "e2a6bbb2589b85bac1690ec8f220b22a9c3af9bfda56df6391f7ab491c7a039f",
+      "static/outfit.woff2": "c9e52d041266987d3f2785a94c43f6a08775dea16ac6b0ef3e8b259652234d30",
+      "static/session.mjs": "82f377511e4400ab7eabfd9b1703990f1f5ab7d34ac3f173b8b731abcd5cd12d"
+    },
+    "openrouter_sdk_version": "1.1.133",
+    "translator_version": "2.0.0"
+  }
+}

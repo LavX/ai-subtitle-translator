@@ -1,0 +1,747 @@
+[
+  {
+    "model": "dots-studio/dots-3-note-preview:free",
+    "status": "failed",
+    "progress_cues": 0,
+    "returned_cues": 0,
+    "seconds": 6.6844774469973345,
+    "full_structural_success": false,
+    "requests": 0,
+    "http_statuses": {},
+    "observed_cost": null,
+    "requests_without_cost": 0,
+    "actual_providers": {},
+    "allowed_endpoint_attempts": {},
+    "request_sizes": {},
+    "complete_http200_bodies": 0,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": null,
+    "responses_with_reasoning_usage": 0,
+    "reasoning_usage_complete": true,
+    "completion_tokens": null,
+    "responses_with_completion_usage": 0,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": null,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": null,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "google/gemini-3.5-flash-lite",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 40.49633911099954,
+    "full_structural_success": true,
+    "requests": 14,
+    "http_statuses": {
+      "200": 14
+    },
+    "observed_cost": 0.1201938,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Google AI Studio": 14
+    },
+    "allowed_endpoint_attempts": {
+      "google-ai-studio": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 14,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 0,
+    "responses_with_reasoning_usage": 14,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 43593,
+    "responses_with_completion_usage": 14,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 10.117909205997421,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 1.1996716909998213,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "google/gemini-3.1-flash-lite",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 41.82016799199846,
+    "full_structural_success": true,
+    "requests": 17,
+    "http_statuses": {
+      "200": 17
+    },
+    "observed_cost": 0.08372925,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Google": 17
+    },
+    "allowed_endpoint_attempts": {
+      "google-vertex/eu": 17
+    },
+    "request_sizes": {
+      "3": 1,
+      "40": 1,
+      "50": 4,
+      "100": 11
+    },
+    "complete_http200_bodies": 17,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 0,
+    "responses_with_reasoning_usage": 17,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 44179,
+    "responses_with_completion_usage": 17,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 10.308567626001604,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 1.7712945599996601,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "google/gemini-2.5-flash-lite",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 45.5340629559978,
+    "full_structural_success": true,
+    "requests": 14,
+    "http_statuses": {
+      "200": 14
+    },
+    "observed_cost": 0.0210603,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Google AI Studio": 14
+    },
+    "allowed_endpoint_attempts": {
+      "google-ai-studio": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 14,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 2,
+    "responses_with_reasoning_usage": 14,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 43308,
+    "responses_with_completion_usage": 14,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 11.05721977900248,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 1.046967140999186,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "openai/gpt-5.6-luna",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 45.58106398900054,
+    "full_structural_success": true,
+    "requests": 14,
+    "http_statuses": {
+      "200": 14
+    },
+    "observed_cost": 0.046563165000000004,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Amazon Bedrock": 14
+    },
+    "allowed_endpoint_attempts": {
+      "amazon-bedrock/us-east-1": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 14,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 3294,
+    "responses_with_reasoning_usage": 14,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 28109,
+    "responses_with_completion_usage": 14,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 12.543090057999507,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 2.181071732997225,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "inception/mercury-2.5",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 50.856276392001746,
+    "full_structural_success": true,
+    "requests": 16,
+    "http_statuses": {
+      "200": 16
+    },
+    "observed_cost": 0.01370703,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Inception": 16
+    },
+    "allowed_endpoint_attempts": {
+      "inception": 16
+    },
+    "request_sizes": {
+      "1": 1,
+      "40": 1,
+      "50": 2,
+      "100": 12
+    },
+    "complete_http200_bodies": 16,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 1,
+    "reasoning_tokens": 37864,
+    "responses_with_reasoning_usage": 16,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 80541,
+    "responses_with_completion_usage": 16,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 15.653410146998795,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 0.6821551850007381,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "inclusionai/ling-3.0-flash-fin:free",
+    "status": "failed",
+    "progress_cues": 0,
+    "returned_cues": 0,
+    "seconds": 96.43596427800003,
+    "full_structural_success": false,
+    "requests": 14,
+    "http_statuses": {
+      "404": 14
+    },
+    "observed_cost": null,
+    "requests_without_cost": 14,
+    "actual_providers": {},
+    "allowed_endpoint_attempts": {
+      "novita": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 0,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": null,
+    "responses_with_reasoning_usage": 0,
+    "reasoning_usage_complete": false,
+    "completion_tokens": null,
+    "responses_with_completion_usage": 0,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": null,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 0.42543335200025467,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "meta/muse-spark-1.2-contributor",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 126.77244942199832,
+    "full_structural_success": true,
+    "requests": 14,
+    "http_statuses": {
+      "200": 14
+    },
+    "observed_cost": 0.0177702,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Meta": 14
+    },
+    "allowed_endpoint_attempts": {
+      "meta": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 14,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 34760,
+    "responses_with_reasoning_usage": 14,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 71564,
+    "responses_with_completion_usage": 14,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 35.59918198399828,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 1.7125397339987103,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "openai/gpt-4o-mini",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 131.25791961199866,
+    "full_structural_success": true,
+    "requests": 14,
+    "http_statuses": {
+      "200": 14
+    },
+    "observed_cost": 0.027982185,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Azure": 14
+    },
+    "allowed_endpoint_attempts": {
+      "azure/swedencentral": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 14,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 0,
+    "responses_with_reasoning_usage": 14,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 33793,
+    "responses_with_completion_usage": 14,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 40.71243504700033,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 1.784269930998562,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "meta/muse-spark-1.3-contributor",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 376.7408451340016,
+    "full_structural_success": true,
+    "requests": 14,
+    "http_statuses": {
+      "200": 14
+    },
+    "observed_cost": 0.0188954,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Meta": 14
+    },
+    "allowed_endpoint_attempts": {
+      "meta": 14
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 13
+    },
+    "complete_http200_bodies": 14,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 42224,
+    "responses_with_reasoning_usage": 14,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 78415,
+    "responses_with_completion_usage": 14,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 152.8174760820002,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 29.34904731899951,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 2
+  },
+  {
+    "model": "z-ai/glm-5.3-flash",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 501.72589819899804,
+    "full_structural_success": true,
+    "requests": 17,
+    "http_statuses": {
+      "200": 14,
+      "429": 3
+    },
+    "observed_cost": 0.11707725999999999,
+    "requests_without_cost": 3,
+    "actual_providers": {
+      "BaseTen": 10,
+      "Fireworks": 4
+    },
+    "allowed_endpoint_attempts": {
+      "baseten/fp8": 11,
+      "crusoe/fp4": 1,
+      "makora": 1,
+      "fireworks": 4
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 16
+    },
+    "complete_http200_bodies": 14,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 54007,
+    "responses_with_reasoning_usage": 14,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 223553,
+    "responses_with_completion_usage": 14,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 481.4811428510002,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 1.5022013849993527,
+    "retry_after_responses": 1,
+    "retry_after_seconds": [
+      1.0
+    ],
+    "completed_responses_over_120s": 2
+  },
+  {
+    "model": "qwen/qwen3.7-flash",
+    "status": "completed",
+    "progress_cues": 1340,
+    "returned_cues": 1340,
+    "seconds": 564.7442024320007,
+    "full_structural_success": true,
+    "requests": 17,
+    "http_statuses": {
+      "200": 17
+    },
+    "observed_cost": 0.02014999,
+    "requests_without_cost": 0,
+    "actual_providers": {
+      "Alibaba": 17
+    },
+    "allowed_endpoint_attempts": {
+      "alibaba": 17
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 16
+    },
+    "complete_http200_bodies": 17,
+    "interrupted_requests": 0,
+    "interrupted_whitespace_only": 0,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {},
+    "content_filter_responses": 0,
+    "empty_content_responses": 3,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 120074,
+    "responses_with_reasoning_usage": 17,
+    "reasoning_usage_complete": true,
+    "completion_tokens": 163943,
+    "responses_with_completion_usage": 17,
+    "completion_usage_complete": true,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 147.69096055800037,
+    "max_interrupted_seconds": null,
+    "headers_seconds_max": 1.2067399869993096,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 6
+  },
+  {
+    "model": "deepseek/deepseek-v4-flash-0731",
+    "status": "client_timeout",
+    "progress_cues": 400,
+    "returned_cues": 0,
+    "seconds": 600.0074718680007,
+    "full_structural_success": false,
+    "requests": 9,
+    "http_statuses": {
+      "200": 9
+    },
+    "observed_cost": 0.08143216,
+    "requests_without_cost": 4,
+    "actual_providers": {
+      "CoreWeave": 5
+    },
+    "allowed_endpoint_attempts": {
+      "coreweave/fp8": 9
+    },
+    "request_sizes": {
+      "50": 1,
+      "100": 8
+    },
+    "complete_http200_bodies": 5,
+    "interrupted_requests": 4,
+    "interrupted_whitespace_only": 4,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "TimeoutError": 4
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 1,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 223453,
+    "responses_with_reasoning_usage": 5,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 284855,
+    "responses_with_completion_usage": 5,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 575.8998953670016,
+    "max_interrupted_seconds": 595.5230411870034,
+    "headers_seconds_max": 1.1889176030017552,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 3
+  },
+  {
+    "model": "liquid/lfm-2.5-2.6b:free",
+    "status": "client_timeout",
+    "progress_cues": 700,
+    "returned_cues": 0,
+    "seconds": 600.093575259998,
+    "full_structural_success": false,
+    "requests": 91,
+    "http_statuses": {
+      "200": 85,
+      "429": 6
+    },
+    "observed_cost": 0,
+    "requests_without_cost": 9,
+    "actual_providers": {
+      "Liquid": 82
+    },
+    "allowed_endpoint_attempts": {
+      "liquid/fp8": 91
+    },
+    "request_sizes": {
+      "1": 4,
+      "4": 1,
+      "5": 22,
+      "6": 18,
+      "8": 2,
+      "10": 26,
+      "12": 1,
+      "15": 2,
+      "20": 5,
+      "25": 3,
+      "30": 1,
+      "50": 1,
+      "100": 5
+    },
+    "complete_http200_bodies": 82,
+    "interrupted_requests": 3,
+    "interrupted_whitespace_only": 3,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "TimeoutError": 3
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 3,
+    "reasoning_tokens": 157139,
+    "responses_with_reasoning_usage": 82,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 189592,
+    "responses_with_completion_usage": 82,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 105.2493493410002,
+    "max_interrupted_seconds": 18.171905434002838,
+    "headers_seconds_max": 3.0097687460001907,
+    "retry_after_responses": 6,
+    "retry_after_seconds": [
+      1.0,
+      54.0
+    ],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "nvidia/nemotron-3.5-lightning:free",
+    "status": "client_timeout",
+    "progress_cues": 0,
+    "returned_cues": 0,
+    "seconds": 600.0986088690006,
+    "full_structural_success": false,
+    "requests": 4,
+    "http_statuses": {
+      "200": 4
+    },
+    "observed_cost": null,
+    "requests_without_cost": 4,
+    "actual_providers": {},
+    "allowed_endpoint_attempts": {
+      "nvidia/nvfp4": 4
+    },
+    "request_sizes": {
+      "100": 4
+    },
+    "complete_http200_bodies": 0,
+    "interrupted_requests": 4,
+    "interrupted_whitespace_only": 4,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "TimeoutError": 4
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": null,
+    "responses_with_reasoning_usage": 0,
+    "reasoning_usage_complete": false,
+    "completion_tokens": null,
+    "responses_with_completion_usage": 0,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": null,
+    "max_interrupted_seconds": 596.0368170990005,
+    "headers_seconds_max": 0.8922826850030106,
+    "retry_after_responses": 0,
+    "retry_after_seconds": [],
+    "completed_responses_over_120s": 0
+  },
+  {
+    "model": "qwen/qwen3.8-flash",
+    "status": "client_timeout",
+    "progress_cues": 1000,
+    "returned_cues": 0,
+    "seconds": 600.1246362950005,
+    "full_structural_success": false,
+    "requests": 15,
+    "http_statuses": {
+      "200": 14,
+      "429": 1
+    },
+    "observed_cost": 0.069066008,
+    "requests_without_cost": 5,
+    "actual_providers": {
+      "Makora": 5,
+      "Alibaba": 5
+    },
+    "allowed_endpoint_attempts": {
+      "makora/fp4": 6,
+      "alibaba": 9
+    },
+    "request_sizes": {
+      "40": 1,
+      "100": 14
+    },
+    "complete_http200_bodies": 10,
+    "interrupted_requests": 4,
+    "interrupted_whitespace_only": 4,
+    "interrupted_with_no_body": 0,
+    "transport_errors": {
+      "TimeoutError": 4
+    },
+    "content_filter_responses": 0,
+    "empty_content_responses": 0,
+    "strict_partial_responses": 0,
+    "reasoning_tokens": 104298,
+    "responses_with_reasoning_usage": 10,
+    "reasoning_usage_complete": false,
+    "completion_tokens": 138775,
+    "responses_with_completion_usage": 10,
+    "completion_usage_complete": false,
+    "reasoning_parameter_sent": false,
+    "max_completed_body_seconds": 468.49615759399967,
+    "max_interrupted_seconds": 243.30224334300146,
+    "headers_seconds_max": 1.4918779930012533,
+    "retry_after_responses": 1,
+    "retry_after_seconds": [
+      1.0
+    ],
+    "completed_responses_over_120s": 5
+  }
+]
