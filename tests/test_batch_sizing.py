@@ -358,6 +358,7 @@ class TestAdaptiveRetry:
         self.provider = MagicMock()
         self.provider.get_model_metadata.return_value = None
         self.settings = MagicMock()
+        self.settings.request_timeout = 120.0
         self.settings.batch_size = 100
         self.settings.max_retries = 2
         self.settings.retry_delay = 0.01
@@ -545,8 +546,8 @@ class TestAdaptiveRetry:
         assert result.success is False
 
     @pytest.mark.asyncio
-    async def test_timeout_after_retries_triggers_adaptive(self):
-        """Timeout errors trigger adaptive retry after exhausting normal retries."""
+    async def test_timeout_immediately_triggers_adaptive(self):
+        """Timeout errors immediately recover with smaller batches."""
         lines = [{"index": str(i), "content": f"Line {i}"} for i in range(10)]
 
         call_count = 0
@@ -555,7 +556,9 @@ class TestAdaptiveRetry:
             nonlocal call_count
             call_count += 1
             if len(batch.lines) > 5:
-                raise TranslationProviderError("Request timeout", retryable=True)
+                from subtitle_translator.providers.base import ProviderTimeoutError
+
+                raise ProviderTimeoutError("Request timeout")
             return TranslationResult(
                 translations=[
                     {"index": line["index"], "content": f"T-{line['content']}"}

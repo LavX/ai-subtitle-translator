@@ -2,7 +2,7 @@
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -115,6 +115,13 @@ class TranslationConfig(BaseModel):
     temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Sampling temperature (0.0-2.0)"
     )
+    request_timeout: float | None = Field(
+        default=None,
+        alias="requestTimeout",
+        ge=30,
+        le=900,
+        description="Provider response timeout in seconds for this translation",
+    )
     max_concurrent_jobs: int | None = Field(
         default=None,
         alias="maxConcurrentJobs",
@@ -132,6 +139,11 @@ class TranslationConfig(BaseModel):
     )
     provider: ProviderConfig | None = Field(
         default=None, description="OpenRouter provider routing configuration"
+    )
+    service_tier: Literal["default", "flex", "priority"] | None = Field(
+        default=None,
+        alias="serviceTier",
+        description="OpenRouter service tier; default uses standard capacity, null follows routing",
     )
     parallel_batches: int | None = Field(
         default=None,
@@ -283,6 +295,15 @@ class TranslateFileResponse(BaseModel):
     )
 
 
+class ModelReasoningInfo(BaseModel):
+    """Public reasoning choices reported by the model catalog."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    mandatory: bool | None = None
+    supported_efforts: list[str] = Field(default_factory=list, alias="supportedEfforts")
+
+
 class ModelInfo(BaseModel):
     """Information about an available LLM model."""
 
@@ -300,6 +321,7 @@ class ModelInfo(BaseModel):
     is_default: bool = Field(
         default=False, alias="isDefault", description="Whether this is the default model"
     )
+    reasoning: ModelReasoningInfo | None = None
 
 
 class ModelsResponse(BaseModel):
@@ -465,7 +487,10 @@ class TestConnectionRequest(BaseModel):
     """Request model for testing encryption and API key validity."""
 
     apiKey: str = Field(
-        ..., min_length=1, max_length=500, description="API key to test (plaintext or enc: encrypted)"
+        ...,
+        min_length=1,
+        max_length=500,
+        description="API key to test (plaintext or enc: encrypted)",
     )
 
 

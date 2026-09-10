@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 
 from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
 from subtitle_translator.config import Settings, get_settings
-from subtitle_translator.core.batch_processor import BatchProcessor
+from subtitle_translator.core.batch_processor import BatchProcessor, summarize_batch_failure
 from subtitle_translator.core.srt_parser import SRTParser, add_rtl_markers
 from subtitle_translator.providers.base import TranslationProvider
 from subtitle_translator.providers.openrouter import OpenRouterProvider
@@ -120,6 +120,8 @@ class SubtitleTranslator:
             if not result.success:
                 failed_batches = [r for r in result.batch_results if not r.success]
                 error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
+                if result.progress.total_batches > len(result.batch_results):
+                    error_msg = summarize_batch_failure(result, result.progress.total_batches)
 
                 # Return partial results if any
                 if result.all_translations:
@@ -224,6 +226,8 @@ class SubtitleTranslator:
             if not result.success:
                 failed_batches = [r for r in result.batch_results if not r.success]
                 error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
+                if result.progress.total_batches > len(result.batch_results):
+                    error_msg = summarize_batch_failure(result, result.progress.total_batches)
 
                 # Return partial results if any
                 if result.all_translations:
@@ -345,10 +349,15 @@ _translator_lock: asyncio.Lock = asyncio.Lock()
 async def get_translator() -> SubtitleTranslator:
     """Get or create the global translator instance."""
     global _translator_instance
-    if _translator_instance is None:
-        async with _translator_lock:
-            if _translator_instance is None:
-                _translator_instance = SubtitleTranslator()
+    async with _translator_lock:
+        settings = get_settings()
+        if _translator_instance is None:
+            _translator_instance = SubtitleTranslator(settings=settings)
+        elif _translator_instance.settings is not settings:
+            provider = _translator_instance.provider
+            if isinstance(provider, OpenRouterProvider):
+                provider = provider.with_settings(settings)
+            _translator_instance = SubtitleTranslator(provider=provider, settings=settings)
     return _translator_instance
 
 

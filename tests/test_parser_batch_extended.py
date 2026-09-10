@@ -440,8 +440,9 @@ class TestFailedBatchUsageIsCounted:
         # 10 lines fail, the retry runs two 5-line sub-batches: the first succeeds (7 tokens),
         # the second answers one line twice (3 + 3 tokens) and fails the batch.
         assert result.success is False
-        assert "Adaptive retry failed at size 5" in result.error
-        assert len(result.translations) == 5
+        assert "Adaptive retry failed for cues 5-9 at size 5" in result.error
+        assert len(result.translations) == 6
+        assert result.translations[-1] == {"index": "5", "content": "Hola"}
         assert result.tokens_used == 13
         assert result.cost == pytest.approx(0.003)
         assert result.retries == 1
@@ -686,6 +687,24 @@ class TestProcessBatchesStream:
         assert results[0][0].success is True
         assert results[0][1].completed_batches == 1
         assert results[0][1].percent_complete == 100.0
+
+    @pytest.mark.asyncio
+    async def test_stream_counts_every_line_sharing_a_position(self):
+        provider = _mock_provider(
+            translate_result=TranslationResult(
+                translations=[{"index": "0", "content": "Hola"}],
+                model_used="test",
+                total_tokens=10,
+                cost=0.001,
+            )
+        )
+        processor = BatchProcessor(provider, _make_settings())
+        lines = [{"index": "0", "content": "Hello"}, {"index": "0", "content": "Hello again"}]
+        results = []
+        async for _, progress in processor.process_batches_stream(lines, "en", "es"):
+            results.append(progress)
+        assert results[-1].total_lines == 2
+        assert results[-1].completed_lines == 2
 
     @pytest.mark.asyncio
     async def test_stream_multiple_batches(self):
