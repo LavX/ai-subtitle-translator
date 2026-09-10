@@ -2,9 +2,14 @@
 
 import threading
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve absolute path to project root (3 levels up from src/subtitle_translator/config.py)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+DEFAULT_DATA_DIR = PROJECT_ROOT / ".app" / "data"
 
 
 class Settings(BaseSettings):
@@ -47,10 +52,10 @@ class Settings(BaseSettings):
     encryption_enabled: bool = True
     encryption_strict: bool = False  # When True, reject plaintext API keys
     encryption_key: str = ""  # 64-char hex AES-256 key, overrides key file
-    encryption_key_file: str = "/app/data/encryption.key"
+    encryption_key_file: str = str(DEFAULT_DATA_DIR / "encryption.key")
 
     # Persistence
-    db_path: str = "/app/data/jobs.db"
+    db_path: str = str(DEFAULT_DATA_DIR / "jobs.db")
     job_retention_hours: int = 24
 
     # Admin API key for protecting config endpoints (optional)
