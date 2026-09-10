@@ -229,9 +229,9 @@ estimated Luna cost = 0.046563165 × your cue count / 1340
 
 ### Raw results and earlier runs
 
-- [Complete run report](docs/benchmarks/2026-09-10-smartfast-full-quality-report.md), [raw JSON](docs/benchmarks/2026-09-10-smartfast-full-quality.json) and [CSV](docs/benchmarks/2026-09-10-smartfast-full-quality.csv), including requests, tokens, cache usage and returned-cue counts.
-- [Quality findings](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.md), [raw assessments and mechanical checks](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.json) and [quality CSV](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.csv).
-- [Price preflight](docs/benchmarks/2026-09-10-smartfast-full-quality-prices.json), [endpoint metrics](docs/benchmarks/2026-09-10-smartfast-full-quality-endpoints.json) and [verification](docs/benchmarks/2026-09-10-smartfast-full-quality-verification.json).
+- [Complete run report](docs/benchmarks/2026-09-10-smartfast-full-quality-report.md) and [CSV](docs/benchmarks/2026-09-10-smartfast-full-quality.csv), including requests, tokens, cache usage and returned-cue counts.
+- [Quality findings](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.md), including the mechanical checks, and the [quality CSV](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.csv).
+- The price preflight, endpoint metrics and verification records for this run are not kept in the repository. The figures taken from them are in the report and the CSVs above; the raw captures were several megabytes of JSON that nothing read.
 - [Historical benchmarks](docs/benchmarks/history.md): September 7 smoke tests and September 9 routing/retry runs, with their original settings and limitations.
 
 ## How it fits together
