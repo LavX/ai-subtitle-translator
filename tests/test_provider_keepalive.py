@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from functools import partial
 
 import httpx
 import pytest
@@ -13,7 +14,7 @@ from subtitle_translator.providers.openrouter import OpenRouterProvider
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("prefix", [b"", b'{"choices":', b'{"choices": []}'])
-async def test_continuous_body_is_cut_off_and_shared_client_remains_usable(prefix):
+async def test_continuous_body_is_cut_off_and_shared_client_remains_usable(prefix, monkeypatch):
     class ContinuousBody(httpx.AsyncByteStream):
         def __init__(self):
             self.close_count = 0
@@ -59,17 +60,19 @@ async def test_continuous_body_is_cut_off_and_shared_client_remains_usable(prefi
             },
         )
 
+    monkeypatch.setattr(
+        httpx, "AsyncClient", partial(httpx.AsyncClient, transport=httpx.MockTransport(respond))
+    )
     provider = OpenRouterProvider(
         Settings(
             _env_file=None,
             openrouter_api_key="synthetic-test-only",
             openrouter_default_model="test/model",
-            request_timeout=0.05,
+            request_timeout=0.2,
         )
     )
     client = provider._client = httpx.AsyncClient(
         base_url="https://openrouter.example/api/v1",
-        transport=httpx.MockTransport(respond),
     )
     batch = TranslationBatch([{"index": "1", "content": "Hello."}], "en", "hu")
     try:

@@ -64,7 +64,7 @@ async def process_content_translation_job(
         raw_config = job.request_data.get("config")
         if raw_config:
             safe_config = {}
-            for key, value in raw_config.items():
+            for key, value in request.config.model_dump(exclude_none=True).items():
                 if "key" in key.lower() or "secret" in key.lower() or "password" in key.lower():
                     safe_config[key] = "***" if value else None
                 else:
@@ -98,6 +98,9 @@ async def process_content_translation_job(
 
         # Convert request lines to internal format
         lines = [{"index": str(line.position), "content": line.line} for line in request.lines]
+
+        # Reconstruct the same opaque session after queue recovery.
+        config_override = (config_override or TranslationConfig()).for_operation(job_id)
 
         # Create batch processor
         processor = BatchProcessor(translator.provider, translator.settings)
@@ -230,7 +233,10 @@ async def process_file_translation_job(
         )
 
         # Extract config override from request data
-        config_override = _extract_config_override_from_dict(request_data.get("config"))
+        config_override = _extract_config_override_from_dict(
+            request_data.get("config"),
+            fallback_model=model or translator.settings.openrouter_default_model,
+        )
         model_to_use = (
             (config_override.model if config_override else None)
             or model
@@ -247,9 +253,10 @@ async def process_file_translation_job(
 
         # Log request config for file translation
         if request_data.get("config"):
-            raw_config = request_data.get("config")
             safe_config = {}
-            for key, value in raw_config.items():
+            for key, value in (
+                (config_override or TranslationConfig()).model_dump(exclude_none=True).items()
+            ):
                 if "key" in key.lower() or "secret" in key.lower() or "password" in key.lower():
                     safe_config[key] = "***" if value else None
                 else:
@@ -290,6 +297,9 @@ async def process_file_translation_job(
         # Update total_lines now that we know the actual count
         if job_id in job_manager.jobs:
             job_manager.jobs[job_id].total_lines = len(lines)
+
+        # Reconstruct the same opaque session after queue recovery.
+        config_override = (config_override or TranslationConfig()).for_operation(job_id)
 
         # Create batch processor
         processor = BatchProcessor(translator.provider, translator.settings)
@@ -406,17 +416,22 @@ def _extract_config_override(
         return config
 
     # Try to extract from raw request data
-    return _extract_config_override_from_dict(request_data.get("config"))
+    return _extract_config_override_from_dict(
+        request_data.get("config"), fallback_model=request_data.get("model")
+    )
 
 
 def _extract_config_override_from_dict(
     config_dict: dict[str, Any] | None,
+    *,
+    fallback_model: str | None = None,
 ) -> TranslationConfig | None:
     """
     Extract TranslationConfig from a dictionary.
 
     Args:
         config_dict: Raw config dictionary from request
+        fallback_model: Top-level model or settings default used without a config model
 
     Returns:
         TranslationConfig if valid dict provided, None otherwise
@@ -424,7 +439,16 @@ def _extract_config_override_from_dict(
     if config_dict is None:
         return None
 
+    configured_model = config_dict.get("model") if isinstance(config_dict, dict) else None
+    # Invalid options must not erase a requested SmartFast mode or restore a
+    # SmartFast fallback while silently dropping explicit provider restrictions.
+    smartfast_model = any(
+        isinstance(model, str) and "smartfast" in model.rsplit("/", 1)[-1].split(":")[1:]
+        for model in (configured_model, fallback_model)
+    )
     if not isinstance(config_dict, dict):
+        if smartfast_model:
+            raise ValueError("Invalid SmartFast routing configuration")
         return None
 
     # Check if any fields are present
@@ -451,9 +475,18 @@ def _extract_config_override_from_dict(
 
     try:
         return TranslationConfig(**config_dict)
-    except Exception as e:
-        # Log validation failure for debugging
-        logger.warning(f"Failed to create TranslationConfig from dict: {e}")
+    except Exception:
+        provider_config = config_dict.get("provider")
+        if smartfast_model or (
+            isinstance(provider_config, dict)
+            and (
+                str(provider_config.get("sort", "")).strip().lower() == "smartfast"
+                or "smartFast" in provider_config
+                or "smart_fast" in provider_config
+            )
+        ):
+            raise ValueError("Invalid SmartFast routing configuration") from None
+        logger.warning("Failed to validate stored translation configuration")
         return None
 
 

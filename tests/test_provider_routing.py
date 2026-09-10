@@ -1,7 +1,9 @@
 """OpenRouter provider routing: sort values, the :nitro/:floor shortcuts and typed suffixes."""
 
-from unittest.mock import AsyncMock, MagicMock
+import json
+from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from pydantic import ValidationError
 
@@ -26,6 +28,9 @@ def _make_settings():
     settings.openrouter_max_tokens = 8000
     settings.request_timeout = 120.0
     settings.openrouter_headers = {"Authorization": "Bearer sk-test-key-123"}
+    settings.get_openrouter_headers = lambda api_key_override=None: {
+        "Authorization": f"Bearer {api_key_override or settings.openrouter_api_key}"
+    }
     settings.max_retries = 0
     settings.retry_delay = 0
     return settings
@@ -36,22 +41,21 @@ def _provider():
 
 
 def _ok_response(model):
-    resp = MagicMock()
-    resp.status_code = 200
-    resp.json.return_value = {
-        "id": "gen-1",
-        "model": model,
-        "choices": [
-            {
-                "message": {
-                    "content": '{"translations": [{"index": 0, "content": "Szia"}]}',
+    return httpx.Response(
+        200,
+        json={
+            "id": "gen-1",
+            "model": model,
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"translations": [{"index": 0, "content": "Szia"}]}',
+                    }
                 }
-            }
-        ],
-        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
-    }
-    resp.text = ""
-    return resp
+            ],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        },
+    )
 
 
 async def _send(provider, config, model=None):
@@ -60,13 +64,21 @@ async def _send(provider, config, model=None):
         target_language="hu",
         source_language="en",
     )
-    client = AsyncMock()
-    client.post.return_value = _ok_response(model or PLAIN)
-    client.is_closed = False
-    provider._client = client
-    await provider.translate_batch(batch, model=model, config_override=config)
-    call = client.post.call_args
-    return call.kwargs.get("json") or call[1].get("json")
+    requests = []
+
+    async def respond(request):
+        requests.append(request)
+        return _ok_response(model or PLAIN)
+
+    provider._model_params_fetched = True
+    async with httpx.AsyncClient(
+        base_url=provider.settings.openrouter_api_base,
+        transport=httpx.MockTransport(respond),
+    ) as client:
+        provider._client = client
+        await provider.translate_batch(batch, model=model, config_override=config)
+    assert len(requests) == 1
+    return json.loads(requests[0].content)
 
 
 class TestSplitRoutingSuffix:

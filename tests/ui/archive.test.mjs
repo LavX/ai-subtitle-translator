@@ -1,12 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { crc32, safeName, uniqueName, floorModel, routeModel, zip, latestFirst } from '../../src/subtitle_translator/static/archive.mjs';
+import { crc32, safeName, uniqueName, floorModel, routeModel, routingConfig, zip, latestFirst } from '../../src/subtitle_translator/static/archive.mjs';
 test('selected routing overrides pasted shortcuts and preserves model variants', () => {
  assert.equal(routeModel('foo/bar:floor','nitro'), 'foo/bar:nitro');
  assert.equal(routeModel('foo/bar:nitro','default'), 'foo/bar');
  assert.equal(routeModel('foo/bar:free','nitro'), 'foo/bar:free');
  assert.equal(routeModel('foo/bar','floor'), 'foo/bar:floor');
+});
+test('SmartFast routing preserves exact free and thinking variants', () => {
+ assert.equal(routeModel('  foo/bar:free  ', 'smartfast'), 'foo/bar:free:smartfast');
+ assert.equal(routeModel('foo/bar:thinking', 'smartfast'), 'foo/bar:thinking:smartfast');
+ assert.equal(routeModel('foo/bar:floor', 'smartfast'), 'foo/bar:smartfast');
+ assert.equal(routeModel('foo/bar:smartfast', 'smartfast'), 'foo/bar:smartfast');
+});
+test('leaving SmartFast restores selected routing without losing the model variant', () => {
+ assert.equal(routeModel('foo/bar:smartfast', 'floor'), 'foo/bar:floor');
+ assert.equal(routeModel('foo/bar:smartfast', 'nitro'), 'foo/bar:nitro');
+ assert.equal(routeModel('foo/bar:smartfast', 'default'), 'foo/bar');
+ assert.equal(routeModel('foo/bar:free:smartfast', 'floor'), 'foo/bar:free');
+ assert.equal(routeModel('foo/bar:thinking:smartfast', 'nitro'), 'foo/bar:thinking');
+});
+test('capability lookup removes the local route while retaining the exact variant', () => {
+ const catalog = [{id: 'foo/bar', mandatory: false}, {id: 'foo/bar:thinking', mandatory: true}, {id: 'foo/bar:free', price: 0}];
+ assert.equal(catalog.find(item => item.id === routeModel('foo/bar:thinking:smartfast', 'default')).mandatory, true);
+ assert.equal(catalog.find(item => item.id === routeModel('foo/bar:free:smartfast', 'default')).price, 0);
+});
+test('SmartFast request config submits numeric tuning values including zero ceilings', () => {
+ assert.deepEqual(routingConfig('foo/bar:free', 'smartfast', {
+  medianPremiumPercent: '75.5', speedTolerancePercent: '0', sparsePremiumMultiplier: '2', maxPromptPrice: '0', maxCompletionPrice: '0',
+ }), {model: 'foo/bar:free:smartfast', provider: {sort: 'smartfast', smartFast: {
+  medianPremiumPercent: 75.5, speedTolerancePercent: 0, sparsePremiumMultiplier: 2, maxPromptPrice: 0, maxCompletionPrice: 0,
+ }}});
+});
+test('other routes discard inactive SmartFast values and keep existing sort behavior', () => {
+ for (const [route, model] of [['floor', 'foo/bar:floor'], ['nitro', 'foo/bar:nitro'], ['default', 'foo/bar']]) {
+  assert.deepEqual(routingConfig('foo/bar:smartfast', route, {maxPromptPrice: ''}), {model, provider: {sort: route}});
+ }
+ assert.deepEqual(routingConfig('foo/bar:thinking', 'nitro'), {model: 'foo/bar:thinking', provider: {sort: 'nitro'}});
+ assert.deepEqual(routingConfig('foo/bar', 'smartfast'), {model: 'foo/bar:smartfast', provider: {sort: 'smartfast'}});
+});
+test('invalid SmartFast values cannot become an unbounded or accidental free request', () => {
+ for (const value of ['', ' ', 'NaN', 'Infinity', '-0.1', '1000.1', null, true]) {
+  assert.throws(() => routingConfig('foo/bar', 'smartfast', {maxPromptPrice: value}), /input price/i);
+ }
+ for (const [field, value, label] of [['medianPremiumPercent', '1001', /median premium/i], ['speedTolerancePercent', '-1', /speed tolerance/i], ['sparsePremiumMultiplier', '0.99', /sparse.*multiplier/i], ['sparsePremiumMultiplier', '101', /sparse.*multiplier/i], ['maxCompletionPrice', '1001', /output price/i]]) {
+  assert.throws(() => routingConfig('foo/bar', 'smartfast', {[field]: value}), label);
+ }
 });
 test('CRC matches standard reference', () => assert.equal(crc32(new TextEncoder().encode('123456789')), 0xcbf43926));
 test('download names cannot contain paths or controls', () => {

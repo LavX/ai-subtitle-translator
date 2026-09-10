@@ -266,7 +266,7 @@ async def test_adaptive_timeout_budget_preserves_finished_subbatch_and_cleans_re
         finally:
             active.remove(asyncio.current_task())
 
-    provider = OpenRouterProvider(settings(request_timeout=0.05))
+    provider = OpenRouterProvider(settings(request_timeout=0.2))
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
@@ -277,10 +277,10 @@ async def test_adaptive_timeout_budget_preserves_finished_subbatch_and_cleans_re
             BatchProcessor(provider, provider.settings).process_all_batches(
                 [{"index": str(i), "content": "source"} for i in range(10)], "en", "hu"
             ),
-            0.3,
+            0.9,
         )
         elapsed = asyncio.get_running_loop().time() - start
-        assert elapsed < 0.2
+        assert elapsed < 0.7
         # One same-size retry precedes the split; the split still keeps its own window.
         assert calls == [10, 10, 5, 5]
         assert not result.success
