@@ -199,10 +199,12 @@ class TestBatchProcessor:
     def mock_settings(self):
         """Create mock settings."""
         settings = MagicMock()
+        settings.request_timeout = 120.0
         settings.batch_size = 50
         settings.max_retries = 3
         settings.retry_delay = 0.1
         settings.openrouter_default_model = "test-model"
+        settings.parallel_batches_per_job = 1
         return settings
 
     def test_create_batches(self, mock_provider, mock_settings):
@@ -318,10 +320,12 @@ class TestSubtitleTranslator:
     def mock_settings(self):
         """Create mock settings."""
         settings = MagicMock()
+        settings.request_timeout = 120.0
         settings.batch_size = 100
         settings.max_retries = 3
         settings.retry_delay = 0.1
         settings.openrouter_default_model = "test-model"
+        settings.parallel_batches_per_job = 1
         settings.is_rtl_language = MagicMock(return_value=False)
         return settings
 

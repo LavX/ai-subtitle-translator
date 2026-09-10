@@ -11,7 +11,7 @@ Translate SRT files and subtitle lines through OpenRouter. Run the service on yo
 
 [![CI](https://github.com/LavX/ai-subtitle-translator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LavX/ai-subtitle-translator/actions/workflows/ci.yml) [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](pyproject.toml) [![License: MIT](https://img.shields.io/badge/license-MIT-3a8068)](LICENSE) [![Sponsor LavX](https://img.shields.io/badge/Sponsor-LavX-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/LavX)
 
-**[Get started](#quick-start)** · **[Models & costs](#subtitle-translation-leaderboard)** · **[Use the API](#api-endpoints)** · **[Configuration](#configuration)**
+**[Get started](#quick-start)** · **[Models & costs](#subtitle-translation-leaderboard)** · **[Web UI](#optional-web-ui)** · **[Use the API](#api-endpoints)** · **[Configuration](#configuration)**
 
 - **SRT in, SRT out.** Subtitle files and right-to-left language support.
 - **Choose your model.** OpenRouter models with per-request provider routing.
@@ -19,18 +19,15 @@ Translate SRT files and subtitle lines through OpenRouter. Run the service on yo
 
 ## What could a season cost?
 
-<picture>
-  <source media="(max-width: 600px)" srcset="docs/assets/readme-costs-mobile.svg">
-  <img src="docs/assets/readme-costs.svg" alt="Luna floor estimates in USD: 20-minute episode $0.0068; two-hour movie $0.0410; 24 forty-minute episodes $0.3277." width="1280">
-</picture>
-
-**Illustrative costs, not full-movie measurements.** These use our September 7, 2026 English-to-Hungarian sample, Luna's `:floor` route and 15 cues per minute. One target language; retries excluded. [See every episode/season scenario, model comparison and limitation.](#episode-movie-and-season-cost-estimates)
+The latest full-file run translated 1,340 cues with Luna for **$0.0466**. Scaling that result to 24 forty-minute episodes at 15 cues/minute gives roughly **$0.50 for one target language**. This is a budgeting estimate, not a measured season bill. [See the current results, formula and limits.](#episode-movie-and-season-cost-estimates)
 
 ## Quick start
 
+The SmartFast examples require the 2.0.0 RC build tested below. The installer pulls the published `latest` image; it does not select this RC. To reproduce the benchmark build, use the Docker or manual source instructions, which pin commit `f80a190`.
+
 ### With Bazarr+
 
-Run this on your Docker host:
+For the published image, run this on your Docker host:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/LavX/ai-subtitle-translator/main/install.sh | bash
@@ -39,7 +36,7 @@ curl -sSL https://raw.githubusercontent.com/LavX/ai-subtitle-translator/main/ins
 The installer detects containers named `bazarr` or `bazarr-ui-test`, configures networking and prints the encryption key.
 
 1. Open **AI Subtitle Translator** settings in Bazarr+.
-2. Enter a translator URL reachable from Bazarr+, the printed encryption key, your OpenRouter API key and an explicit model such as `google/gemini-3.1-flash-lite:floor`.
+2. Enter a translator URL reachable from Bazarr+, the printed encryption key, your OpenRouter API key and an explicit model such as `openai/gpt-5.6-luna:floor`. For an RC service built below, use `openai/gpt-5.6-luna:smartfast` to match the benchmark routing.
 3. Click **Test**, then **Save**.
 
 On a shared custom Docker network, use `http://ai-subtitle-translator:8765`. Across separate bridge networks, use the Docker host's IP and published port. `localhost` works only when Bazarr+ shares the host network or runs directly on that host. See the [Bazarr+ Setup Guide](docs/BAZARR-SETUP.md).
@@ -49,11 +46,12 @@ On a shared custom Docker network, use `http://ai-subtitle-translator:8765`. Acr
 ```bash
 git clone https://github.com/LavX/ai-subtitle-translator.git
 cd ai-subtitle-translator
+git checkout f80a190
 
 # Set your OpenRouter API key and a recommended model
 cat > .env <<'EOF'
 OPENROUTER_API_KEY=sk-or-...
-OPENROUTER_DEFAULT_MODEL=google/gemini-3.1-flash-lite:floor
+OPENROUTER_DEFAULT_MODEL=openai/gpt-5.6-luna:smartfast
 EOF
 
 docker compose up -d
@@ -66,17 +64,51 @@ Service runs at `http://localhost:8765`. Interactive docs at `/docs`. The named 
 ```bash
 git clone https://github.com/LavX/ai-subtitle-translator.git
 cd ai-subtitle-translator
+git checkout f80a190
 python -m venv venv && source venv/bin/activate
 pip install -e .
 export OPENROUTER_API_KEY=sk-or-...
-export OPENROUTER_DEFAULT_MODEL=google/gemini-3.1-flash-lite:floor
+export OPENROUTER_DEFAULT_MODEL=openai/gpt-5.6-luna:smartfast
 mkdir -p data
 export DB_PATH="$PWD/data/jobs.db"
 export ENCRYPTION_KEY_FILE="$PWD/data/encryption.key"
 uvicorn subtitle_translator.main:app --host 0.0.0.0 --port 8765
 ```
 
-The examples select Gemini 3.1 Flash Lite with `:floor` routing. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
+The source-build examples select Luna with local `:smartfast` routing on this 2.0.0 RC build. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
+
+## Optional web UI
+
+Enable the standalone subtitle studio for single-file or batch SRT translation:
+
+```dotenv
+UI_ENABLED=true
+```
+
+Add that setting to `.env` for the supplied Compose setup, then run `docker compose up -d --build`. For a manual installation, export `UI_ENABLED=true` before starting the service. Open **http://localhost:8765/ui/**, or use your server's host name and port. The UI is disabled by default and adds no frontend build step or external CDN dependency.
+
+1. Enter your **OpenRouter API key** and click **Connect**. No service token or encryption key is needed in the GUI. Connection checks use OpenRouter's [key endpoint](https://openrouter.ai/docs/api_reference/limits), without making a translation request.
+2. Optionally select **Remember on this device** to save and reuse the validated key in this browser. **Forget saved key** removes it and disconnects. Unchecking Remember also removes the saved copy.
+3. Add UTF-8 `.srt` files, choose the source and target languages, and select a model or enter a custom ID. Luna is preselected, with the full OpenRouter catalog available. Choose Lowest price (`:floor`, the default), Fastest (`:nitro`), SmartFast (price + speed), or OpenRouter default routing. **Service tier** starts at **Standard**, which keeps that routing preference while disabling automatic Flex and priority tier selection. **Follow routing** allows discounted Flex with `:floor` or priority capacity with `:nitro`. SmartFast uses standard capacity unless you explicitly choose another tier through a provider restriction or the API.
+4. Translate the batch, follow each file's progress and reported cost, then download individual SRTs or the ready results as a ZIP.
+
+The preview supports side-by-side comparison, subtitle italics/bold/underline, cue search, direct cue entry and keyboard navigation. Partial downloads show translated-cue coverage separately from completed batches. **Request options** sets a provider deadline of 2, 5 or 10 minutes; the UI starts at 2 minutes, and a request that stalls is retried once at the same size before the batch is split. A longer deadline gives slow routes more time, but does not guarantee provider availability. Flex capacity can be much slower or unavailable. Standard capacity can cost more than the catalog price and the [historical `:floor` estimates](docs/benchmarks/history.md#episode-movie-and-season-cost-estimates). See [OpenRouter service tiers](https://openrouter.ai/docs/guides/features/service-tiers) and [service compatibility](#subtitle-translation-leaderboard).
+
+To select a specific provider, open **Request options** and enter its OpenRouter ID in **Provider**, for example `azure`. The request is restricted to that provider with fallbacks disabled, so it must serve the selected model. Leave it empty for automatic selection. Routing and tier settings still apply, but a tier-specific endpoint ID can change the eligible tier and price. This can help when one provider is slow, but does not guarantee availability.
+
+**SmartFast** filters providers by price and estimated request time, then keeps each job with an eligible provider when possible. Selecting it reveals five controls in **Request options**: median premium (50%), speed tolerance (20%), sparse pool multiplier (3), maximum input price ($1 per million tokens), and maximum output price ($3 per million tokens). These are quoted rate limits, not a total bill budget. Cache hits and faster translations are not guaranteed. See [SmartFast routing](docs/smartfast.md) for selection rules, API examples and Bazarr+ model suffix usage. The full-file SmartFast benchmark below is separate from the historical routing comparisons.
+
+**Reasoning** starts at **Off**, which explicitly disables reasoning for subtitle translation. **Model default** omits the setting, and catalog-supported effort levels are available when reported. A model that declares mandatory reasoning cannot use Off. Changing models keeps your explicit selection and explains incompatible choices before you submit. Custom model IDs remain usable with Off or Model default; the backend checks metadata when available.
+
+The queue shows files awaiting submission, active jobs and downloadable outputs, with partial downloads counted separately. Job messages show the latest reported request, backoff and timeout recovery activity. Elapsed time and an accepted API key do not confirm translated output. If an older server has no activity detail, the UI says so. Terminal errors retain attempted and unattempted batch counts, including after restoring history.
+
+GUI translations always use the OpenRouter key you entered. The GUI never falls back to the server's configured key. Its session shows only GUI jobs belonging to that key; people sharing a key share access to those jobs. Existing service-token API clients keep their authentication flow and do not list GUI jobs.
+
+Remembering is opt-in and uses browser local storage, so save a key only on a trusted device. Without it, the browser keeps the key only for the current session. Disconnect clears the in-memory key; a saved key remains available until you forget it. Your key and subtitles pass through this self-hosted service to OpenRouter. Use HTTPS when accessing the service across an untrusted network.
+
+Batch translation submits one job per file, not OpenRouter's asynchronous batch API. Queued and running jobs can be cancelled from the queue; a cancelled running job stops its provider requests and frees its worker. **Forget** removes a finished job and its result from the server. Partial results are marked and remain downloadable. The queue lists the newest event first: a job that just finished or a file you just added moves to the top. After a reload, the GUI restores retained jobs automatically when you connect with the same key. A remembered key reconnects automatically. Connection interruptions leave the last known progress visible while the GUI reconnects. Submissions are never automatically replayed.
+
+The GUI is served by the application. Its Python controller calls the job manager directly, using one same-origin `/ui/session` WebSocket for browser commands and live updates. Browser state is plain JSON, with no custom encryption layer. Reverse proxies must forward WebSocket upgrades. Queued cancellation preserves results if a job finishes before the command arrives. Existing HTTP API clients remain supported. Per-job keys use the service's existing encryption at rest. If encryption is disabled, keys are not persisted, and interrupted GUI jobs fail after a restart instead of using the server's key.
 
 ## Authentication
 
@@ -152,171 +184,55 @@ docker run -e ENCRYPTION_ENABLED=false ...
 
 ## Subtitle translation leaderboard
 
-In our September 7, 2026 English-to-Hungarian smoke test, **Luna offered the strongest quality/value** and **Gemini 3.1 Flash Lite was the fastest practical option**. DeepSeek V4 Flash 0731 produced readable output with longer waits, but cost more than Luna. This is a qualitative judgment from 20 synthetic cues per pass, not a general translation-quality ranking.
+**Start with Luna on SmartFast.** In the September 10, 2026 full-file English-to-Hungarian run, Luna tied Gemini 3.1 Flash Lite for the highest sampled quality and cost less, with a similar completion time. Muse Spark 1.3 placed next on sampled quality but took much longer; Muse 1.2 offers a cheaper, faster alternative to it. Mercury was fast and inexpensive, but frequent malformed Hungarian lowered its score.
 
-| Model ID | Result | Time / 20 cues | Mean cost / 20 cues | Main finding |
-|---|---|---:|---:|---|
-| `openai/gpt-5.6-luna:floor` | 2/2 initial passes | 14.81s | $0.000455 | Best quality/value in this sample |
-| `google/gemini-3.1-flash-lite:floor` | 2/2 initial passes | 3.19s | $0.000823 | Fast; one negation error |
-| `deepseek/deepseek-v4-flash-0731:floor` | 2/2 selected retries | 170.23s | $0.000877 | Readable, with some literal idioms |
-| `z-ai/glm-5.3-flash:floor` | 2/2 initial passes | 11.38s | $0.000258 | Cheapest of these, but made meaning errors |
+**10 of 16 models returned all 1,340 cues.** Every model below was tested on the same current build, commit `f80a190`, through the actual 2.0.0 RC queued API with OpenRouter SDK 1.1.133. No older results fill gaps in this comparison.
 
-Times are medians. Initial requests had a 100-second limit; DeepSeek's two initial requests timed out, then succeeded at 148 and 193 seconds with a 600-second limit. Its row uses successful retries only and excludes unknown charges from the original timeouts. Completion means all cue IDs returned, not correct language or meaning.
+| Model ID | Result | Progress / 1,340 | Seconds | Observed cost, USD | Quality / 100 | Reviewed / 180 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `openai/gpt-5.6-luna` | Complete | 1340 | 45.581 | $0.046563 | 93 | 180 |
+| `google/gemini-3.1-flash-lite` | Complete | 1340 | 41.820 | $0.083729 | 93 | 180 |
+| `meta/muse-spark-1.3-contributor` | Complete | 1340 | 376.741 | $0.018895 | 91 | 180 |
+| `meta/muse-spark-1.2-contributor` | Complete | 1340 | 126.772 | $0.017770 | 89 | 180 |
+| `google/gemini-3.5-flash-lite` | Complete | 1340 | 40.496 | $0.120194 | 84 | 180 |
+| `z-ai/glm-5.3-flash` | Complete | 1340 | 501.726 | $0.117077† | 81 | 180 |
+| `openai/gpt-4o-mini` | Complete | 1340 | 131.258 | $0.027982 | 81 | 180 |
+| `google/gemini-2.5-flash-lite` | Complete | 1340 | 45.534 | $0.021060 | 80 | 180 |
+| `inception/mercury-2.5` | Complete | 1340 | 50.856 | $0.013707 | 70 | 180 |
+| `qwen/qwen3.7-flash` | Complete | 1340 | 564.744 | $0.020150 | 58 | 180 |
+| `deepseek/deepseek-v4-flash-0731` | 600s cap | 400 | 600.007 | $0.081432† | 87* | 50 |
+| `qwen/qwen3.8-flash` | 600s cap | 1000 | 600.125 | $0.069066† | 79* | 144 |
+| `liquid/lfm-2.5-2.6b:free` | 600s cap | 700 | 600.094 | $0.000000† | 29* | 125 |
+| `inclusionai/ling-3.0-flash-fin:free` | Failed | 0 | 96.436 | unknown | N/A | 0 |
+| `nvidia/nemotron-3.5-lightning:free` | 600s cap | 0 | 600.099 | unknown | N/A | 0 |
+| `dots-studio/dots-3-note-preview:free` | Failed | 0 | 6.684 | $0.000000 (no requests) | N/A | 0 |
 
-**Service compatibility:** the benchmark used a direct request harness. It omitted temperature for Luna, while the service currently always sends temperature. Luna's result does not prove compatibility with the service's current payload. The quick-start examples use Gemini 3.1 Flash Lite; all benchmark results remain subject to provider and prompt differences.
+All complete files returned 1,340 cues with preserved indices and timestamps. Failed and capped jobs returned no subtitle file; progress counts settled work, not delivered output. **\* Provisional fragment score:** only available sampled cues were reviewed, so these scores are excluded from the ranking. **† Cost lower bound:** some requests lacked usage. Total observed charges were **$0.63762675**, with **39 requests missing cost values**.
 
-For DeepSeek or other slow `:floor` providers, consider a longer HTTP timeout in `.env` (forwarded by Compose):
+### How this was measured
 
-```dotenv
-OPENROUTER_DEFAULT_MODEL=deepseek/deepseek-v4-flash-0731:floor
-REQUEST_TIMEOUT=600
-```
+All 16 jobs launched in parallel using Bazarr+ compatible encrypted requests, with 100-cue batches and four parallel batches per model. Each job had a ten-minute wall-clock cap and a 600-second request timeout. Temperature was configured as 0.3, omitted for Luna because unsupported; reasoning was unspecified. The harness used the service API, not a running Bazarr+ client.
 
-Apply changed settings by recreating the container (`docker compose up -d`) or restarting a manual process. This is an HTTP timeout, not a whole-job deadline, and differs from the benchmark's hard request cutoff.
+SmartFast checked endpoint prices before routing, excluded expensive outliers, and preferred lower prices within a 20% estimated speed band. The run used median +50% and sparse-pool 3× price filters, $1 input / $3 output per million token ceilings, and exact zero caps for free models. Stable sessions and provider affinity support caching. All 284 forwarded requests passed price, session and payload checks; all 15 admitted models passed the initial endpoint-selection audit. Advertised speed and session affinity do not guarantee the fastest actual response. See the [SmartFast guide](docs/smartfast.md) for configuration.
+
+Quality used a fixed, blinded **180-cue sample per complete file**: twelve evenly spaced 12-cue scenes and 36 thematic cues, selected before output arrived. The automated editorial rubric weights meaning 50%, semantic completeness 20%, Hungarian fluency/register 20%, and terminology 10%. Each model had one primary reviewer with targeted context checks. Scores are subjective judgments, not accuracy percentages; small differences are not statistically established. Every available cue also received mechanical checks for structure, unchanged text, line length and reading speed. This was not a full-file semantic review.
+
+The incomplete runs had different causes: **Dots** had no eligible healthy endpoint; **Ling** returned 14 upstream HTTP 404 errors; **Nemotron** sent headers and whitespace keepalives without completed response bodies. **DeepSeek**, **Qwen 3.8** and **Liquid** returned partial work but missed the deadline. Native JSON support was optional for these routes. See the [routing and stall diagnosis](docs/benchmarks/2026-09-10-smartfast-full-quality-diagnosis.md) for receipts and reasoning-token counts.
 
 ### Episode, movie and season cost estimates
 
-A **cue** is one timed subtitle entry, which can contain one or two lines of text. For budgeting, use **15 cues per minute**, with **10–20 cues per minute** as illustrative lower/higher dialogue-density scenarios. These are planning assumptions, not a measured universal average or a statistical confidence interval. Count the actual cues in your subtitle file when available.
-
-For context, a [study of Swedish subtitles for selected reality and documentary TV episodes](https://jatjournal.org/index.php/jat/article/download/195/84) found 12.9 cues per minute in its 2020s sample (section 6.1.1). We round upward to 15 for the examples below; applying that rate to other genres and movies is our budgeting assumption. The movie example uses two hours, not a claimed average film runtime. Quiet films can fall below the range; fast dialogue and accessibility captions can exceed it.
-
-At 15 cues/minute, budget **300 cues for 20 minutes**, **600 for 40 minutes** and **1,800 for a two-hour movie**. “Full season” below means 24 episodes.
-
-#### Estimated API cost in USD, one target language
-
-These examples use the planning cue counts below and the measured mean cost per 20 cues. All four model routes use `:floor`. DeepSeek 0731 uses its two successful longer-timeout retries; the other models use their two initial completed passes. GLM is included for price comparison despite the meaning errors noted in the leaderboard.
-
-| What you translate | Cues | Luna | DeepSeek V4 Flash 0731 | Gemini 3.1 Flash Lite | GLM 5.3 Flash |
-|---|---:|---:|---:|---:|---:|
-| 20-minute episode | 300 | $0.0068 | $0.0132 | $0.0124 | $0.0039 |
-| 40-minute episode | 600 | $0.0137 | $0.0263 | $0.0247 | $0.0077 |
-| Movie (120-minute example) | 1,800 | $0.0410 | $0.0789 | $0.0741 | $0.0232 |
-| Mini-series: 8 × 20-minute episodes | 2,400 | $0.0546 | $0.1052 | $0.0988 | $0.0309 |
-| Mini-series: 8 × 40-minute episodes | 4,800 | $0.1092 | $0.2104 | $0.1976 | $0.0618 |
-| Full season: 24 × 20-minute episodes | 7,200 | $0.1639 | $0.3156 | $0.2964 | $0.0927 |
-| Full season: 24 × 40-minute episodes | 14,400 | $0.3277 | $0.6313 | $0.5928 | $0.1854 |
-
-For scale, the two-hour movie estimate is about **4.10 US cents with Luna** or **7.89 cents with DeepSeek 0731**. A 24-episode season of 40-minute episodes is about **$0.33 with Luna** or **$0.63 with DeepSeek 0731**.
-
-The 10–20 cues/minute scenarios make each central estimate approximately **0.67×–1.33×** as large, holding text length per cue and all other factors constant. For example, the two-hour movie is roughly **$0.0273–$0.0546 with Luna**, or **$0.0526–$0.1052 with DeepSeek 0731**, from cue-density variation alone.
+For a rough Luna budget, scale its measured **$0.046563165 per 1,340 cues** by your file’s cue count. At an illustrative 15 cues/minute, a 20-minute episode is about **$0.0104**, a two-hour movie **$0.0625**, and 24 forty-minute episodes **$0.5004**. These are extrapolations from this one SmartFast run, not measured season bills. Text density, reasoning, provider prices, retries and cache usage can change costs. Time does not scale linearly because batches run in parallel.
 
 ```text
-estimated cues = minutes per episode × episode count × 15
-estimated cost = mean measured cost per 20 cues × estimated cues / 20
-Luna, 24 × 40 min = $0.000455175 × 14,400 / 20 = $0.327726
+estimated Luna cost = 0.046563165 × your cue count / 1340
 ```
 
-Use the same formula with any model's cost per 20 cues in the leaderboard. For an actual file, substitute its cue count. For multiple target languages or seasons, sum their estimates; multiplying by their count is a rough shortcut when the volumes are similar.
+### Raw results and earlier runs
 
-These are **API-cost extrapolations, not measured full-episode or movie bills**. They assume similar text length per cue, 20-cue batches, unchanged provider prices and reasoning settings, and no failed attempts or retries. Unknown charges from timed-out requests are excluded. Cue length, target language, batch size, reasoning volume, retries, caching and promotions can change the bill beyond the density range. Hosting and any account-level fees or taxes are not included. Request latency does not scale directly into movie runtime because parallelism and batch sizing change it.
-
-### Full benchmark results
-
-<details>
-<summary>All initial completions, 100-second cutoff</summary>
-
-### Completed both initial passes with `:floor`
-
-Every model below returned all 20 cues in both passes without truncation. **Completion measures structure, not translation correctness.** Costs are actual reported API charges in USD, including billed reasoning tokens. Time is median request latency for one 20-cue pass.
-
-| Model ID | Time / 20 cues | Mean cost / 20 cues | Estimated cost / 600 cues | Review |
-|---|---:|---:|---:|---|
-| `openai/gpt-5.6-luna:floor` | 14.81s | $0.000455 | $0.0137 | Best quality/value in this sample; natural idioms, minor awkward phrasing |
-| `google/gemini-3.1-flash-lite:floor` | 3.19s | $0.000823 | $0.0247 | Best speed option; one negation error reversed meaning |
-| `openai/gpt-5.6-luna-pro:floor` | 28.65s | $0.001962 | $0.0588 | Strong output; no demonstrated quality gain over Luna |
-| `z-ai/glm-5.3-flash:floor` | 11.38s | $0.000258 | $0.0077 | Cheapest; fire alarm became starting a fire in one pass |
-| `tencent/hy3:floor` | 41.28s | $0.002572 | $0.0772 | Readable, but literal idioms and lost detail |
-| `tencent/hy3-preview:floor` | 63.47s | $0.003041 | $0.0912 | Readable, but awkward literal phrasing |
-| `nex-agi/nex-n2-pro:floor` | 47.62s | $0.006434 | $0.1930 | Mostly readable; costly, with some literal idioms |
-| `arcee-ai/trinity-large-thinking:floor` | 4.31s | $0.000799 | $0.0240 | Fast, but meaning errors and invented words |
-| `minimax/minimax-m2.7:floor` | 20.99s | $0.002145 | $0.0643 | Poor idioms and person/tense errors |
-| `google/gemma-4-31b-it:floor` | 77.18s | $0.001213 | $0.0364 | Broken Hungarian and mixed-language output |
-| `google/gemini-3.5-flash-lite:floor` | 9.05s | $0.001233 | $0.0370 | Readable in places, but malformed Hungarian words in both passes |
-| `openai/gpt-4o-mini:floor` | 11.42s | $0.000593 | $0.0178 | Readable, but literal translations of close call and low profile |
-| `deepseek/deepseek-v4-flash-vision-exp:floor` | 68.71s | $0.003255 | $0.0976 | Mostly readable; no demonstrated benefit for text subtitles |
-
-Vision Exp is a separate model and is not evidence for DeepSeek V4 Flash 0731.
-
-</details>
-
-<details>
-<summary>Initial failures and selected longer-timeout retries</summary>
-
-### Initial incomplete or timed-out `:floor` runs
-
-| Model ID | Complete passes | Observed limitation |
-|---|---:|---|
-| `stepfun/step-3.7-flash:floor` | 1/2 | One 100-second timeout; grammatical and meaning errors in the completed pass |
-| `qwen/qwen3.6-35b-a3b:floor` | 1/2 | One output truncated at the token cap; completed pass reversed who forgives whom |
-| `minimax/minimax-m3:floor` | 0/2 | Returned only one untranslated English cue per pass |
-| `xiaomi/mimo-v2.5-pro:floor` | 0/2 | Both requests exceeded 100 seconds; translation quality not assessed |
-| `deepseek/deepseek-v4-flash-0731:floor` | 0/2 | Both requests exceeded 100 seconds; no output available for quality assessment |
-| `deepseek/deepseek-v4-flash:floor` (0423) | 1/2 | One 100-second timeout; completed pass added profanity and used a literal idiom |
-| `google/gemini-2.5-flash-lite:floor` | 0/2 | One timeout; other pass shifted all cue indices from 1–20 to 0–19 |
-| `qwen/qwen3.5-flash-02-23:floor` | 0/2 | Both responses contained only a number, no translations |
-| `qwen/qwen3.7-flash:floor` | 1/2 | One 429; completed pass changed 9:30 to 9:15 and reversed who forgives whom |
-
-These are the original 100-second results, preserved separately from the longer-timeout follow-up below. Timeouts do not establish a translation-quality failure. No movie-cost estimate is made from these failed attempts.
-
-### Longer-timeout follow-up with `:floor`
-
-The 100-second cutoff was too restrictive for some routes. Only the four timed-out requests from the top-ten follow-up were repeated with a **600-second limit**. Prompts, low reasoning request, 8,192-token cap, price filters and parsing stayed the same. These are selected retries, not a fresh independent benchmark; the other pass results were retained.
-
-| Model ID | Completed retries | Time per retry | Mean cost / 20 cues | Estimated cost / 600 cues | Review |
-|---|---:|---:|---:|---:|---|
-| `deepseek/deepseek-v4-flash-0731:floor` | 2/2 | 147.90s / 192.57s | $0.000877 | $0.0263 | Readable Hungarian, some literal idioms; no added profanity in these retries |
-| `google/gemini-2.5-flash-lite:floor` | 1/1 | 8.21s | $0.001107 | $0.0332 | Correct indices on retry; separate original pass with shifted indices remains unsuccessful |
-| `deepseek/deepseek-v4-flash:floor` | 1/1 | 325.01s | $0.000542 | $0.0163 | Older 0423 version; readable with some awkward phrasing |
-
-All four retries completed and reported $0.00340 in charges. These cost projections use only the successful retries, **excluding unknown charges from the original timed-out requests**. They are not the total cost of obtaining the successful output across all attempts. DeepSeek 0731 now has two complete results across four total attempts; 0423 has two across three; Gemini 2.5 Flash Lite has one across three. The original 100-second series and these selected 600-second retries should not be compared as equal success-rate samples. No timeout setting in the service was changed.
-
-</details>
-
-<details>
-<summary>Earlier throughput comparisons and screening</summary>
-
-### Earlier comparisons, different settings
-
-These measurements used throughput routing before the `:floor` series. They are kept separate because neither latency nor cost is directly comparable across routes and reasoning settings.
-
-| Model | Successful sample | Time / 20 cues | Mean cost / 20 cues | Estimated cost / 600 cues | Review |
-|---|---|---:|---:|---:|---|
-| `deepseek/deepseek-v4-flash-0731` | One low-reasoning follow-up | 6.31s | $0.000389 | $0.0117 | Mostly natural, but added profanity; two earlier attempts with default reasoning and a smaller output cap were truncated |
-| `google/gemini-2.5-flash` | Two passes with default reasoning | 5.10s | $0.002429 | $0.0729 | Mostly natural; one overly literal idiom |
-
-Other models from the earlier throughput screening are excluded from the recommendations above. These outcomes apply to that configuration, not every possible provider or prompt:
-
-| Earlier model | Complete passes | Screening result |
-|---|---:|---|
-| `inception/mercury-2.5-preview` | 2/2 | Poor Hungarian phrasing and idioms |
-| `nvidia/nemotron-3.5-lightning` | 2/2 | Severe Hungarian language errors |
-| `tencent/hy-mt2-7b` | 2/2 | Poor Hungarian and mixed-language output |
-| `tencent/hy-mt2-30b-a3b` | 1/2 | Missing cue in one pass; awkward wording |
-| `poolside/laguna-s-2.1` | 1/2 | One truncated pass; poor Hungarian |
-| `tencent/hy-mt2-1.8b` | 0/2 | Repetition and truncated output |
-| `poolside/laguna-xs-2.1` | 0/2 | Empty content |
-| `inclusionai/ling-3.0-flash-fin` | 0/2 | Unusable structured output |
-| `ibm-granite/granite-4.2-8b` | 0/2 | Unusable structured output; no translated cues |
-| `qwen/qwen3.8-flash` | 0/2 | Truncated output; follow-up hit a rate limit |
-| `meta/muse-spark-1.2-contributor` | 0/2 | Access denied (403); quality not assessed |
-| `meta/muse-spark-1.3-contributor` | 0/2 | Access denied (403); quality not assessed |
-
-</details>
-
-<details>
-<summary>Method, routing, sample limits and total charges</summary>
-
-### Test method and limits
-
-The `:floor` series used the service's translation prompt, formatter and tolerant parser at source commit `16b32b3`, with direct OpenRouter requests rather than the live job queue. Each request used low reasoning effort, an 8,192-token output cap and JSON-object response format. Temperature was 0.3 where supported, omitted for Luna and Luna Pro. The initial 44 requests ran with concurrency three, randomized order, no retries and a 100-second timeout. The four selected follow-up retries used concurrency three, a fixed submission order and a 600-second timeout. Provider price filters capped eligible routes at $1 per million input tokens and $3 per million output tokens; the earlier throughput screening used $0.50 and $3 respectively. The harness sent JSON mode even to routes without advertised support. Production requests can differ, including omission of JSON mode when reasoning is enabled.
-
-Latest aliases were deduplicated, and listings marked batch were tested as their base model with `:floor`, not as asynchronous batch jobs. Hungarian output was reviewed qualitatively for meaning, idioms, grammar and completeness; there was no blinded panel or formal accuracy scoring. The original 30 `:floor` attempts reported $0.06226, excluding unknown charges for three timeouts. Seven additional models from the translation top ten received two passes each with the same settings. These 14 attempts reported $0.00632, with four timeouts and one 429 returning no cost. Before the longer-timeout retries, combined reported charges were $0.06858. Including those four retries, reported charges across the 48 floor attempts total $0.07199; seven original timeouts and one 429 returned no cost. Provider selection and prices can change between requests.
-
-All ten models in OpenRouter's translation request-share ranking for the seven days ending September 6, 2026 are now covered by two `:floor` attempts each. GLM 5.3 Flash, Luna and Gemini 3.1 Flash Lite reuse the original measurements; the other seven were added without repeating those three. The catalog maps DeepSeek 0423 to `deepseek/deepseek-v4-flash` and Qwen3.5 Flash to `qwen/qwen3.5-flash-02-23`. Popularity is not a translation-quality score. Source: [OpenRouter Data API](https://openrouter.ai/docs/cookbook/administration/data-api#task-classifications), as of 2026-09-06, licensed under CC BY 4.0.
-
-The service's recommended model list with metadata is available at `GET /api/v1/models`. It is a curated list, not the full OpenRouter catalog or this leaderboard.
-
-</details>
+- [Complete run report](docs/benchmarks/2026-09-10-smartfast-full-quality-report.md) and [CSV](docs/benchmarks/2026-09-10-smartfast-full-quality.csv), including requests, tokens, cache usage and returned-cue counts.
+- [Quality findings](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.md), including the mechanical checks, and the [quality CSV](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.csv).
+- The price preflight, endpoint metrics and verification records for this run are not kept in the repository. The figures taken from them are in the report and the CSVs above; the raw captures were several megabytes of JSON that nothing read.
+- [Historical benchmarks](docs/benchmarks/history.md): September 7 smoke tests and September 9 routing/retry runs, with their original settings and limitations.
 
 ## How it fits together
 
@@ -386,7 +302,7 @@ curl -X POST http://localhost:8765/api/v1/jobs/translate/content \
       {"position": 1, "line": "Say my name."}
     ],
     "config": {
-      "model": "google/gemini-3.1-flash-lite:floor",
+      "model": "openai/gpt-5.6-luna:smartfast",
       "temperature": 0.3,
       "reasoning": {"effort": "low"},
       "parallelBatches": 4
@@ -413,7 +329,7 @@ Poll `GET /api/v1/jobs/{id}` for live progress and metrics:
   "targetLanguage": "hu",
   "title": "Breaking Bad S05E07",
   "mediaType": "Episode",
-  "model": "google/gemini-3.1-flash-lite:floor",
+  "model": "openai/gpt-5.6-luna:smartfast",
   "totalLines": 600,
   "totalBatches": 6,
   "completedBatches": 4,
@@ -447,7 +363,7 @@ Every translate endpoint accepts an optional `config` block to override defaults
 }
 ```
 
-Reasoning effort levels: `xhigh`, `high`, `medium`, `low`, `minimal`, `none`. The `none` value omits explicit reasoning settings; provider defaults may still enable reasoning.
+Reasoning effort levels: `xhigh`, `high`, `medium`, `low`, `minimal`, `none`. The `none` value explicitly disables reasoning. Omitting reasoning settings retains model defaults.
 
 Provider routing (`provider.sort`) decides which OpenRouter provider serves the model:
 
@@ -458,9 +374,14 @@ Provider routing (`provider.sort`) decides which OpenRouter provider serves the 
 | `latency` | `provider.sort: latency` | Lowest latency first |
 | `nitro` | `model:nitro` slug shortcut | Fastest, and priority-tier endpoints become eligible |
 | `floor` | `model:floor` slug shortcut | Cheapest, and flex-tier endpoints become eligible |
+| `smartfast` | Filtered `provider.only`, mandatory `max_price`, and `session_id` | Price limits, estimated speed and affinity for each job; see [SmartFast](docs/smartfast.md) |
 | `default` | nothing | OpenRouter's own load balancing |
 
-`nitro` and `floor` are supersets of the matching sort. OpenRouter does not stack slug variants, so on a slug that already carries one (`:thinking`, `:free`, ...) they fall back to the plain `throughput`/`price` sort. A `:nitro` or `:floor` typed straight into the model id is honoured as-is and no competing sort is sent. `provider.order`, `only`, `ignore` and `allowFallbacks` are passed through unchanged.
+`nitro` and `floor` are supersets of the matching sort. OpenRouter does not stack slug variants, so on a slug that already carries one (`:thinking`, `:free`, ...) they fall back to the plain `throughput`/`price` sort. A `:nitro` or `:floor` typed straight into the model id is honoured as-is and no competing sort is sent. For these existing routes, `provider.order`, `only`, `ignore` and `allowFallbacks` are passed through unchanged.
+
+SmartFast accepts `config.provider.sort: "smartfast"` or a trailing `:smartfast` on the model ID. The translator removes that local suffix before calling OpenRouter and preserves underlying variants, including `model:free:smartfast` and `model:thinking:smartfast`. Tune it with `config.provider.smartFast`; the [SmartFast guide](docs/smartfast.md) lists all fields and bounds. Manual provider order, stacked routing shortcuts and a competing sort are rejected. Explicit `only`, `ignore` and `allowFallbacks: false` restrictions remain effective within SmartFast's limits.
+
+Per-request `config.serviceTier` accepts `default` (standard capacity), `flex`, or `priority`. It is forwarded as OpenRouter's top-level `service_tier`. Setting `default` prevents route shortcuts from admitting Flex and priority tiers, while retaining their price or throughput sorting. Outside SmartFast, omitting it preserves OpenRouter's routing-based tier selection. SmartFast uses standard endpoints when it is omitted, unless an explicit `only` restriction selects another tier. The GUI explicitly selects standard capacity for new submissions; existing API clients retain their current behavior.
 
 ## Configuration
 
@@ -474,13 +395,14 @@ The table lists application defaults. For manual runs, most settings load from e
 | `BATCH_SIZE` | `100` | Max subtitle lines per batch (auto-adjusted per model) |
 | `PARALLEL_BATCHES_PER_JOB` | `4` | Concurrent batches per translation job |
 | `JOB_QUEUE_MAX_CONCURRENT` | `15` | Concurrent translation job workers at startup |
-| `JOB_QUEUE_MAX_JOBS` | `500` | Maximum queued and processing jobs accepted; see the startup-load caveat below |
+| `JOB_QUEUE_MAX_JOBS` | `500` | Maximum queued and processing jobs accepted; existing active jobs are retained after a lower limit is configured |
 | `RETRY_DELAY` | `1.0` | Base delay in seconds for ordinary retries |
 | `MAX_RETRIES` | `3` | Ordinary retry setting; repeated 429s use up to `MAX_RETRIES + 3` attempts |
-| `REQUEST_TIMEOUT` | `120.0` | HTTP request timeout in seconds, not a whole-job deadline |
+| `REQUEST_TIMEOUT` | `120.0` | Provider request timeout in seconds; each root batch has a budget of three times this value including one same-size retry and recovery |
 | `LOG_LEVEL` | `INFO` | Log level (`DEBUG` for full request/response logging) |
 | `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed CORS origins |
 | `ADMIN_API_KEY` | *(empty)* | Required as `X-Admin-Key` header for PUT /config when set |
+| `UI_ENABLED` | `false` | Serve the optional web UI at `/ui/` |
 | `HOST` | `0.0.0.0` | Bind address when launched with `python -m subtitle_translator.main` |
 | `PORT` | `8765` | Port when launched with `python -m subtitle_translator.main` |
 | `ENCRYPTION_ENABLED` | `true` | Enable AES-256-GCM API key encryption |
@@ -492,13 +414,21 @@ The table lists application defaults. For manual runs, most settings load from e
 
 The Docker image and manual Uvicorn command above explicitly bind to `0.0.0.0:8765`. Change the Uvicorn arguments to use another bind address or port.
 
-`PUT /api/v1/config` changes are held in memory and lost on restart. The current implementation can keep using previously cached model, API key, temperature and batch defaults after an update. For reliable default changes, update the environment and restart the service. See the interactive schema for accepted fields.
+`PUT /api/v1/config` changes are held in memory and lost on restart. Running jobs keep the model, temperature, parallel batch count and API key defaults captured when they started. Queued jobs use current defaults when they start; explicit request overrides retain priority. API key rotation updates subsequent requests without closing connections used by running jobs. See the interactive schema for accepted fields.
+
+A provider timeout is retried once at the same size, because a stalled request usually means a slow provider rather than an oversized batch, and a stall does not teach the model a smaller batch size. If the retry also times out, the batch is split once above the five-line floor. A timed-out floor batch or recovery request is not repeated. The root batch, including the retry and recovery, has a budget of three times the configured request timeout. Up to `PARALLEL_BATCHES_PER_JOB` batches are in flight at once, and a batch that finishes frees its slot for the next one immediately, so one stalled request no longer holds back the other slots. A parallel group that produces no usable output and only timeout failures stops later groups; earlier translations and reported usage remain available. Ordinary invalid-response, network and rate-limit errors keep their distinct retry handling within the batch budget. Per-request `config.requestTimeout` overrides the timeout (30-900 seconds).
+
+Small models are loose with JSON. A trailing comma is repaired, and a reply cut off by the token limit keeps the complete translations before the break, and only the cues it left out are requested again. One malformed line no longer costs the lines behind it: when a batch is split, every smaller batch is still attempted after one of them fails, and the result names the cues that stayed in the source language and why.
+
+OpenRouter can return HTTP 200 with an error inside the response body. The service handles those errors by their embedded code: rate limits wait before retrying and do not reduce batch size; transient server errors use bounded retries; authentication and credit errors fail the batch. Reported usage from failed attempts remains included. A provider error marker cannot count as a completed translation.
+
+Job messages publish request, retry, backoff and recovery activity while work is pending. Activity does not advance completed line/batch counts or invent usage. Partial adaptive output retains translated indices while missing positions use source-text fallbacks in downloadable results. Every request line carrying a translated position counts as completed; a reply that repeats an index or answers one nobody asked for adds nothing.
 
 ## Job persistence
 
 Jobs are stored in SQLite and survive container restarts. On startup, queued or in-progress jobs from the previous session are recovered and re-queued from the beginning; completed batches are not checkpointed for resumption. Per-request API keys are encrypted at rest when encryption is enabled. With encryption disabled, those keys are not persisted, so recovery requires a configured default API key.
 
-Startup currently loads only the newest 500 records, including finished jobs. Recovery runs before the configured queue limit is applied. Older active jobs outside that window are not automatically re-queued.
+Startup recovers every stored queued or processing job independently of recent terminal history. History loaded into memory is bounded by `JOB_QUEUE_MAX_JOBS`. If that limit has decreased below the accepted active count, existing work is retained and new submissions wait until the active count falls below the limit.
 
 Mount a volume to `/app/data` to persist across container recreations:
 
@@ -507,7 +437,7 @@ docker run -d --name ai-subtitle-translator \
   -p 8765:8765 \
   -v translator-data:/app/data \
   -e OPENROUTER_API_KEY=sk-or-... \
-  -e OPENROUTER_DEFAULT_MODEL=google/gemini-3.1-flash-lite:floor \
+  -e OPENROUTER_DEFAULT_MODEL=openai/gpt-5.6-luna:floor \
   ghcr.io/lavx/ai-subtitle-translator:latest
 ```
 
@@ -540,17 +470,19 @@ When OpenRouter returns 429 Too Many Requests:
 
 ## Reasoning support
 
-Reasoning configuration first uses built-in model overrides and recommended-model metadata, then falls back to the OpenRouter `/models` API for other model IDs. When reasoning is requested:
+Reasoning configuration uses explicit catalog effort metadata when available, then falls back to built-in model overrides and recommended-model metadata. Other model IDs use the OpenRouter `/models` API. When reasoning is requested:
 
 - For effort-based models, the service forwards the requested effort, for example `{"reasoning": {"effort": "low"}}`
-- For models using a token budget, pass `{"reasoning": {"maxTokens": N}}` in request config. The service sends OpenRouter `max_tokens`; an `effort` value alone is ignored for these models
-- `effort: "none"` omits explicit reasoning parameters; it does not send a provider-side disable flag
-- `response_format: json_object` is sent when no reasoning payload is built. JSON mode only allows an object at the top level, so the prompt asks for `{"translations": [...]}`; asking for a bare array under JSON mode made some models (DeepSeek V4 Flash among them) answer with a single translated line per batch. The parser also accepts a wrapper under any single list-valued key.
-- `response_format: json_object` is skipped when a reasoning payload is present (some models misbehave with reasoning and JSON mode together)
+- When the catalog declares supported efforts, an explicit effort is forwarded unchanged or rejected before a translation request if unsupported. This metadata takes priority over older token-budget model overrides. Without effort metadata, token-budget models accept `{"reasoning": {"maxTokens": N}}`; an `effort` value alone keeps the existing fallback behavior
+- `effort: "none"` or `enabled: false` sends `reasoning: {"effort": "none"}` to OpenRouter. Omitted reasoning settings retain model defaults. Models declaring mandatory reasoning in `/models` metadata reject explicit disable before a translation request is sent. Disable also conflicts with an explicitly selected thinking variant.
+- `response_format: json_object` is sent when reasoning is omitted or explicitly disabled. SmartFast also requires every endpoint allowed for that request to support this optional field, otherwise it omits the field and keeps the same JSON instructions, cue validation and bounded recovery. JSON mode only allows an object at the top level, so the prompt asks for `{"translations": [...]}`; asking for a bare array under JSON mode made some models (DeepSeek V4 Flash among them) answer with a single translated line per batch. The parser also accepts a wrapper under any single list-valued key.
+- `response_format: json_object` is skipped when reasoning is enabled (some models misbehave with reasoning and JSON mode together)
 
 </details>
 
 ## Development
+
+Open feature and fix pull requests against `development`, the pre-release branch. `main` is the stable branch.
 
 ```bash
 pip install -e ".[dev]"
@@ -558,6 +490,22 @@ pytest tests/ -v --tb=short # unit and integration tests
 ruff check src/ tests/    # lint
 ruff format src/ tests/   # format
 ```
+
+The optional UI has dependency-free JavaScript checks:
+
+```bash
+node --test tests/ui/*.test.mjs
+```
+
+For browser acceptance checks, install Playwright in your development environment:
+
+```bash
+pip install playwright
+playwright install chromium
+PYTHONPATH=src python tests/ui_browser.py
+```
+
+This starts a temporary local service using the real API and job worker with synthetic translations and dummy OpenRouter key validation. It makes no paid model calls. The checks cover key saving and reuse, job ownership, batch downloads, partial results, cancellation races and interrupted submissions. Set `CHROMIUM_PATH` to use a particular Chromium executable.
 
 ## Project structure
 
@@ -567,6 +515,10 @@ src/subtitle_translator/
   config.py               # Settings from environment variables
   crypto.py               # AES-256-GCM encryption and key management
   cli.py                  # CLI commands (key regeneration)
+  web.py                  # Optional static UI routes
+  gui.py                  # App-owned browser commands and live job updates
+  ui_api.py               # OpenRouter key authentication and GUI job ownership
+  static/                 # Browser workspace and ZIP download helper
   api/
     routes.py             # REST API endpoints
     models.py             # Pydantic request/response models

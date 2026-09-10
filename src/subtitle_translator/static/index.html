@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>Subtitle studio | AI Subtitle Translator</title>
+ <link rel="stylesheet" href="./app.css">
+ <script type="module" src="./app.js"></script>
+</head>
+<body>
+ <header class="masthead"><a class="brand" href="./"><span class="brand-mark"><svg viewBox="0 0 40 34" aria-hidden="true"><path d="M10 4H4v26h6M30 4h6v26h-6M13 13h14M13 21h10"/></svg></span><span>AI Subtitle<br>Translator</span></a><div class="header-right"><span>Subtitle studio</span><span id="connection-state" class="connection-state">Not connected</span><span id="live-state" role="status"></span></div></header>
+ <main>
+  <section id="connection-panel" class="connection" aria-labelledby="connection-heading">
+   <div class="connection-copy"><h2 id="connection-heading">OpenRouter API key</h2><p>Use your OpenRouter key to translate.</p></div>
+   <form id="connection-form"><label for="api-key">OpenRouter API key</label><div class="input-action"><input id="api-key" type="password" autocomplete="off" placeholder="sk-or-…" required><button id="connect" type="submit">Connect</button><button id="disconnect" type="button" class="secondary" hidden>Disconnect</button></div><div class="remember-options"><label class="checkbox-label" for="remember-key"><input id="remember-key" type="checkbox">Remember on this device</label><button id="use-saved-key" type="button" class="text-button" hidden>Use saved key</button><button id="forget-saved-key" type="button" class="text-button" hidden>Forget saved key</button></div><p class="key-help">Remembering stores your key in this browser. Use only on a trusted device.</p></form>
+  </section>
+  <p id="notice" role="status" aria-live="polite" class="notice">Add subtitles, choose a language, then translate.</p>
+  <div class="workspace">
+   <section class="queue" aria-labelledby="queue-heading">
+    <div id="upload-panel" class="stage">
+     <div class="stage-top"><span id="preview-label">Subtitle preview</span><span class="stage-format">.srt</span></div>
+     <div class="caption-preview" id="caption-preview" data-preview-interactive>
+      <div id="original-pane" class="comparison-pane"><span id="source-caption" class="preview-language" hidden>Original</span><p id="preview-source">Drop your subtitles here</p></div>
+      <div id="translated-pane" class="comparison-pane"><span id="translated-caption" class="preview-language">Translation</span><p id="preview-translated"></p><p id="translation-placeholder">Translated text appears here.</p></div>
+      <span id="preview-caption">Add an SRT file to inspect its subtitles.</span>
+     </div>
+     <div id="preview-controls" class="preview-controls" data-preview-interactive hidden>
+      <div class="preview-navigation"><button id="previous-cue" type="button" aria-label="Previous cue"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><span id="cue-position" aria-live="polite"></span><button id="next-cue" type="button" aria-label="Next cue"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button></div>
+      <input id="cue-slider" type="range" min="1" max="1" value="1" aria-label="Subtitle cue">
+      <div class="cue-meta"><span id="cue-time"></span><label class="cue-jump-label" for="cue-jump">Go to cue <input id="cue-jump" type="number" min="1" value="1"></label></div>
+      <details id="cue-browser"><summary>Browse and search subtitles <span id="cue-browser-count"></span></summary><label class="sr-only" for="cue-search">Search subtitle text</label><input id="cue-search" type="search" placeholder="Search original or translated text" autocomplete="off"><ol id="cue-results" aria-label="Matching subtitle cues"></ol><p id="cue-search-status" role="status"></p></details>
+     </div>
+     <input id="file-input" type="file" accept=".srt" multiple hidden>
+     <button id="dropzone" type="button" class="dropzone"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span><strong>Add subtitle files</strong><small>or drop your SRT files here</small></span></button>
+     <p class="upload-limit">UTF-8 files · Up to 100 files · 20 MB total</p>
+    </div>
+    <div class="section-head"><div><h2 id="queue-heading">Translation queue</h2><p id="file-count">No files added</p><span id="queue-summary" aria-live="polite"></span></div><div class="queue-tools"><button id="restore-jobs" type="button" class="text-button" disabled>Restore recent jobs</button><button id="download-all" type="button" class="secondary" disabled>Download ZIP</button></div></div>
+    <div id="empty-queue" class="empty-queue"><svg class="empty-icon" viewBox="0 0 32 28" aria-hidden="true"><path d="M9 3H3v22h6M23 3h6v22h-6M11 11h10M11 18h6"/></svg><p>Your subtitles will appear here.<small>Each file keeps its own progress and download.</small></p></div>
+    <ul id="files" class="files" aria-label="Subtitle queue"></ul>
+    <div class="queue-footer"><span id="total-cost">Reported API cost: $0.0000</span><span>Jobs restore automatically when you reconnect with the same key.</span></div>
+   </section>
+   <aside class="settings" aria-labelledby="settings-heading">
+    <div class="settings-title"><h2 id="settings-heading">Translation settings</h2><p>Applies to files you translate next.</p></div>
+    <div class="languages"><label for="source-language">Original language<input id="source-language" list="languages" value="en" maxlength="50" required spellcheck="false"></label><button id="swap-languages" type="button" class="language-swap" aria-label="Swap languages"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16m-4-4 4 4-4 4M20 16H4m4-4-4 4 4 4"/></svg></button><label for="target-language">Translate into<input id="target-language" list="languages" value="hu" maxlength="50" required spellcheck="false"></label></div>
+    <datalist id="languages"><option value="en">English</option><option value="hu">Hungarian</option><option value="de">German</option><option value="es">Spanish</option><option value="fr">French</option><option value="it">Italian</option><option value="pt">Portuguese</option><option value="nl">Dutch</option><option value="pl">Polish</option><option value="ro">Romanian</option><option value="uk">Ukrainian</option><option value="ar">Arabic</option><option value="he">Hebrew</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option></datalist>
+    <p class="hint">Choose a language or enter its code.</p>
+    <label for="model">Translation model</label><input id="model" list="models" value="openai/gpt-5.6-luna:floor" autocomplete="off" required spellcheck="false"><datalist id="models"><option value="openai/gpt-5.6-luna:floor">GPT-5.6 Luna</option><option value="deepseek/deepseek-v4-flash-0731:floor">DeepSeek V4 Flash 0731</option><option value="z-ai/glm-5.3-flash:floor">GLM 5.3 Flash</option></datalist>
+    <div id="model-details" class="model-details" hidden></div><p class="hint">Search the OpenRouter catalog or enter any model ID.</p>
+    <label for="routing">Provider routing</label><select id="routing" aria-describedby="routing-hint"><option value="floor">Lowest price (:floor)</option><option value="nitro">Fastest (:nitro)</option><option value="smartfast">SmartFast (price + speed)</option><option value="default">OpenRouter default</option></select>
+    <p id="routing-hint" class="hint">Choose how OpenRouter picks a provider.</p>
+    <label for="service-tier">Service tier</label><select id="service-tier" aria-describedby="service-tier-hint"><option value="default">Standard</option><option value="auto">Follow routing</option></select>
+    <p id="service-tier-hint" class="hint">Standard keeps the provider on its normal processing queue even with lowest-price routing. Follow routing lets a :floor route use a provider’s cheaper Flex queue, which can wait minutes per request.</p>
+    <label for="media-title">Film or series title <span class="optional">optional</span></label><input id="media-title" maxlength="200" placeholder="Uses each filename if left empty">
+    <details class="request-options"><summary>Request options</summary><label for="provider-only">Provider <span class="optional">optional</span></label><input id="provider-only" maxlength="100" placeholder="Automatic" autocomplete="off" spellcheck="false" aria-describedby="provider-only-hint"><p id="provider-only-hint" class="hint">Enter an OpenRouter provider ID, such as azure. Only that provider will be used and it must support your model. Leave empty for automatic selection. SmartFast price and capability limits still apply.</p><label for="request-timeout">Provider timeout</label><select id="request-timeout"><option value="120" selected>2 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes</option></select><p class="hint">Slow providers get more time to respond before a retry.</p><label for="reasoning">Reasoning</label><select id="reasoning" aria-describedby="reasoning-hint"><option value="none">Off</option><option value="default">Model default</option></select><p id="reasoning-hint" class="hint">Off explicitly disables reasoning for subtitle translation.</p>
+     <div id="smartfast-options" hidden role="group" aria-label="SmartFast settings">
+      <label for="smartfast-median">Median premium (%)</label><input id="smartfast-median" data-smartfast="medianPremiumPercent" type="number" min="0" max="1000" step="any" value="50" required aria-describedby="smartfast-median-hint"><p id="smartfast-median-hint" class="hint">With at least five eligible endpoints, keep estimated cold costs within this percentage above the median.</p>
+      <label for="smartfast-speed">Speed tolerance (%)</label><input id="smartfast-speed" data-smartfast="speedTolerancePercent" type="number" min="0" max="1000" step="any" value="20" required aria-describedby="smartfast-speed-hint"><p id="smartfast-speed-hint" class="hint">Allow this much extra estimated request time over the fastest priced candidate. SmartFast uses throughput routing inside the price limits when no usable speed estimate exists.</p>
+      <label for="smartfast-sparse">Sparse pool multiplier</label><input id="smartfast-sparse" data-smartfast="sparsePremiumMultiplier" type="number" min="1" max="100" step="any" value="3" required aria-describedby="smartfast-sparse-hint"><p id="smartfast-sparse-hint" class="hint">With fewer than five eligible endpoints, cap estimated cold cost at this multiple of the cheapest.</p>
+      <label for="smartfast-input">Maximum input price ($ / 1M tokens)</label><input id="smartfast-input" data-smartfast="maxPromptPrice" type="number" min="0" max="1000" step="any" value="1" required aria-describedby="smartfast-price-hint">
+      <label for="smartfast-output">Maximum output price ($ / 1M tokens)</label><input id="smartfast-output" data-smartfast="maxCompletionPrice" type="number" min="0" max="1000" step="any" value="3" required aria-describedby="smartfast-price-hint"><p id="smartfast-price-hint" class="hint">Limits on quoted token rates, not a total bill budget. Free model variants require zero token and request charges. If no eligible provider remains, translation fails. Keeping a provider improves cache opportunity but does not guarantee cache hits.</p>
+     </div>
+    </details>
+    <button id="translate" type="button" class="primary" disabled><span id="translate-label">Translate files</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18 18 6M6 6h12v12"/></svg></button>
+    <p class="billing-note">Translations use your OpenRouter credit. Reported costs appear beside each file.</p>
+    <details class="workflow-note"><summary>About your queue</summary><p>Processing jobs keep running when you disconnect or close this tab. Queued and running jobs can be cancelled; cancelling a running job stops its provider requests. Your queue restores automatically after reconnecting or reloading with the same key.</p><p>Partial files include original text where translation failed. Review them before use.</p></details>
+   </aside>
+  </div>
+ </main>
+ <footer>
+  <span class="footer-brand">AI Subtitle Translator <small>open source, MIT</small></span>
+  <nav class="footer-links" aria-label="Project links">
+   <a href="https://github.com/LavX/ai-subtitle-translator" target="_blank" rel="noopener">Source and issues</a>
+   <a href="https://github.com/LavX/bazarr" target="_blank" rel="noopener">Bazarr+</a>
+  </nav>
+  <span class="footer-pitch">Want this on your whole library? <a href="https://github.com/LavX/bazarr" target="_blank" rel="noopener">Bazarr+</a> runs the same translator automatically for every show and film in Sonarr and Radarr, next to subtitle search, sync and a provider hub.</span>
+ </footer>
+</body>
+</html>
