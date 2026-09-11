@@ -20,6 +20,7 @@ def _make_settings(**overrides):
         "host": "0.0.0.0",
         "port": 8765,
         "debug": False,
+        "ui_enabled": False,
         "openrouter_api_key": "sk-test-key",
         "openrouter_default_model": "test-model",
         "encryption_enabled": False,
@@ -429,7 +430,7 @@ class TestLifespanAuthToken:
                 pass
             mock_set_at.assert_called_once_with(None)
             mock_logger.warning.assert_any_call(
-                "No encryption key, auth token disabled. All endpoints are open."
+                "No encryption key, legacy API token authentication is disabled."
             )
 
 

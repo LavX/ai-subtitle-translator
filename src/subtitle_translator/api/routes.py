@@ -704,16 +704,19 @@ async def list_jobs(
                 },
             ) from e
 
-    jobs = job_manager.list_jobs(status_filter=job_status, limit=limit)
-    stats = job_manager.get_stats()
-
-    job_responses = [_build_job_status_response(job) for job in jobs]
+    legacy_jobs = [
+        job
+        for job in job_manager.list_jobs(limit=len(job_manager.jobs))
+        if "_ui_owner" not in job.request_data
+    ]
+    jobs = [job for job in legacy_jobs if job_status is None or job.status == job_status]
+    job_responses = [_build_job_status_response(job) for job in jobs[:limit]]
 
     return JobListResponse(
         jobs=job_responses,
-        total=stats["total"],
-        processing=stats["processing"],
-        queued=stats["queued"],
+        total=len(legacy_jobs),
+        processing=sum(job.status == JobStatus.PROCESSING for job in legacy_jobs),
+        queued=sum(job.status == JobStatus.QUEUED for job in legacy_jobs),
     )
 
 
@@ -736,7 +739,7 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
     """
     job = job_manager.get_job(job_id)
 
-    if not job:
+    if not job or "_ui_owner" in job.request_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -753,23 +756,31 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
     response_model=JobDeleteResponse,
     summary="Cancel/Delete Job",
     description=(
-        "Cancel a queued job or delete a completed/failed job. Processing jobs cannot be cancelled."
+        "Cancel a queued job or delete a completed/failed job. Processing jobs cannot be cancelled. "
+        "Set onlyQueued=true to retain jobs that are no longer queued."
     ),
     responses={
         404: {"model": ErrorResponse, "description": "Job not found"},
     },
 )
-async def cancel_or_delete_job(job_id: str) -> JobDeleteResponse:
+async def cancel_or_delete_job(
+    job_id: str,
+    only_queued: Annotated[
+        bool,
+        Query(alias="onlyQueued", description="Cancel only if still queued; retain all other jobs"),
+    ] = False,
+) -> JobDeleteResponse:
     """
     Cancel a queued job or delete a completed job.
 
     - Queued jobs will be cancelled
     - Completed/failed/cancelled jobs will be deleted
     - Processing jobs cannot be cancelled (returns current status)
+    - With onlyQueued=true, non-queued jobs are retained and return their current status
     """
     job = job_manager.get_job(job_id)
 
-    if not job:
+    if not job or "_ui_owner" in job.request_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -794,6 +805,12 @@ async def cancel_or_delete_job(job_id: str) -> JobDeleteResponse:
         JobStatus.FAILED,
         JobStatus.CANCELLED,
     ):
+        if only_queued:
+            return JobDeleteResponse(
+                jobId=job_id,
+                status=job.status.value,
+                message="Job is no longer queued; kept unchanged",
+            )
         job_manager.delete_job(job_id)
         return JobDeleteResponse(
             jobId=job_id,

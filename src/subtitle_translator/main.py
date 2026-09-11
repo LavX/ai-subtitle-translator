@@ -20,9 +20,12 @@ from subtitle_translator.api.routes import (
 from subtitle_translator.config import get_settings
 from subtitle_translator.core.translator import close_translator
 from subtitle_translator.crypto import derive_auth_token, load_or_generate_key
+from subtitle_translator.gui import gui_router
 from subtitle_translator.queue.job_manager import job_manager
 from subtitle_translator.queue.job_store import JobStore
 from subtitle_translator.queue.worker import job_worker_handler
+from subtitle_translator.ui_api import ui_api_router
+from subtitle_translator.web import ui_router
 
 # Configure logging - use LOG_LEVEL env var (default: INFO)
 log_level_str = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -53,7 +56,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting AI Subtitle Translator service on {settings.host}:{settings.port}")
     logger.info(f"Default model: {settings.openrouter_default_model}")
 
-    if not settings.openrouter_api_key:
+    if not settings.openrouter_api_key and settings.ui_enabled:
+        logger.info("GUI translations use the OpenRouter key supplied by each user")
+    elif not settings.openrouter_api_key:
         logger.warning("OpenRouter API key is not configured!")
     else:
         logger.info("OpenRouter API key is configured")
@@ -92,12 +97,15 @@ async def lifespan(app: FastAPI):
         logger.info("Auth token derived from encryption key (X-Auth-Token header required)")
     else:
         set_auth_token(None)
-        logger.warning("No encryption key, auth token disabled. All endpoints are open.")
+        logger.warning("No encryption key, legacy API token authentication is disabled.")
 
     # Job persistence setup
     store = JobStore(db_path=settings.db_path, crypto_key=crypto_key)
     job_manager.set_store(store)
     job_manager.job_ttl = timedelta(hours=settings.job_retention_hours)
+
+    job_manager.max_concurrent = settings.job_queue_max_concurrent
+    job_manager.max_jobs = settings.job_queue_max_jobs
 
     # Recover jobs from previous run
     recovered = await job_manager.recover_jobs()
@@ -106,8 +114,6 @@ async def lifespan(app: FastAPI):
 
     # Start job queue workers
     logger.info(f"Starting job queue with {settings.job_queue_max_concurrent} workers")
-    job_manager.max_concurrent = settings.job_queue_max_concurrent
-    job_manager.max_jobs = settings.job_queue_max_jobs
     job_manager.set_worker_handler(job_worker_handler)
     await job_manager.start_workers()
 
@@ -127,7 +133,7 @@ def create_app() -> FastAPI:
     Returns:
         Configured FastAPI application instance
     """
-    get_settings()
+    settings = get_settings()
 
     app = FastAPI(
         title="AI Subtitle Translator",
@@ -164,6 +170,10 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.include_router(jobs_router)
     app.include_router(config_router)
+    if settings.ui_enabled:
+        app.include_router(ui_api_router)
+        app.include_router(gui_router)
+        app.include_router(ui_router)
 
     return app
 

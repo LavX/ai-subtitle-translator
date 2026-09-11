@@ -54,6 +54,10 @@ class BatchSizeResolver:
         )
         return new_size
 
+    def limit_planned_size(self, model_id: str, planned_size: int) -> int:
+        """Apply only learned reductions to an already planned request."""
+        return min(planned_size, self._learned_sizes.get(model_id, planned_size))
+
     def record_floor_failure(self, model_id: str) -> None:
         """A failure that could not be split any further keeps the learned size but
         clears the success streak, so growing back still takes consecutive successes."""

@@ -399,3 +399,10 @@ class TestJobWorkerHandler:
             await job_worker_handler(manager, job_id, "unknown_type")
             job = manager.get_job(job_id)
             assert job.status == JobStatus.FAILED
+
+
+@pytest.mark.parametrize("field", ["requestTimeout", "request_timeout"])
+def test_timeout_only_config_survives_worker_extraction(field):
+    config = _extract_config_override_from_dict({field: 600})
+    assert config is not None
+    assert config.request_timeout == 600

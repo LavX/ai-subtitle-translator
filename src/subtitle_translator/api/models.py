@@ -2,9 +2,13 @@
 
 import re
 from datetime import datetime
-from typing import Any
+from hashlib import sha256
+from typing import Any, Literal
+from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
+
+from subtitle_translator.providers.smartfast import SmartFastPolicy
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07")
 _DANGEROUS_CONTROL_CHARS = frozenset(
@@ -54,7 +58,7 @@ class ReasoningConfig(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-PROVIDER_SORT_VALUES = ("default", "throughput", "price", "latency", "nitro", "floor")
+PROVIDER_SORT_VALUES = ("default", "throughput", "price", "latency", "nitro", "floor", "smartfast")
 
 
 class ProviderConfig(BaseModel):
@@ -75,7 +79,8 @@ class ProviderConfig(BaseModel):
         description=(
             "Provider routing: 'throughput', 'price' or 'latency' set provider.sort; "
             "'nitro' and 'floor' use the OpenRouter slug shortcuts (which also unlock "
-            "the priority/flex tiers); 'default' keeps OpenRouter's load balancing"
+            "the priority/flex tiers); 'smartfast' selects a price-bounded fast provider pool; "
+            "'default' keeps OpenRouter's load balancing"
         ),
     )
     only: list[str] | None = Field(
@@ -83,6 +88,10 @@ class ProviderConfig(BaseModel):
     )
     ignore: list[str] | None = Field(
         default=None, max_length=20, description="List of provider slugs to skip"
+    )
+
+    smart_fast: SmartFastPolicy | None = Field(
+        default=None, alias="smartFast", description="SmartFast price and speed policy"
     )
 
     model_config = {"populate_by_name": True}
@@ -105,6 +114,18 @@ class ProviderConfig(BaseModel):
 class TranslationConfig(BaseModel):
     """Per-request configuration that can override defaults."""
 
+    _smartfast_session_id: str | None = PrivateAttr(default=None)
+
+    def for_operation(self, job_id: str | None = None) -> "TranslationConfig":
+        """Copy options and bind an opaque internal identity to one operation."""
+        config = self.model_copy()
+        config._smartfast_session_id = (
+            sha256(f"translation-job:{job_id}".encode()).hexdigest()
+            if job_id is not None
+            else uuid4().hex
+        )
+        return config
+
     api_key: str | None = Field(
         default=None,
         alias="apiKey",
@@ -114,6 +135,13 @@ class TranslationConfig(BaseModel):
     model: str | None = Field(default=None, description="Model to use for translation")
     temperature: float | None = Field(
         default=None, ge=0.0, le=2.0, description="Sampling temperature (0.0-2.0)"
+    )
+    request_timeout: float | None = Field(
+        default=None,
+        alias="requestTimeout",
+        ge=30,
+        le=900,
+        description="Provider response timeout in seconds for this translation",
     )
     max_concurrent_jobs: int | None = Field(
         default=None,
@@ -132,6 +160,11 @@ class TranslationConfig(BaseModel):
     )
     provider: ProviderConfig | None = Field(
         default=None, description="OpenRouter provider routing configuration"
+    )
+    service_tier: Literal["default", "flex", "priority"] | None = Field(
+        default=None,
+        alias="serviceTier",
+        description="OpenRouter service tier; default uses standard capacity, null follows routing",
     )
     parallel_batches: int | None = Field(
         default=None,
@@ -283,6 +316,15 @@ class TranslateFileResponse(BaseModel):
     )
 
 
+class ModelReasoningInfo(BaseModel):
+    """Public reasoning choices reported by the model catalog."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    mandatory: bool | None = None
+    supported_efforts: list[str] = Field(default_factory=list, alias="supportedEfforts")
+
+
 class ModelInfo(BaseModel):
     """Information about an available LLM model."""
 
@@ -300,6 +342,7 @@ class ModelInfo(BaseModel):
     is_default: bool = Field(
         default=False, alias="isDefault", description="Whether this is the default model"
     )
+    reasoning: ModelReasoningInfo | None = None
 
 
 class ModelsResponse(BaseModel):
@@ -465,7 +508,10 @@ class TestConnectionRequest(BaseModel):
     """Request model for testing encryption and API key validity."""
 
     apiKey: str = Field(
-        ..., min_length=1, max_length=500, description="API key to test (plaintext or enc: encrypted)"
+        ...,
+        min_length=1,
+        max_length=500,
+        description="API key to test (plaintext or enc: encrypted)",
     )
 
 

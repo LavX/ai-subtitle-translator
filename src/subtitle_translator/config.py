@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8765
     debug: bool = False
+    ui_enabled: bool = False
 
     # OpenRouter Configuration
     openrouter_api_key: str = ""

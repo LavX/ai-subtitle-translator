@@ -4,7 +4,11 @@ import logging
 from typing import Any
 
 from subtitle_translator.api.models import TranslateContentRequest, TranslationConfig
-from subtitle_translator.core.batch_processor import BatchProcessor, BatchProgress
+from subtitle_translator.core.batch_processor import (
+    BatchProcessor,
+    BatchProgress,
+    summarize_batch_failure,
+)
 from subtitle_translator.core.translator import (
     SubtitleTranslator,
     get_translator,
@@ -36,6 +40,12 @@ async def process_content_translation_job(
     try:
         # Parse request data
         request = TranslateContentRequest(**job.request_data)
+        model = (
+            (request.config.model if request.config else None)
+            or request.model
+            or translator.settings.openrouter_default_model
+        )
+        job_manager.set_job_model(job_id, model)
 
         if not request.lines:
             job_manager.set_job_completed(job_id, {"lines": [], "model_used": "", "tokens_used": 0})
@@ -54,7 +64,7 @@ async def process_content_translation_job(
         raw_config = job.request_data.get("config")
         if raw_config:
             safe_config = {}
-            for key, value in raw_config.items():
+            for key, value in request.config.model_dump(exclude_none=True).items():
                 if "key" in key.lower() or "secret" in key.lower() or "password" in key.lower():
                     safe_config[key] = "***" if value else None
                 else:
@@ -89,6 +99,9 @@ async def process_content_translation_job(
         # Convert request lines to internal format
         lines = [{"index": str(line.position), "content": line.line} for line in request.lines]
 
+        # Reconstruct the same opaque session after queue recovery.
+        config_override = (config_override or TranslationConfig()).for_operation(job_id)
+
         # Create batch processor
         processor = BatchProcessor(translator.provider, translator.settings)
 
@@ -96,7 +109,7 @@ async def process_content_translation_job(
         def progress_callback(progress: BatchProgress) -> None:
             percent = int(progress.percent_complete)
             failed_info = f", {progress.failed_batches} failed" if progress.failed_batches else ""
-            message = (
+            message = progress.message or (
                 f"Translated {progress.completed_lines}/{progress.total_lines} lines "
                 f"({progress.completed_batches}/{progress.total_batches} batches{failed_info})"
             )
@@ -125,8 +138,7 @@ async def process_content_translation_job(
         )
 
         if not result.success:
-            failed_batches = [r for r in result.batch_results if not r.success]
-            error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
+            error_summary = summarize_batch_failure(result, job.total_batches)
 
             # Report as partial if we have some results, otherwise fail
             if result.all_translations:
@@ -136,12 +148,12 @@ async def process_content_translation_job(
                     request.targetLanguage,
                     translator.settings,
                 )
-                total_lines = len(request.lines)
                 # Count request lines, not distinct positions: a request may repeat a
-                # position, and a returned index that nobody asked for is not a line.
-                returned_indices = {
-                    str(translation["index"]) for translation in result.all_translations
-                }
+                # position and the translation is applied to every line carrying it,
+                # while a returned index nobody asked for is not a line. The set of
+                # returned indices keeps a duplicated reply from counting twice.
+                total_lines = len(request.lines)
+                returned_indices = {str(t["index"]) for t in result.all_translations}
                 translated_count = sum(
                     1 for line in request.lines if str(line.position) in returned_indices
                 )
@@ -152,13 +164,12 @@ async def process_content_translation_job(
                         "model_used": result.model_used,
                         "tokens_used": result.total_tokens,
                     },
-                    error=f"{translated_count}/{total_lines} lines translated. "
-                    f"{len(failed_batches)} of {len(result.batch_results)} batches failed: {error_msg}",
+                    error=f"{translated_count}/{total_lines} lines translated. {error_summary}",
                 )
             else:
                 job_manager.set_job_failed(
                     job_id,
-                    f"All {len(failed_batches)} batches failed: {error_msg}",
+                    error_summary,
                 )
             return
 
@@ -222,7 +233,16 @@ async def process_file_translation_job(
         )
 
         # Extract config override from request data
-        config_override = _extract_config_override_from_dict(request_data.get("config"))
+        config_override = _extract_config_override_from_dict(
+            request_data.get("config"),
+            fallback_model=model or translator.settings.openrouter_default_model,
+        )
+        model_to_use = (
+            (config_override.model if config_override else None)
+            or model
+            or translator.settings.openrouter_default_model
+        )
+        job_manager.set_job_model(job_id, model_to_use)
 
         # Restore API key from job-level storage (stripped from request_data for security)
         if job.api_key_override:
@@ -233,9 +253,10 @@ async def process_file_translation_job(
 
         # Log request config for file translation
         if request_data.get("config"):
-            raw_config = request_data.get("config")
             safe_config = {}
-            for key, value in raw_config.items():
+            for key, value in (
+                (config_override or TranslationConfig()).model_dump(exclude_none=True).items()
+            ):
                 if "key" in key.lower() or "secret" in key.lower() or "password" in key.lower():
                     safe_config[key] = "***" if value else None
                 else:
@@ -277,6 +298,9 @@ async def process_file_translation_job(
         if job_id in job_manager.jobs:
             job_manager.jobs[job_id].total_lines = len(lines)
 
+        # Reconstruct the same opaque session after queue recovery.
+        config_override = (config_override or TranslationConfig()).for_operation(job_id)
+
         # Create batch processor
         processor = BatchProcessor(translator.provider, translator.settings)
 
@@ -284,7 +308,7 @@ async def process_file_translation_job(
         def progress_callback(progress: BatchProgress) -> None:
             percent = int(progress.percent_complete)
             failed_info = f", {progress.failed_batches} failed" if progress.failed_batches else ""
-            message = (
+            message = progress.message or (
                 f"Translated {progress.completed_lines}/{progress.total_lines} lines "
                 f"({progress.completed_batches}/{progress.total_batches} batches{failed_info})"
             )
@@ -312,8 +336,7 @@ async def process_file_translation_job(
         )
 
         if not result.success:
-            failed_batches = [r for r in result.batch_results if not r.success]
-            error_msg = "; ".join(r.error or "Unknown error" for r in failed_batches)
+            error_summary = summarize_batch_failure(result, job.total_batches)
 
             if result.all_translations:
                 is_rtl = translator.settings.is_rtl_language(target_language)
@@ -321,7 +344,12 @@ async def process_file_translation_job(
                     entries, result.all_translations, is_rtl=is_rtl
                 )
                 translated_content = translator._srt_parser.compose(translated_entries)
-                translated_count = len(result.all_translations)
+                # Count entries, not distinct cue numbers: a file may repeat a number
+                # and the translation is applied to every entry carrying it.
+                returned_indices = {str(t["index"]) for t in result.all_translations}
+                translated_count = sum(
+                    1 for line in lines if str(line["index"]) in returned_indices
+                )
                 total_count = len(lines)
 
                 job_manager.set_job_partial(
@@ -332,13 +360,12 @@ async def process_file_translation_job(
                         "tokens_used": result.total_tokens,
                         "subtitle_count": len(entries),
                     },
-                    error=f"{translated_count}/{total_count} lines translated. "
-                    f"{len(failed_batches)} of {len(result.batch_results)} batches failed: {error_msg}",
+                    error=f"{translated_count}/{total_count} lines translated. {error_summary}",
                 )
             else:
                 job_manager.set_job_failed(
                     job_id,
-                    f"All {len(failed_batches)} batches failed: {error_msg}",
+                    error_summary,
                 )
             return
 
@@ -389,17 +416,22 @@ def _extract_config_override(
         return config
 
     # Try to extract from raw request data
-    return _extract_config_override_from_dict(request_data.get("config"))
+    return _extract_config_override_from_dict(
+        request_data.get("config"), fallback_model=request_data.get("model")
+    )
 
 
 def _extract_config_override_from_dict(
     config_dict: dict[str, Any] | None,
+    *,
+    fallback_model: str | None = None,
 ) -> TranslationConfig | None:
     """
     Extract TranslationConfig from a dictionary.
 
     Args:
         config_dict: Raw config dictionary from request
+        fallback_model: Top-level model or settings default used without a config model
 
     Returns:
         TranslationConfig if valid dict provided, None otherwise
@@ -407,7 +439,16 @@ def _extract_config_override_from_dict(
     if config_dict is None:
         return None
 
+    configured_model = config_dict.get("model") if isinstance(config_dict, dict) else None
+    # Invalid options must not erase a requested SmartFast mode or restore a
+    # SmartFast fallback while silently dropping explicit provider restrictions.
+    smartfast_model = any(
+        isinstance(model, str) and "smartfast" in model.rsplit("/", 1)[-1].split(":")[1:]
+        for model in (configured_model, fallback_model)
+    )
     if not isinstance(config_dict, dict):
+        if smartfast_model:
+            raise ValueError("Invalid SmartFast routing configuration")
         return None
 
     # Check if any fields are present
@@ -418,19 +459,34 @@ def _extract_config_override_from_dict(
             "api_key",
             "model",
             "temperature",
+            "requestTimeout",
+            "request_timeout",
             "maxConcurrentJobs",
             "max_concurrent_jobs",
             "reasoning",
             "provider",
+            "serviceTier",
+            "service_tier",
+            "parallelBatches",
+            "parallel_batches",
         ]
     ):
         return None
 
     try:
         return TranslationConfig(**config_dict)
-    except Exception as e:
-        # Log validation failure for debugging
-        logger.warning(f"Failed to create TranslationConfig from dict: {e}")
+    except Exception:
+        provider_config = config_dict.get("provider")
+        if smartfast_model or (
+            isinstance(provider_config, dict)
+            and (
+                str(provider_config.get("sort", "")).strip().lower() == "smartfast"
+                or "smartFast" in provider_config
+                or "smart_fast" in provider_config
+            )
+        ):
+            raise ValueError("Invalid SmartFast routing configuration") from None
+        logger.warning("Failed to validate stored translation configuration")
         return None
 
 
@@ -449,6 +505,14 @@ async def job_worker_handler(
         job_id: The job ID to process
         job_type: The type of job
     """
+    job = job_manager.get_job(job_id)
+    if job is not None and "_ui_owner" in job.request_data:
+        if not job.api_key_override or job.api_key_override.startswith("enc:"):
+            job_manager.set_job_failed(
+                job_id, "OpenRouter key is unavailable after restart. Submit this file again."
+            )
+            return
+
     # Get translator instance
     translator = await get_translator()
 

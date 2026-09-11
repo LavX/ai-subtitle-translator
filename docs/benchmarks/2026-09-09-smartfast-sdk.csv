@@ -1,0 +1,9 @@
+model,status,client_seconds,completedLines,returned_cues,tokensUsed,provider_requests,observed_cost,observed_cost_complete,requests_without_cost,cache_read_tokens,session_count,full_structural_success
+qwen/qwen3.7-flash,completed,590.4118457090008,1340,1340,235127,24,0.02601827,True,0,2560,1,True
+inclusionai/ling-3.0-flash-fin:free,failed,92.78762147700036,0,0,,14,,False,14,,1,False
+nvidia/nemotron-3.5-lightning:free,client_timeout,600.0120306419994,0,0,,7,0,False,4,0,1,False
+dots-studio/dots-3-note-preview:free,client_timeout,600.0138831000004,0,0,,32,0,False,5,7680,1,False
+liquid/lfm-2.5-2.6b:free,client_timeout,600.0174468610021,484,0,147871,86,0,False,18,46000,1,False
+qwen/qwen3.8-flash,client_timeout,600.0199519589987,800,0,145303,17,0.060811898,False,9,2048,1,False
+deepseek/deepseek-v4-flash-0731,client_timeout,600.021617847,500,0,251175,9,0.15986806,False,4,0,1,False
+z-ai/glm-5.3-flash,client_timeout,600.022878931999,600,0,127921,31,0.04305417,False,25,0,1,False

@@ -1,0 +1,17 @@
+model,status,client_seconds,completedLines,returned_cues,tokensUsed,provider_requests,observed_cost,observed_cost_complete,requests_without_cost,cache_read_tokens,session_count,full_structural_success
+google/gemini-2.5-flash-lite,completed,36.38319544799742,1340,1340,80580,14,0.0210207,True,0,0,1,True
+openai/gpt-4o-mini,completed,74.61299902800238,1340,1340,68246,14,0.02545995,True,0,0,1,True
+openai/gpt-5.6-luna,completed,84.65357068199955,1340,1340,62515,14,0.04233305,True,0,0,1,True
+meta/muse-spark-1.2-contributor,completed,133.03139046300203,1340,1340,105451,14,0.0175103,True,0,1250,1,True
+meta/muse-spark-1.3-contributor,completed,177.21027279400005,1340,1340,113619,14,0.01908265,True,0,1875,1,True
+nvidia/nemotron-3.5-lightning:free,failed,2.403207616000145,0,0,,0,,True,0,,0,False
+inclusionai/ling-3.0-flash-fin:free,failed,2.4061426839980413,0,0,,0,,True,0,,0,False
+google/gemini-3.5-flash-lite,partial,10.310568210999918,310,1340,20701,4,0.0278781,True,0,0,1,False
+inception/mercury-2.5,partial,33.500027523001336,1098,1340,104002,12,0.01180178,True,0,0,1,False
+google/gemini-3.1-flash-lite,completed,44.55134324300161,1340,1340,81214,14,0.07513225,True,0,0,1,False
+liquid/lfm-2.5-2.6b:free,partial,44.6303858680003,261,1340,36576,4,0,True,0,1376,1,False
+qwen/qwen3.8-flash,failed,121.84395387900076,0,0,,4,,False,4,,1,False
+qwen/qwen3.7-flash,failed,121.84685843099942,0,0,,4,,False,4,,1,False
+dots-studio/dots-3-note-preview:free,partial,121.9959646089992,100,1340,15753,4,0,False,2,0,1,False
+z-ai/glm-5.3-flash,client_timeout,300.00187388799895,1240,0,61169,17,0.01315065,False,4,0,1,False
+deepseek/deepseek-v4-flash-0731,client_timeout,300.0020589070009,200,0,30863,14,0.01743258,False,10,0,1,False
