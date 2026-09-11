@@ -23,8 +23,6 @@ The latest full-file run translated 1,340 cues with Luna for **$0.0466**. Scalin
 
 ## Quick start
 
-The SmartFast examples require the 2.0.0 RC build tested below. The installer pulls the published `latest` image; it does not select this RC. To reproduce the benchmark build, use the Docker or manual source instructions, which pin commit `f80a190`.
-
 ### With Bazarr+
 
 For the published image, run this on your Docker host:
@@ -36,7 +34,7 @@ curl -sSL https://raw.githubusercontent.com/LavX/ai-subtitle-translator/main/ins
 The installer detects containers named `bazarr` or `bazarr-ui-test`, configures networking and prints the encryption key.
 
 1. Open **AI Subtitle Translator** settings in Bazarr+.
-2. Enter a translator URL reachable from Bazarr+, the printed encryption key, your OpenRouter API key and an explicit model such as `openai/gpt-5.6-luna:floor`. For an RC service built below, use `openai/gpt-5.6-luna:smartfast` to match the benchmark routing.
+2. Enter a translator URL reachable from Bazarr+, the printed encryption key, your OpenRouter API key and an explicit model such as `openai/gpt-5.6-luna:smartfast` to match the benchmark routing.
 3. Click **Test**, then **Save**.
 
 On a shared custom Docker network, use `http://ai-subtitle-translator:8765`. Across separate bridge networks, use the Docker host's IP and published port. `localhost` works only when Bazarr+ shares the host network or runs directly on that host. See the [Bazarr+ Setup Guide](docs/BAZARR-SETUP.md).
@@ -46,7 +44,6 @@ On a shared custom Docker network, use `http://ai-subtitle-translator:8765`. Acr
 ```bash
 git clone https://github.com/LavX/ai-subtitle-translator.git
 cd ai-subtitle-translator
-git checkout f80a190
 
 # Set your OpenRouter API key and a recommended model
 cat > .env <<'EOF'
@@ -64,7 +61,6 @@ Service runs at `http://localhost:8765`. Interactive docs at `/docs`. The named 
 ```bash
 git clone https://github.com/LavX/ai-subtitle-translator.git
 cd ai-subtitle-translator
-git checkout f80a190
 python -m venv venv && source venv/bin/activate
 pip install -e .
 export OPENROUTER_API_KEY=sk-or-...
@@ -75,7 +71,7 @@ export ENCRYPTION_KEY_FILE="$PWD/data/encryption.key"
 uvicorn subtitle_translator.main:app --host 0.0.0.0 --port 8765
 ```
 
-The source-build examples select Luna with local `:smartfast` routing on this 2.0.0 RC build. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
+The source-build examples select Luna with local `:smartfast` routing on v2.0.0. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
 
 ## Optional web UI
 
@@ -186,7 +182,7 @@ docker run -e ENCRYPTION_ENABLED=false ...
 
 **Start with Luna on SmartFast.** In the September 10, 2026 full-file English-to-Hungarian run, Luna tied Gemini 3.1 Flash Lite for the highest sampled quality and cost less, with a similar completion time. Muse Spark 1.3 placed next on sampled quality but took much longer; Muse 1.2 offers a cheaper, faster alternative to it. Mercury was fast and inexpensive, but frequent malformed Hungarian lowered its score.
 
-**10 of 16 models returned all 1,340 cues.** Every model below was tested on the same current build, commit `f80a190`, through the actual 2.0.0 RC queued API with OpenRouter SDK 1.1.133. No older results fill gaps in this comparison.
+**10 of 16 models returned all 1,340 cues.** Every model below was tested on commit `f80a190`, the build that became v2.0.0, through the actual 2.0.0 queued API with OpenRouter SDK 1.1.133. No older results fill gaps in this comparison.
 
 | Model ID | Result | Progress / 1,340 | Seconds | Observed cost, USD | Quality / 100 | Reviewed / 180 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
