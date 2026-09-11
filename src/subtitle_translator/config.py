@@ -1,5 +1,6 @@
 """Configuration management using pydantic-settings."""
 
+import os
 import threading
 from datetime import timedelta
 from pathlib import Path
@@ -7,9 +8,27 @@ from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Resolve absolute path to project root (3 levels up from src/subtitle_translator/config.py)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_DATA_DIR = PROJECT_ROOT / ".app" / "data"
+
+def _resolve_data_dir() -> Path:
+    """Resolve the default data directory honoring the established persistence contract."""
+    # 1. Explicit override (e.g., set via docker-compose.yml or install.sh)
+    if "APP_DATA_DIR" in os.environ:
+        return Path(os.environ["APP_DATA_DIR"])
+    
+    # 2. Container environments (maintains compatibility with existing Docker deployments)
+    if Path("/.dockerenv").exists() or Path("/app/data").is_dir():
+        return Path("/app/data")
+        
+    # 3. Local bare-metal development from source tree
+    project_root = Path(__file__).resolve().parent.parent.parent
+    if (project_root / "pyproject.toml").exists():
+        return project_root / ".app" / "data"
+        
+    # 4. Ultimate fallback for local pip installations outside of a container
+    return Path.cwd() / ".app" / "data"
+
+
+DEFAULT_DATA_DIR = _resolve_data_dir()
 
 
 class Settings(BaseSettings):

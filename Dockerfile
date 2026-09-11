@@ -3,7 +3,8 @@ FROM python:3.14-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    APP_DATA_DIR=/app/data
 
 # Set working directory
 WORKDIR /app
