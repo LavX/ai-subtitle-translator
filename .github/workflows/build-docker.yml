@@ -146,8 +146,12 @@ jobs:
           RUN pip install --no-cache-dir -e .
 
           RUN useradd --create-home --shell /bin/bash appuser && \
+              mkdir -p /app/data && \
               chown -R appuser:appuser /app
           USER appuser
+
+          # Persistent data volume (encryption keys, job database)
+          VOLUME ["/app/data"]
 
           EXPOSE 8765
 
