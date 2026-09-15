@@ -413,6 +413,14 @@ The table lists application defaults. For manual runs, most settings load from e
 | `DB_PATH` | `/app/data/jobs.db` | SQLite database path for job persistence |
 | `JOB_RETENTION_HOURS` | `24` | Hours to keep completed/failed jobs before cleanup |
 
+`OPENROUTER_MAX_TOKENS` and `BATCH_SIZE` have to fit each other. A batch that cannot
+answer inside the budget comes back cut short, and the adaptive sizer then halves the
+batch size for that model and re-sends, so the reply arrives complete but the truncated
+attempt is still billed. Measured on a 1355-cue film at the defaults, a verbose model
+spent 6200 to 8000 completion tokens per 100-cue batch, so two batches were cut short
+and the run took 27 requests instead of 14. Either raise the budget or lower
+`BATCH_SIZE`; the log names which limit stopped a reply when it happens.
+
 The Docker image and manual Uvicorn command above explicitly bind to `0.0.0.0:8765`. Change the Uvicorn arguments to use another bind address or port.
 
 `PUT /api/v1/config` changes are held in memory and lost on restart. Running jobs keep the model, temperature, parallel batch count and API key defaults captured when they started. Queued jobs use current defaults when they start; explicit request overrides retain priority. API key rotation updates subsequent requests without closing connections used by running jobs. See the interactive schema for accepted fields.
