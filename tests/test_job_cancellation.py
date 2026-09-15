@@ -1,4 +1,6 @@
-"""Queued-only cancellation must preserve jobs that have already advanced."""
+"""Cancellation through the public job API."""
+
+import asyncio
 
 import httpx
 import pytest
@@ -37,6 +39,17 @@ async def queued_job(persisted_manager):
         job_type=JobType.TRANSLATE_FILE,
         request_data={"content": "1\n00:00:00,000 --> 00:00:01,000\nHello\n"},
     )
+
+
+async def _until(predicate, timeout=5.0):
+    """Wait for a condition the worker settles asynchronously."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        if predicate():
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("condition was not reached in time")
 
 
 def advance_job(manager, job_id, status):
@@ -105,3 +118,74 @@ async def test_default_and_false_keep_existing_terminal_deletion(
     assert response.json()["status"] == "deleted"
     assert manager.get_job(queued_job) is None
     assert store.load_job(queued_job) is None
+
+
+class TestCancellingARunningJob:
+    """A job that has started must be stoppable through the public API.
+
+    The GUI could already do this: its route asks the manager to interrupt the
+    handler task. The public route, which is the one Bazarr+ calls, refused and
+    still answered 200, so a caller was told the job had been dealt with while it
+    kept running, kept billing and kept holding its worker.
+    """
+
+    @pytest.fixture
+    async def running(self, persisted_manager):
+        """A job the worker has actually started, blocked inside its handler."""
+        manager, _ = persisted_manager
+        entered = asyncio.Event()
+
+        async def handler(job_manager, job_id, job_type):
+            entered.set()
+            await asyncio.Event().wait()
+
+        manager.set_worker_handler(handler)
+        await manager.start_workers()
+        job_id = await manager.submit_job(
+            job_type=JobType.TRANSLATE_FILE,
+            request_data={"content": "1\n00:00:00,000 --> 00:00:01,000\nHello\n"},
+        )
+        await asyncio.wait_for(entered.wait(), 5)
+        assert manager.get_job(job_id).status == JobStatus.PROCESSING
+        try:
+            yield job_id
+        finally:
+            await manager.stop_workers()
+
+    async def test_delete_cancels_a_running_job(self, client, persisted_manager, running):
+        manager, store = persisted_manager
+
+        response = await client.delete(f"/api/v1/jobs/{running}")
+
+        assert response.status_code == 200
+        assert response.json()["status"] in ("cancelling", "cancelled")
+        await _until(lambda: manager.get_job(running).status == JobStatus.CANCELLED)
+        assert store.load_job(running).status == JobStatus.CANCELLED
+
+    async def test_only_queued_still_leaves_a_running_job_alone(
+        self, client, persisted_manager, running
+    ):
+        """onlyQueued means 'cancel only if it has not started', and still does."""
+        manager, _ = persisted_manager
+
+        response = await client.delete(f"/api/v1/jobs/{running}?onlyQueued=true")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == JobStatus.PROCESSING.value
+        assert response.json()["message"] == "Cannot cancel job that is currently processing"
+        assert manager.get_job(running).status == JobStatus.PROCESSING
+
+    async def test_delete_says_so_when_a_running_job_has_no_handler_to_stop(
+        self, client, persisted_manager, queued_job
+    ):
+        """A job restored as processing after a restart has no task to interrupt,
+        and the caller must be told that rather than shown a false success."""
+        manager, _ = persisted_manager
+        manager.set_job_processing(queued_job)
+
+        response = await client.delete(f"/api/v1/jobs/{queued_job}")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == JobStatus.PROCESSING.value
+        assert response.json()["message"] == "Cannot cancel job that is currently processing"
+        assert manager.get_job(queued_job).status == JobStatus.PROCESSING

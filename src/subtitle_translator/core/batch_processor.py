@@ -1,6 +1,7 @@
 """Batch processing logic for subtitle translation."""
 
 import asyncio
+import inspect
 import logging
 from collections import Counter, defaultdict, deque
 from collections.abc import AsyncGenerator, Callable
@@ -109,6 +110,20 @@ def summarize_batch_failure(result: BatchProcessingResult, total_batches: int | 
     return f"All {len(failed_batches)} batches failed: {error}"
 
 
+def _split_off_blank(
+    lines: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Separate cues that carry text from cues that carry none.
+
+    The blank ones are returned exactly as they arrived, so putting them back
+    preserves whatever whitespace the source file had at that position.
+    """
+    translatable, blank = [], []
+    for line in lines:
+        (translatable if str(line.get("content", "")).strip() else blank).append(line)
+    return translatable, blank
+
+
 class BatchProcessor:
     """Handles batch processing of subtitle translations."""
 
@@ -126,6 +141,30 @@ class BatchProcessor:
         """
         self.provider = provider
         self.settings = settings or get_settings()
+
+    def _model_output_ceiling(self, model: str) -> int | None:
+        """What the catalog says this model will write, when the provider knows.
+
+        Not every provider publishes one, and the catalog may not be loaded yet, so
+        an unknown ceiling leaves planning to the configured budget as before.
+        """
+        lookup = getattr(self.provider, "model_output_ceiling", None)
+        # Planning is synchronous, so the lookup has to be too: anything awaitable
+        # here is not the capability this asks for. The catalog is loaded separately,
+        # before planning, by _warm_model_capabilities.
+        if not callable(lookup) or inspect.iscoroutinefunction(lookup):
+            return None
+        ceiling = lookup(model)
+        return ceiling if isinstance(ceiling, int) and not isinstance(ceiling, bool) else None
+
+    async def _warm_model_capabilities(self) -> None:
+        """Give the provider a chance to load the catalog before batches are planned."""
+        warm = getattr(self.provider, "warm_model_capabilities", None)
+        if callable(warm):
+            try:
+                await warm()
+            except Exception as exc:  # noqa: BLE001 - planning must survive a cold catalog
+                logger.debug(f"Could not load model capabilities before planning: {exc}")
 
     def create_batches(
         self,
@@ -155,6 +194,7 @@ class BatchProcessor:
                 model,
                 context_length=metadata.get("context_length") if metadata else None,
                 max_batch_size=metadata.get("max_batch_size") if metadata else None,
+                output_ceiling=self._model_output_ceiling(model),
             )
         else:
             size = self.settings.batch_size
@@ -820,6 +860,14 @@ class BatchProcessor:
         else:
             model_to_use = model or self.settings.openrouter_default_model
 
+        # A cue with no text has nothing to translate, and no reply can carry a
+        # translation for it. Sending it makes the batch look short, which costs a
+        # split, a retry down to a single line and finally a failed batch, and the
+        # file reports partial although every position came back intact. Hold the
+        # blank ones aside and put them back unchanged at the end.
+        lines, blank_lines = _split_off_blank(lines)
+
+        await self._warm_model_capabilities()
         batches = self.create_batches(lines, batch_size, model=model_to_use)
 
         # Determine parallel batch count (config override takes precedence)
@@ -834,7 +882,7 @@ class BatchProcessor:
         )
 
         batch_results: list[BatchResult] = []
-        all_translations: list[dict[str, str]] = []
+        all_translations: list[dict[str, str]] = list(blank_lines)
         translated_indices: set[str] = set()
 
         # Create indexed batches for tracking
@@ -1030,6 +1078,7 @@ class BatchProcessor:
         """
         if config_override is None or config_override._smartfast_session_id is None:
             config_override = (config_override or TranslationConfig()).for_operation()
+        await self._warm_model_capabilities()
         batches = self.create_batches(lines, batch_size, model=config_override.model or model)
 
         progress = BatchProgress(
