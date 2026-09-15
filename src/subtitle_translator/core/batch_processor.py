@@ -109,6 +109,20 @@ def summarize_batch_failure(result: BatchProcessingResult, total_batches: int | 
     return f"All {len(failed_batches)} batches failed: {error}"
 
 
+def _split_off_blank(
+    lines: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Separate cues that carry text from cues that carry none.
+
+    The blank ones are returned exactly as they arrived, so putting them back
+    preserves whatever whitespace the source file had at that position.
+    """
+    translatable, blank = [], []
+    for line in lines:
+        (translatable if str(line.get("content", "")).strip() else blank).append(line)
+    return translatable, blank
+
+
 class BatchProcessor:
     """Handles batch processing of subtitle translations."""
 
@@ -820,6 +834,13 @@ class BatchProcessor:
         else:
             model_to_use = model or self.settings.openrouter_default_model
 
+        # A cue with no text has nothing to translate, and no reply can carry a
+        # translation for it. Sending it makes the batch look short, which costs a
+        # split, a retry down to a single line and finally a failed batch, and the
+        # file reports partial although every position came back intact. Hold the
+        # blank ones aside and put them back unchanged at the end.
+        lines, blank_lines = _split_off_blank(lines)
+
         batches = self.create_batches(lines, batch_size, model=model_to_use)
 
         # Determine parallel batch count (config override takes precedence)
@@ -834,7 +855,7 @@ class BatchProcessor:
         )
 
         batch_results: list[BatchResult] = []
-        all_translations: list[dict[str, str]] = []
+        all_translations: list[dict[str, str]] = list(blank_lines)
         translated_indices: set[str] = set()
 
         # Create indexed batches for tracking
