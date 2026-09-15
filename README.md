@@ -392,6 +392,7 @@ The table lists application defaults. For manual runs, most settings load from e
 | `OPENROUTER_API_KEY` | *(empty)* | Default OpenRouter API key; required for translation unless supplied in request config |
 | `OPENROUTER_DEFAULT_MODEL` | `amazon/nova-2-lite-v1:free` | Default translation model |
 | `OPENROUTER_TEMPERATURE` | `0.3` | Sampling temperature |
+| `OPENROUTER_MAX_TOKENS` | `8000` | Output budget sent as `max_tokens`. A reasoning budget is added on top of it, and the model's own output ceiling caps the total. `0` sends no budget and lets OpenRouter reserve the model's full output ceiling, which a free account rarely has the credit for |
 | `BATCH_SIZE` | `100` | Max subtitle lines per batch (auto-adjusted per model) |
 | `PARALLEL_BATCHES_PER_JOB` | `4` | Concurrent batches per translation job |
 | `JOB_QUEUE_MAX_CONCURRENT` | `15` | Concurrent translation job workers at startup |
