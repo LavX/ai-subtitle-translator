@@ -756,8 +756,8 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
     response_model=JobDeleteResponse,
     summary="Cancel/Delete Job",
     description=(
-        "Cancel a queued job or delete a completed/failed job. Processing jobs cannot be cancelled. "
-        "Set onlyQueued=true to retain jobs that are no longer queued."
+        "Cancel a queued or running job, or delete a completed/failed job. "
+        "Set onlyQueued=true to cancel only a job that has not started yet and retain all others."
     ),
     responses={
         404: {"model": ErrorResponse, "description": "Job not found"},
@@ -774,9 +774,12 @@ async def cancel_or_delete_job(
     Cancel a queued job or delete a completed job.
 
     - Queued jobs will be cancelled
+    - Running jobs are asked to stop and return "cancelling" until the worker
+      records the final status; one with no handler left to interrupt returns
+      its current status instead
     - Completed/failed/cancelled jobs will be deleted
-    - Processing jobs cannot be cancelled (returns current status)
-    - With onlyQueued=true, non-queued jobs are retained and return their current status
+    - With onlyQueued=true, anything that has already started is retained and
+      returns its current status
     """
     job = job_manager.get_job(job_id)
 
@@ -818,7 +821,23 @@ async def cancel_or_delete_job(
             message="Job deleted successfully",
         )
 
-    # Processing jobs cannot be cancelled
+    # A running job is interrupted through its handler task, the same way the GUI
+    # route does it. Without this the caller was told 200 and nothing stopped: the
+    # job kept running, kept billing and kept holding its worker.
+    if job.status == JobStatus.PROCESSING and not only_queued:
+        if job_manager.cancel_job(job_id):
+            current = job_manager.get_job(job_id)
+            cancelled = current is not None and current.status == JobStatus.CANCELLED
+            return JobDeleteResponse(
+                jobId=job_id,
+                # The worker records the final status once the handler has stopped.
+                status=JobStatus.CANCELLED.value if cancelled else "cancelling",
+                message="Cancellation requested",
+            )
+
+    # Either the caller asked to spare anything already running, or there is no
+    # handler left to interrupt, as with a job restored as processing after a
+    # restart. Say so rather than report a cancellation that did not happen.
     return JobDeleteResponse(
         jobId=job_id,
         status=job.status.value,
