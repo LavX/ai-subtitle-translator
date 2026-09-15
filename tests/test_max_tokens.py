@@ -1,7 +1,7 @@
 """The OPENROUTER_MAX_TOKENS output budget that goes out with every request."""
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -9,12 +9,19 @@ import pytest
 from subtitle_translator.api.models import ReasoningConfig, TranslationConfig
 from subtitle_translator.providers.base import TranslationBatch
 from subtitle_translator.providers.openrouter import (
+    EFFORT_REASONING_MODELS,
+    ENABLED_REASONING_MODELS,
     MAX_TOKENS_REASONING_MODELS,
+    THINKING_VARIANT_MODELS,
     OpenRouterProvider,
 )
 
 PLAIN = "deepseek/deepseek-v4-flash"
 REASONER = MAX_TOKENS_REASONING_MODELS[0]
+EFFORT_MODEL = EFFORT_REASONING_MODELS[0]
+ENABLED_MODEL = ENABLED_REASONING_MODELS[0]
+THINKING_MODEL = THINKING_VARIANT_MODELS[0]
+MODELS = (PLAIN, REASONER, EFFORT_MODEL, ENABLED_MODEL, THINKING_MODEL)
 
 
 def _make_settings(max_tokens=8000):
@@ -34,16 +41,18 @@ def _make_settings(max_tokens=8000):
     return settings
 
 
-def _provider(max_tokens=8000, supported=None, ceiling=None):
+def _provider(max_tokens=8000, supported=None, ceiling=None, reasoning=None):
     provider = OpenRouterProvider(settings=_make_settings(max_tokens))
     # Stand in for the catalog fetch so no test touches the network.
     provider._model_params_fetched = True
-    for model in (PLAIN, REASONER):
+    for model in MODELS:
         provider._model_params_cache[model] = (
             list(supported) if supported is not None else ["temperature", "max_tokens"]
         )
         if ceiling is not None:
             provider._model_max_output_cache[model] = ceiling
+        if reasoning is not None:
+            provider._model_reasoning_cache[model] = dict(reasoning)
     return provider
 
 
@@ -110,28 +119,66 @@ class TestConfiguredBudget:
 
 @pytest.mark.asyncio
 class TestReasoningHeadroom:
-    async def test_reasoning_budget_is_added_on_top(self):
-        """max_tokens must stay strictly above the reasoning budget it contains."""
+    """Reasoning is spent out of max_tokens, so the budget has to make room for it."""
+
+    async def test_a_declared_reasoning_budget_is_added_on_top(self):
         config = TranslationConfig(reasoning=ReasoningConfig(maxTokens=2000))
         payload = await _send(_provider(), config=config, model=REASONER)
         assert payload["reasoning"] == {"max_tokens": 2000}
         assert payload["max_tokens"] == 10000
 
-    async def test_default_reasoning_budget_is_added_on_top(self):
+    async def test_the_default_reasoning_budget_is_added_on_top(self):
         config = TranslationConfig(reasoning=ReasoningConfig(enabled=True))
         payload = await _send(_provider(), config=config, model=REASONER)
         assert payload["reasoning"] == {"max_tokens": 2000}
         assert payload["max_tokens"] == 10000
 
-    async def test_effort_reasoning_leaves_the_budget_alone(self):
+    async def test_an_effort_level_buys_a_share_of_the_budget(self):
+        """High effort spends about 80% of max_tokens, so 8000 for the answer needs 5x."""
         config = TranslationConfig(reasoning=ReasoningConfig(effort="high"))
-        payload = await _send(_provider(), config=config, model=REASONER)
+        payload = await _send(_provider(), config=config, model=EFFORT_MODEL)
+        assert payload["reasoning"] == {"effort": "high"}
+        assert payload["max_tokens"] == 40000
+
+    async def test_a_lower_effort_buys_a_smaller_share(self):
+        config = TranslationConfig(reasoning=ReasoningConfig(effort="low"))
+        payload = await _send(_provider(), config=config, model=EFFORT_MODEL)
+        assert payload["max_tokens"] == 10000
+
+    async def test_reasoning_switched_on_without_an_effort_gets_the_medium_share(self):
+        config = TranslationConfig(reasoning=ReasoningConfig(enabled=True))
+        payload = await _send(_provider(), config=config, model=ENABLED_MODEL)
+        assert payload["reasoning"] == {"enabled": True}
+        assert payload["max_tokens"] == 16000
+
+    async def test_a_thinking_variant_gets_room_although_it_declares_nothing(self):
+        config = TranslationConfig(reasoning=ReasoningConfig(enabled=True), useThinkingVariant=True)
+        payload = await _send(_provider(), config=config, model=THINKING_MODEL)
+        assert payload["model"].endswith(":thinking")
+        assert "reasoning" not in payload
+        assert payload["max_tokens"] == 16000
+
+    async def test_a_mandatory_reasoner_gets_room_without_being_asked(self):
+        """Over a hundred catalog models think whether or not the request says so."""
+        provider = _provider(reasoning={"mandatory": True, "default_effort": "high"})
+        payload = await _send(provider)
+        assert "reasoning" not in payload
+        assert payload["max_tokens"] == 40000
+
+    async def test_an_optional_reasoner_left_off_keeps_the_plain_budget(self):
+        provider = _provider(reasoning={"mandatory": False, "default_effort": "high"})
+        payload = await _send(provider)
+        assert payload["max_tokens"] == 8000
+
+    async def test_reasoning_turned_off_keeps_the_plain_budget(self):
+        config = TranslationConfig(reasoning=ReasoningConfig(effort="none"))
+        payload = await _send(_provider(), config=config, model=EFFORT_MODEL)
         assert payload["max_tokens"] == 8000
 
 
 @pytest.mark.asyncio
 class TestModelCeiling:
-    async def test_budget_is_clamped_to_the_model_output_ceiling(self):
+    async def test_budget_is_clamped_to_the_published_ceiling(self):
         payload = await _send(_provider(max_tokens=64000, ceiling=4096))
         assert payload["max_tokens"] == 4096
 
@@ -139,9 +186,30 @@ class TestModelCeiling:
         payload = await _send(_provider(max_tokens=8000, ceiling=65536))
         assert payload["max_tokens"] == 8000
 
-    async def test_omitted_when_the_model_does_not_take_it(self):
-        payload = await _send(_provider(supported=["temperature"]))
+    async def test_an_implausible_ceiling_is_ignored(self):
+        """A one-token ceiling is a broken catalog, not a budget worth honouring."""
+        payload = await _send(_provider(max_tokens=8000, ceiling=1))
+        assert payload["max_tokens"] == 8000
+
+    async def test_no_budget_is_sent_when_the_ceiling_cannot_hold_the_reasoning(self, caplog):
+        """Clamping here would ask for a reply the reasoning leaves no room to write."""
+        config = TranslationConfig(reasoning=ReasoningConfig(maxTokens=16000))
+        with caplog.at_level("WARNING"):
+            payload = await _send(_provider(ceiling=16384), config=config, model=REASONER)
         assert "max_tokens" not in payload
+        assert payload["reasoning"] == {"max_tokens": 16000}
+        assert "no answer room" in caplog.text
+
+    async def test_omitted_when_the_model_takes_no_budget_parameter(self, caplog):
+        with caplog.at_level("INFO"):
+            payload = await _send(_provider(supported=["temperature"]))
+        assert "max_tokens" not in payload
+        assert "accepts no output budget parameter" in caplog.text
+
+    async def test_sent_under_the_newer_name_when_that_is_what_the_model_takes(self):
+        payload = await _send(_provider(supported=["temperature", "max_completion_tokens"]))
+        assert "max_tokens" not in payload
+        assert payload["max_completion_tokens"] == 8000
 
     async def test_sent_when_the_catalog_has_no_entry_for_the_model(self):
         provider = _provider()
@@ -150,20 +218,71 @@ class TestModelCeiling:
         assert payload["max_tokens"] == 8000
 
 
+async def _load_catalog(provider, body):
+    """Run the catalog fetch against a stand-in body, as the fetch builds its own client."""
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = body
+    with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+        context = AsyncMock()
+        context.get.return_value = response
+        MockClient.return_value.__aenter__ = AsyncMock(return_value=context)
+        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+        await provider._ensure_model_params_cache()
+
+
+@pytest.mark.asyncio
+class TestCatalogCeilingCache:
+    async def test_a_rejected_catalog_leaves_no_ceiling_behind(self):
+        """A body with no usable parameters is not a catalog, so nothing it said binds."""
+        provider = OpenRouterProvider(settings=_make_settings())
+        await _load_catalog(
+            provider, {"data": [{"id": PLAIN, "top_provider": {"max_completion_tokens": 4096}}]}
+        )
+
+        assert provider._model_params_fetched is False
+        assert provider._model_max_output_cache == {}
+
+    async def test_an_accepted_catalog_records_the_ceiling(self):
+        provider = OpenRouterProvider(settings=_make_settings())
+        await _load_catalog(
+            provider,
+            {
+                "data": [
+                    {
+                        "id": PLAIN,
+                        "supported_parameters": ["max_tokens"],
+                        "top_provider": {"max_completion_tokens": 4096},
+                    }
+                ]
+            },
+        )
+
+        assert provider._model_params_fetched is True
+        assert provider._model_max_output_cache == {PLAIN: 4096}
+
+
 @pytest.mark.asyncio
 class TestTruncationWarning:
     async def test_a_reply_cut_by_the_budget_names_the_budget(self, caplog):
         with caplog.at_level("WARNING"):
             await _send(_provider(max_tokens=1500), finish_reason="length")
         assert "1500-token output budget" in caplog.text
-        assert "OPENROUTER_MAX_TOKENS" in caplog.text
+        assert "Raise OPENROUTER_MAX_TOKENS" in caplog.text
+
+    async def test_a_reply_cut_at_the_ceiling_does_not_advise_raising_the_budget(self, caplog):
+        """The clamp would swallow the increase, so telling the user to raise it lies."""
+        with caplog.at_level("WARNING"):
+            await _send(_provider(max_tokens=64000, ceiling=4096), finish_reason="length")
+        assert "4096-token output budget" in caplog.text
+        assert "will not lift it" in caplog.text
 
     async def test_a_reply_cut_without_a_budget_names_the_model_ceiling(self, caplog):
         with caplog.at_level("WARNING"):
             await _send(_provider(max_tokens=0), finish_reason="length")
-        assert "its own output ceiling" in caplog.text
+        assert "own output ceiling" in caplog.text
 
     async def test_a_complete_reply_warns_about_nothing(self, caplog):
         with caplog.at_level("WARNING"):
             await _send(_provider(), finish_reason="stop")
-        assert "truncated" not in caplog.text
+        assert "cut short" not in caplog.text
