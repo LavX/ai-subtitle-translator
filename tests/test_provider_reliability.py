@@ -349,6 +349,7 @@ async def test_timeout_override_survives_file_config_and_reaches_http(field):
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     try:
         override = _extract_config_override_from_dict({field: 45})
         assert override.request_timeout == 45

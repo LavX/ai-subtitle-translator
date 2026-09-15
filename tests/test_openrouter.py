@@ -445,6 +445,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         result = await provider.translate_batch(batch)
         assert isinstance(result, TranslationResult)
@@ -478,6 +479,7 @@ class TestTranslateBatch:
         """Override authentication is attached to the request on the shared client."""
         provider = OpenRouterProvider(settings=_make_settings())
         provider._client = _CompletionClient()
+        provider._model_params_fetched = True
         provider._client.response = _mock_response(200, _ok_response_json())
         result = await provider.translate_batch(
             _make_batch(), config_override=TranslationConfig(api_key="sk-override-key")
@@ -502,6 +504,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         with pytest.raises(AuthenticationError):
             await provider.translate_batch(batch)
@@ -518,6 +521,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         with pytest.raises(RateLimitError) as exc_info:
             await provider.translate_batch(batch)
@@ -531,6 +535,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         with pytest.raises(RateLimitError) as exc_info:
             await provider.translate_batch(batch)
@@ -544,6 +549,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         with pytest.raises(TranslationProviderError) as exc_info:
             await provider.translate_batch(batch)
@@ -558,6 +564,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         with pytest.raises(TranslationProviderError) as exc_info:
             await provider.translate_batch(batch)
@@ -596,6 +603,7 @@ class TestTranslateBatch:
     async def test_request_timeout_override_reaches_provider(self):
         provider = OpenRouterProvider(settings=_make_settings())
         provider._client = _CompletionClient()
+        provider._model_params_fetched = True
         provider._client.response = _mock_response(200, _ok_response_json())
         await provider.translate_batch(
             _make_batch(), config_override=TranslationConfig(requestTimeout=600)
@@ -614,6 +622,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.failure = httpx.ReadTimeout("timed out")
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         with pytest.raises(TranslationProviderError) as exc_info:
             await provider.translate_batch(batch)
@@ -626,6 +635,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.failure = httpx.ConnectError("connection refused")
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         with pytest.raises(TranslationProviderError) as exc_info:
             await provider.translate_batch(batch)
@@ -642,6 +652,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         await provider.translate_batch(batch, config_override=config)
         request = mock_client.requests[-1]
@@ -661,6 +672,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         await provider.translate_batch(batch)
         request = mock_client.requests[-1]
@@ -677,6 +689,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         await provider.translate_batch(batch)
         request = mock_client.requests[-1]
@@ -710,6 +723,7 @@ class TestTranslateBatch:
         mock_client = _CompletionClient()
         mock_client.response = mock_resp
         provider._client = mock_client
+        provider._model_params_fetched = True
 
         await provider.translate_batch(batch, config_override=config)
         request = mock_client.requests[-1]
@@ -944,6 +958,7 @@ class TestBuildReasoningPayload:
 
     async def test_effort_reasoning(self):
         provider = OpenRouterProvider(settings=_make_settings())
+        provider._model_params_fetched = True
         config = TranslationConfig(
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(effort="high"),
@@ -963,6 +978,7 @@ class TestBuildReasoningPayload:
 
     async def test_invalid_effort_ignored(self):
         provider = OpenRouterProvider(settings=_make_settings())
+        provider._model_params_fetched = True
         config = TranslationConfig(
             model=EFFORT_REASONING_MODELS[0],
             reasoning=ReasoningConfig(effort="superduper"),
