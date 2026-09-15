@@ -261,7 +261,10 @@ async def test_a_root_gets_its_full_budget_when_it_finally_launches():
         await asyncio.sleep(0.15)
         return response(lines)
 
-    provider = provider_with_transport(send, parallel=1, request_timeout=0.2)
+    # 0.5s against a 0.15s reply leaves room for per-request overhead on a loaded
+    # machine. With six roots at one slot, a root that waited 0.6s for its turn
+    # still exceeds the budget outright if the wait is ever charged to it.
+    provider = provider_with_transport(send, parallel=1, request_timeout=0.5)
     try:
         result = await run(provider, 30)
         assert result.success

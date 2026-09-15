@@ -392,6 +392,7 @@ The table lists application defaults. For manual runs, most settings load from e
 | `OPENROUTER_API_KEY` | *(empty)* | Default OpenRouter API key; required for translation unless supplied in request config |
 | `OPENROUTER_DEFAULT_MODEL` | `amazon/nova-2-lite-v1:free` | Default translation model |
 | `OPENROUTER_TEMPERATURE` | `0.3` | Sampling temperature |
+| `OPENROUTER_MAX_TOKENS` | `8000` | Room the reply gets for the translation itself, sent as `max_tokens`. Reasoning is paid for out of the same allowance, so a reasoning request raises what is sent: a declared reasoning budget is added on top, and an effort level (or a model that always reasons) multiplies it, because effort buys a share of the total. The result is held under the output ceiling the catalog publishes for the model's top provider, and a model that accepts no budget parameter is sent none. `0` or any non-positive value sends no budget, which lets OpenRouter reserve the model's full output ceiling against your balance: a free account rarely has the credit for that |
 | `BATCH_SIZE` | `100` | Max subtitle lines per batch (auto-adjusted per model) |
 | `PARALLEL_BATCHES_PER_JOB` | `4` | Concurrent batches per translation job |
 | `JOB_QUEUE_MAX_CONCURRENT` | `15` | Concurrent translation job workers at startup |
@@ -411,6 +412,14 @@ The table lists application defaults. For manual runs, most settings load from e
 | `ENCRYPTION_KEY_FILE` | `/app/data/encryption.key` | Path to persistent encryption key file |
 | `DB_PATH` | `/app/data/jobs.db` | SQLite database path for job persistence |
 | `JOB_RETENTION_HOURS` | `24` | Hours to keep completed/failed jobs before cleanup |
+
+`OPENROUTER_MAX_TOKENS` and `BATCH_SIZE` have to fit each other. A batch that cannot
+answer inside the budget comes back cut short, and the adaptive sizer then halves the
+batch size for that model and re-sends, so the reply arrives complete but the truncated
+attempt is still billed. Measured on a 1355-cue film at the defaults, a verbose model
+spent 6200 to 8000 completion tokens per 100-cue batch, so two batches were cut short
+and the run took 27 requests instead of 14. Either raise the budget or lower
+`BATCH_SIZE`; the log names which limit stopped a reply when it happens.
 
 The Docker image and manual Uvicorn command above explicitly bind to `0.0.0.0:8765`. Change the Uvicorn arguments to use another bind address or port.
 
