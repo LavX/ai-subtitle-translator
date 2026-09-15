@@ -308,6 +308,15 @@ class SubtitleTranslator:
         return await self.provider.health_check()
 
 
+def _subtitle_line_limit() -> int | None:
+    """The longest a subtitle line may be, read from the model that enforces it."""
+    for constraint in SubtitleLine.model_fields["line"].metadata:
+        limit = getattr(constraint, "max_length", None)
+        if limit is not None:
+            return int(limit)
+    return None
+
+
 def map_translations_to_lines(
     original_lines: list[SubtitleLine],
     translations: list[dict[str, str]],
@@ -328,6 +337,7 @@ def map_translations_to_lines(
     """
     translation_map = {t["index"]: t["content"] for t in translations}
     is_rtl = settings.is_rtl_language(target_language)
+    limit = _subtitle_line_limit()
 
     result = []
     for line in original_lines:
@@ -335,6 +345,21 @@ def map_translations_to_lines(
 
         if is_rtl:
             translated_text = add_rtl_markers(translated_text)
+
+        # A model that loops can emit one cue longer than a subtitle line is
+        # allowed to be. That line cannot be delivered, but the rest of the file
+        # can: without this, validating it raised and a finished translation of a
+        # whole film was discarded for a single runaway cue. The position keeps
+        # its source text, the way an untranslated cue already does.
+        if limit is not None and len(translated_text) > limit:
+            logger.warning(
+                "Position %s came back %d characters long, over the %d allowed for a "
+                "subtitle line; keeping the source text for it.",
+                line.position,
+                len(translated_text),
+                limit,
+            )
+            translated_text = line.line
 
         result.append(SubtitleLine(position=line.position, line=translated_text))
 
