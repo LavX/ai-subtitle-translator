@@ -9,6 +9,13 @@ logger = logging.getLogger(__name__)
 TOKENS_PER_LINE_ESTIMATE = 800
 MIN_BATCH_SIZE = 5
 
+# What one translated cue costs in the reply, counting the JSON that carries it.
+# Measured over a 1355-cue film into Hungarian: 100-cue batches came back between
+# 6200 and 8000 completion tokens, so 62 to 80 per cue. The estimate sits at the
+# top of that range because guessing high only costs an extra request, while
+# guessing low costs a whole truncated reply that is billed and thrown away.
+OUTPUT_TOKENS_PER_LINE_ESTIMATE = 100
+
 
 class BatchSizeResolver:
     """Determines optimal batch size per model through learned cache, metadata, and heuristics."""
@@ -19,6 +26,21 @@ class BatchSizeResolver:
         self._success_counts: dict[str, int] = {}
         self._settings = get_settings()
 
+    def _budget_cap(self) -> int | None:
+        """How many cues the configured output budget can answer for, if it is set.
+
+        Without this the first batch of every job is planned as if the reply had the
+        model's whole output ceiling to write in. When OPENROUTER_MAX_TOKENS says
+        otherwise the reply is cut short, and the batch is only resized after that
+        truncated attempt has been billed. The budget is knowable up front, so the
+        first batch may as well fit it.
+        """
+        budget = getattr(self._settings, "openrouter_max_tokens", None)
+        if isinstance(budget, bool) or not isinstance(budget, int) or budget <= 0:
+            # Unset means the provider picks the ceiling, so there is nothing to fit.
+            return None
+        return max(MIN_BATCH_SIZE, budget // OUTPUT_TOKENS_PER_LINE_ESTIMATE)
+
     def resolve(
         self,
         model_id: str,
@@ -27,17 +49,22 @@ class BatchSizeResolver:
     ) -> int:
         global_max = self._settings.batch_size
 
+        # A size learned from a real failure is evidence about this model; the
+        # estimates below are not, so it is never widened by them.
         if model_id in self._learned_sizes:
             return self._learned_sizes[model_id]
 
+        limits = [global_max]
+        budget_cap = self._budget_cap()
+        if budget_cap is not None:
+            limits.append(budget_cap)
+
         if max_batch_size is not None:
-            return min(max_batch_size, global_max)
+            limits.append(max_batch_size)
+        elif context_length is not None:
+            limits.append(max(MIN_BATCH_SIZE, context_length // TOKENS_PER_LINE_ESTIMATE))
 
-        if context_length is not None:
-            heuristic = context_length // TOKENS_PER_LINE_ESTIMATE
-            return min(global_max, max(MIN_BATCH_SIZE, heuristic))
-
-        return global_max
+        return min(limits)
 
     def record_failure(self, model_id: str, failed_batch_size: int) -> int:
         # Halve the smaller of the cached size and the size that actually failed: with

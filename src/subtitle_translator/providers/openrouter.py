@@ -116,6 +116,56 @@ def _has_variant_suffix(model_id: str) -> bool:
     return ":" in model_id.rsplit("/", 1)[-1]
 
 
+def _declared_reasoning_tokens(reasoning_params: dict[str, Any]) -> int:
+    """Tokens this request has explicitly set aside for thinking, or zero.
+
+    Only one reasoning shape names a number; the rest buy a share of the total.
+    """
+    reasoning = reasoning_params.get("reasoning")
+    if not isinstance(reasoning, dict):
+        return 0
+    return _positive_int(reasoning.get("max_tokens")) or 0
+
+
+def _positive_int(value: Any) -> int | None:
+    """The value as a positive whole number of tokens, else None.
+
+    A whole-numbered float counts: the catalog is JSON, and the same field is read
+    elsewhere through a float-tolerant parser. A bool is an int in Python and never
+    a token count, so it is rejected.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, float):
+        if not value.is_integer():
+            return None
+        value = int(value)
+    if not isinstance(value, int) or value <= 0:
+        return None
+    return value
+
+
+# An output allowance smaller than this is not an allowance: it cannot hold a
+# translated batch, so a catalog reporting one is treated as reporting nothing.
+MIN_OUTPUT_TOKENS = 512
+
+# OpenRouter pays for reasoning out of max_tokens, and an effort level buys a
+# percentage of it: https://openrouter.ai/docs/use-cases/reasoning-tokens documents
+# roughly 95% for max and xhigh, 80% high, 50% medium, 20% low, 10% minimal. Asking
+# for the translation budget alone would therefore hand most of it to the thinking.
+REASONING_EFFORT_PERCENT = {
+    "max": 95,
+    "xhigh": 95,
+    "high": 80,
+    "medium": 50,
+    "low": 20,
+    "minimal": 10,
+}
+# A model told to think without being told how hard is charged the medium share,
+# the same effort this provider picks when reasoning is merely switched on.
+DEFAULT_REASONING_PERCENT = REASONING_EFFORT_PERCENT["medium"]
+
+
 # Recommended models for subtitle translation - Updated based on testing
 # Models marked as working after comprehensive testing (Dec 2025)
 
@@ -414,6 +464,7 @@ class OpenRouterProvider(TranslationProvider):
         self._smartfast_router = SmartFastRouter(self.settings)
         self._model_params_cache: dict[str, list[str]] = {}
         self._model_reasoning_cache: dict[str, dict] = {}
+        self._model_max_output_cache: dict[str, int] = {}
         self._model_params_fetched: bool = False
         # A failed catalog fetch is retried after this deadline instead of never.
         self._model_params_retry_at: float = 0.0
@@ -600,6 +651,10 @@ class OpenRouterProvider(TranslationProvider):
                 data = response.json() if response.status_code == 200 else None
                 records = data.get("data") if isinstance(data, dict) else None
                 cached = 0
+                # Output ceilings bound every later request, so they are held back
+                # until the body below proves itself a catalog. A rejected body must
+                # not leave a ceiling behind that outlives the fetch it came from.
+                ceilings: dict[str, int] = {}
                 if isinstance(records, list):
                     for model in records:
                         if not isinstance(model, dict):
@@ -612,7 +667,16 @@ class OpenRouterProvider(TranslationProvider):
                         reasoning = model.get("reasoning")
                         if model_id and isinstance(reasoning, dict):
                             self._model_reasoning_cache[model_id] = reasoning
+                        top_provider = model.get("top_provider")
+                        ceiling = _positive_int(
+                            top_provider.get("max_completion_tokens")
+                            if isinstance(top_provider, dict)
+                            else None
+                        )
+                        if model_id and ceiling:
+                            ceilings[model_id] = ceiling
                 if cached:
+                    self._model_max_output_cache.update(ceilings)
                     logger.info(
                         f"Cached supported_parameters for "
                         f"{len(self._model_params_cache)} models from OpenRouter API"
@@ -813,6 +877,93 @@ class OpenRouterProvider(TranslationProvider):
 
         return final_model_id, reasoning_params
 
+    def _grow_for_reasoning(
+        self, budget: int, model_id: str, reasoning_params: dict[str, Any], thinking: bool
+    ) -> tuple[int, int]:
+        """Grow an output budget so thinking does not eat the translation's room.
+
+        Reasoning is spent out of ``max_tokens`` whichever way it was asked for, but
+        only one of the shapes this provider emits names a number. A declared budget
+        is added on top; an effort level, a bare ``enabled`` and the ":thinking" slug
+        buy a share of the total instead, so the request has to ask for enough that
+        the remaining share still covers the translation. A model that reasons
+        whether or not it was asked to is charged the same way: over a hundred
+        catalog entries are mandatory reasoners, and their thinking would otherwise
+        come straight out of the translation's room without appearing here at all.
+
+        Returns:
+            The grown budget, and the fixed token count reserved for reasoning
+            (zero when reasoning takes a share rather than a fixed amount)
+        """
+        reasoning = reasoning_params.get("reasoning")
+        if isinstance(reasoning, dict):
+            if reasoning.get("effort") == "none" or reasoning.get("enabled") is False:
+                return budget, 0
+            declared = _declared_reasoning_tokens(reasoning_params)
+            if declared:
+                return budget + declared, declared
+            effort = reasoning.get("effort")
+        elif thinking:
+            effort = None
+        else:
+            catalog = self._capability(self._model_reasoning_cache, model_id)
+            if not isinstance(catalog, dict) or not (
+                catalog.get("mandatory") or catalog.get("default_enabled")
+            ):
+                return budget, 0
+            effort = catalog.get("default_effort")
+
+        percent = REASONING_EFFORT_PERCENT.get(str(effort or "").lower(), DEFAULT_REASONING_PERCENT)
+        # Integer ceiling division: the float form lands on 40001 where 40000 is meant.
+        answer_percent = 100 - percent
+        return -(-budget * 100 // answer_percent), 0
+
+    def _resolve_max_tokens(
+        self, model_id: str, reasoning_params: dict[str, Any], thinking: bool = False
+    ) -> int | None:
+        """
+        Resolve the output budget to send with the request.
+
+        Without one OpenRouter reserves the model's entire output ceiling against the
+        account balance before the call, so a 64K-output model 402s anyone whose
+        credit does not cover a maximum-length reply, however short the reply will be.
+
+        The configured budget is the room for the translation itself, so a reasoning
+        budget is added on top of it. The total is then held under the ceiling the
+        catalog reports for the model's top provider, which is the best bound
+        available here: the endpoint that actually serves the request is not chosen
+        until routing, and may allow more.
+
+        Args:
+            model_id: The model identifier, with any variant suffix
+            reasoning_params: The reasoning payload already built for this request
+
+        Returns:
+            The budget to send, or None to let OpenRouter/the provider decide
+        """
+        # A non-positive budget means "no opinion", the behaviour this setting
+        # had for as long as nothing read it.
+        budget = _positive_int(self.settings.openrouter_max_tokens)
+        if budget is None:
+            return None
+
+        total, reserved = self._grow_for_reasoning(budget, model_id, reasoning_params, thinking)
+
+        ceiling = _positive_int(self._capability(self._model_max_output_cache, model_id))
+        if ceiling is None or ceiling < MIN_OUTPUT_TOKENS:
+            return total
+        if ceiling - reserved < MIN_OUTPUT_TOKENS:
+            # Clamping here would send a budget the reasoning alone exhausts, which
+            # is a request for a reply the model has no room to write. Send none and
+            # leave the provider its own ceiling, as it had before a budget existed.
+            logger.warning(
+                f"{model_id} allows {ceiling} output tokens, which a "
+                f"{reserved}-token reasoning budget leaves no answer room under. "
+                "Sending no output budget; lower the reasoning budget for this model."
+            )
+            return None
+        return min(total, ceiling)
+
     def _build_provider_payload(
         self,
         config_override: Optional["TranslationConfig"],
@@ -987,9 +1138,12 @@ class OpenRouterProvider(TranslationProvider):
         # Build reasoning configuration on the bare slug; a typed routing shortcut is
         # re-applied by the provider routing step below.
         bare_model, typed_routing = split_routing_suffix(model_to_use)
-        model_to_use, reasoning_params = await self._build_reasoning_payload(
+        # The reasoning step may switch the slug to a ":thinking" variant, which is
+        # how some models say they reason; the routing step below overwrites it.
+        reasoned_model, reasoning_params = await self._build_reasoning_payload(
             bare_model, config_override
         )
+        model_to_use = reasoned_model
 
         # Build messages
         system_prompt = self.build_system_prompt(
@@ -1031,8 +1185,7 @@ class OpenRouterProvider(TranslationProvider):
                 {"role": "user", "content": user_content},
             ]
 
-        # Build request payload, omit max_tokens to let OpenRouter/provider decide
-        # the optimal output budget per model.
+        # Build request payload
         payload: dict[str, Any] = {
             "model": model_to_use,
             "messages": messages,
@@ -1045,6 +1198,32 @@ class OpenRouterProvider(TranslationProvider):
         supported = self._capability(self._model_params_cache, bare_model)
         if supported is not None and "temperature" not in supported:
             payload.pop("temperature", None)
+
+        # OPENROUTER_MAX_TOKENS bounds what the reply may cost. It is resolved after
+        # the catalog load so the model's published ceiling can bound it in turn, and
+        # it goes out under whichever name the model accepts: a handful take the
+        # budget only as max_completion_tokens.
+        max_tokens = self._resolve_max_tokens(
+            bare_model, reasoning_params, thinking=reasoned_model.endswith(":thinking")
+        )
+        if max_tokens is not None:
+            budget_field = next(
+                (
+                    field
+                    for field in ("max_tokens", "max_completion_tokens")
+                    if supported is None or field in supported
+                ),
+                None,
+            )
+            if budget_field is None:
+                # Without a budget the provider reserves its full output ceiling
+                # against the balance, so say why that is about to happen.
+                logger.info(
+                    f"{bare_model} accepts no output budget parameter; "
+                    "OPENROUTER_MAX_TOKENS cannot be applied to it."
+                )
+            else:
+                payload[budget_field] = max_tokens
 
         # JSON mode constrains the reply to a JSON object at the top level, which is
         # why the prompt asks for {"translations": [...]}: when it asked for a bare
@@ -1138,6 +1317,41 @@ class OpenRouterProvider(TranslationProvider):
                 # including every allowed endpoint during throughput bootstrap.
                 if not decision.supports_parameter("response_format"):
                     payload.pop("response_format", None)
+                # An endpoint that does not take the budget would be sent a field it
+                # rejects. Dropping it costs the cap on that route, which is the
+                # milder failure, but the operator should be able to see it happen.
+                for field in ("max_tokens", "max_completion_tokens"):
+                    if field not in payload:
+                        continue
+                    if not decision.supports_parameter(field):
+                        payload.pop(field)
+                        logger.info(
+                            f"Route for {model_to_use} does not accept {field}; "
+                            "OPENROUTER_MAX_TOKENS is not applied to this request."
+                        )
+                        continue
+                    # The budget was bounded by the catalog's top provider, which is
+                    # not necessarily where this request is going. Now that the pool
+                    # is known, its own ceiling is the one that applies.
+                    route_ceiling = decision.output_ceiling()
+                    if route_ceiling is None or route_ceiling >= payload[field]:
+                        continue
+                    reserved = _declared_reasoning_tokens(reasoning_params)
+                    if route_ceiling - reserved < MIN_OUTPUT_TOKENS:
+                        # Trimming to here would ask for a reply the reasoning alone
+                        # exhausts. Send no budget, as before one existed.
+                        payload.pop(field)
+                        logger.warning(
+                            f"Route for {model_to_use} allows {route_ceiling} output "
+                            f"tokens, which a {reserved}-token reasoning budget leaves "
+                            "no answer room under. Sending no output budget."
+                        )
+                        continue
+                    logger.debug(
+                        f"Route for {model_to_use} allows {route_ceiling} output "
+                        f"tokens; trimming the budget from {payload[field]}."
+                    )
+                    payload[field] = route_ceiling
                 payload["provider"] = dict(decision.provider)
                 if provider_config and provider_config.allow_fallbacks is False:
                     payload["provider"]["allow_fallbacks"] = False
@@ -1152,7 +1366,7 @@ class OpenRouterProvider(TranslationProvider):
                 headers=headers,
                 timeout_seconds=request_timeout,
             )
-            result = await self._process_response(response, model_to_use)
+            result = await self._process_response(response, model_to_use, payload.get("max_tokens"))
             self._validate_and_warn_unchanged(batch.lines, result.translations)
             if decision is not None:
                 requested = {str(line["index"]) for line in batch.lines}
@@ -1203,7 +1417,7 @@ class OpenRouterProvider(TranslationProvider):
                 self._smartfast_router.release(decision)
 
     async def _process_response(
-        self, response: httpx.Response, model_used: str
+        self, response: httpx.Response, model_used: str, max_tokens: int | None = None
     ) -> TranslationResult:
         """
         Process the OpenRouter API response.
@@ -1211,6 +1425,7 @@ class OpenRouterProvider(TranslationProvider):
         Args:
             response: HTTP response from OpenRouter
             model_used: Model that was used for translation
+            max_tokens: Output budget sent with the request, for truncation diagnostics
 
         Returns:
             TranslationResult with parsed translations
@@ -1317,6 +1532,27 @@ class OpenRouterProvider(TranslationProvider):
 
         if isinstance(choices[0], dict) and choices[0].get("finish_reason") == "error":
             fail(choices[0].get("error"))
+
+        if choices[0].get("finish_reason") == "length":
+            # The reply stopped at a limit rather than at its end, so parsing or line
+            # coverage is likely to fail next. Name the limit that stopped it, and
+            # only the remedy that limit answers to: the recovery path splits the
+            # batch and hides the cause otherwise.
+            ceiling = _positive_int(self._capability(self._model_max_output_cache, model_used))
+            if max_tokens is None:
+                remedy = "Lower BATCH_SIZE."
+            elif ceiling is not None and max_tokens >= ceiling:
+                remedy = (
+                    "That is the ceiling its top provider publishes, so raising "
+                    "OPENROUTER_MAX_TOKENS will not lift it: lower BATCH_SIZE, the "
+                    "reasoning budget, or pick a model with more output room."
+                )
+            else:
+                remedy = "Raise OPENROUTER_MAX_TOKENS or lower BATCH_SIZE."
+            limit = f"{max_tokens}-token output budget" if max_tokens else "own output ceiling"
+            logger.warning(
+                f"{model_used} stopped at its {limit} and the reply may be cut short. {remedy}"
+            )
 
         message = choices[0].get("message")
         content = message.get("content") if isinstance(message, dict) else None

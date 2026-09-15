@@ -1071,3 +1071,67 @@ async def test_free_endpoint_failure_never_falls_through_to_paid_endpoint(enviro
         quoted_prices(body) == {"prompt": 0, "completion": 0, "request": 0}
         for body in wire.completions
     )
+
+
+def _budget_aware(wire, ceiling):
+    """Let both the model and its endpoints take an output budget."""
+    wire.models[0]["supported_parameters"].append("max_tokens")
+    for record in wire.endpoints:
+        record["supported_parameters"].append("max_tokens")
+        record["max_completion_tokens"] = ceiling
+
+
+async def test_the_budget_is_trimmed_to_what_the_chosen_route_allows(environment):
+    """The catalog only publishes the top provider's ceiling, which is not this route."""
+    wire, provider, _ = environment
+    _budget_aware(wire, ceiling=4096)
+    await provider.translate_batch(
+        batch(),
+        model="fixture/model:smartfast",
+        config_override=TranslationConfig(reasoning={"effort": "none"}),
+    )
+    assert wire.completions[0]["max_tokens"] == 4096
+
+
+async def test_a_roomier_route_keeps_the_configured_budget(environment):
+    wire, provider, _ = environment
+    _budget_aware(wire, ceiling=65536)
+    await provider.translate_batch(
+        batch(),
+        model="fixture/model:smartfast",
+        config_override=TranslationConfig(reasoning={"effort": "none"}),
+    )
+    assert wire.completions[0]["max_tokens"] == 8000
+
+
+async def test_a_route_that_cannot_take_a_budget_is_sent_none(environment):
+    wire, provider, _ = environment
+    _budget_aware(wire, ceiling=4096)
+    for record in wire.endpoints:
+        record["supported_parameters"].remove("max_tokens")
+    await provider.translate_batch(
+        batch(),
+        model="fixture/model:smartfast",
+        config_override=TranslationConfig(reasoning={"effort": "none"}),
+    )
+    assert "max_tokens" not in wire.completions[0]
+
+
+async def test_no_budget_is_sent_when_the_route_cannot_hold_the_reasoning(environment, caplog):
+    """Trimming here would ask for a reply the thinking alone exhausts."""
+    from subtitle_translator.providers.openrouter import MAX_TOKENS_REASONING_MODELS
+
+    wire, provider, _ = environment
+    _budget_aware(wire, ceiling=4096)
+    # Only this reasoning style names a token count; an effort level buys a share.
+    reasoner = MAX_TOKENS_REASONING_MODELS[0]
+    wire.models[0]["id"] = reasoner
+    with caplog.at_level("WARNING"):
+        await provider.translate_batch(
+            batch(),
+            model=f"{reasoner}:smartfast",
+            config_override=TranslationConfig(reasoning={"maxTokens": 4000}),
+        )
+    assert "max_tokens" not in wire.completions[0]
+    assert wire.completions[0]["reasoning"] == {"max_tokens": 4000}
+    assert "no answer room" in caplog.text
