@@ -163,6 +163,7 @@ async def test_undispatched_roots_do_not_inherit_a_limit_from_a_timeout(parallel
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
+    provider._model_params_fetched = True
     try:
         result = await BatchProcessor(provider, provider.settings).process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(200)],
