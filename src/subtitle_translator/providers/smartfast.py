@@ -333,6 +333,21 @@ class RoutingDecision:
         """Whether every endpoint allowed for this request supports a parameter."""
         return all(parameter in endpoint.supported_parameters for endpoint in self._endpoints)
 
+    def output_ceiling(self) -> int | None:
+        """The smallest completion ceiling among the endpoints allowed for this request.
+
+        The model-level catalog publishes only its top provider's ceiling, which is
+        not where this request is going. Any endpoint in this pool may serve it, so
+        the budget has to fit the least generous one. None when no endpoint declares
+        a ceiling, which leaves the caller its own bound.
+        """
+        ceilings = [
+            int(endpoint.max_completion_tokens)
+            for endpoint in self._endpoints
+            if endpoint.max_completion_tokens
+        ]
+        return min(ceilings) if ceilings else None
+
 
 class SmartFastRouter:
     """Choose a safe provider pool using the caller's authenticated HTTP client."""

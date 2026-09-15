@@ -116,6 +116,17 @@ def _has_variant_suffix(model_id: str) -> bool:
     return ":" in model_id.rsplit("/", 1)[-1]
 
 
+def _declared_reasoning_tokens(reasoning_params: dict[str, Any]) -> int:
+    """Tokens this request has explicitly set aside for thinking, or zero.
+
+    Only one reasoning shape names a number; the rest buy a share of the total.
+    """
+    reasoning = reasoning_params.get("reasoning")
+    if not isinstance(reasoning, dict):
+        return 0
+    return _positive_int(reasoning.get("max_tokens")) or 0
+
+
 def _positive_int(value: Any) -> int | None:
     """The value as a positive whole number of tokens, else None.
 
@@ -888,7 +899,7 @@ class OpenRouterProvider(TranslationProvider):
         if isinstance(reasoning, dict):
             if reasoning.get("effort") == "none" or reasoning.get("enabled") is False:
                 return budget, 0
-            declared = _positive_int(reasoning.get("max_tokens"))
+            declared = _declared_reasoning_tokens(reasoning_params)
             if declared:
                 return budget + declared, declared
             effort = reasoning.get("effort")
@@ -1310,12 +1321,37 @@ class OpenRouterProvider(TranslationProvider):
                 # rejects. Dropping it costs the cap on that route, which is the
                 # milder failure, but the operator should be able to see it happen.
                 for field in ("max_tokens", "max_completion_tokens"):
-                    if field in payload and not decision.supports_parameter(field):
+                    if field not in payload:
+                        continue
+                    if not decision.supports_parameter(field):
                         payload.pop(field)
                         logger.info(
                             f"Route for {model_to_use} does not accept {field}; "
                             "OPENROUTER_MAX_TOKENS is not applied to this request."
                         )
+                        continue
+                    # The budget was bounded by the catalog's top provider, which is
+                    # not necessarily where this request is going. Now that the pool
+                    # is known, its own ceiling is the one that applies.
+                    route_ceiling = decision.output_ceiling()
+                    if route_ceiling is None or route_ceiling >= payload[field]:
+                        continue
+                    reserved = _declared_reasoning_tokens(reasoning_params)
+                    if route_ceiling - reserved < MIN_OUTPUT_TOKENS:
+                        # Trimming to here would ask for a reply the reasoning alone
+                        # exhausts. Send no budget, as before one existed.
+                        payload.pop(field)
+                        logger.warning(
+                            f"Route for {model_to_use} allows {route_ceiling} output "
+                            f"tokens, which a {reserved}-token reasoning budget leaves "
+                            "no answer room under. Sending no output budget."
+                        )
+                        continue
+                    logger.debug(
+                        f"Route for {model_to_use} allows {route_ceiling} output "
+                        f"tokens; trimming the budget from {payload[field]}."
+                    )
+                    payload[field] = route_ceiling
                 payload["provider"] = dict(decision.provider)
                 if provider_config and provider_config.allow_fallbacks is False:
                     payload["provider"]["allow_fallbacks"] = False

@@ -574,3 +574,44 @@ class TestAdaptiveRetry:
 
         assert result.success is True
         assert len(result.translations) == 10
+
+
+class TestBudgetDerivedCap:
+    """A batch that cannot answer inside OPENROUTER_MAX_TOKENS should never be planned."""
+
+    def _resolver(self, budget, batch_size=100):
+        resolver = BatchSizeResolver()
+        resolver._settings = MagicMock()
+        resolver._settings.batch_size = batch_size
+        resolver._settings.openrouter_max_tokens = budget
+        return resolver
+
+    def test_a_tight_budget_caps_the_batch(self):
+        """8000 tokens cannot hold 100 translated cues; it was measured holding about 80."""
+        assert self._resolver(8000).resolve("some/model") == 80
+
+    def test_a_generous_budget_does_not_cap(self):
+        assert self._resolver(64000).resolve("some/model") == 100
+
+    def test_the_opt_out_budget_does_not_cap(self):
+        assert self._resolver(0).resolve("some/model") == 100
+
+    def test_the_cap_never_goes_below_the_floor(self):
+        assert self._resolver(1).resolve("some/model") == MIN_BATCH_SIZE
+
+    def test_the_cap_applies_to_the_metadata_heuristic_too(self):
+        resolver = self._resolver(8000)
+        assert resolver.resolve("some/model", context_length=1_000_000) == 80
+
+    def test_the_cap_applies_under_a_metadata_override(self):
+        resolver = self._resolver(4000)
+        assert resolver.resolve("some/model", max_batch_size=90) == 40
+
+    def test_a_learned_size_still_wins(self):
+        """A size learned from a real failure is evidence; the estimate is not."""
+        resolver = self._resolver(8000)
+        resolver._learned_sizes["some/model"] = 25
+        assert resolver.resolve("some/model") == 25
+
+    def test_a_budget_that_is_not_a_number_is_ignored(self):
+        assert self._resolver(None).resolve("some/model") == 100

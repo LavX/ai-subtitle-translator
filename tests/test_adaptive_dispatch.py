@@ -135,13 +135,18 @@ async def test_retry_resize_preserves_partial_usage_and_consumed_retry_budget(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("parallel_batches", [1, 2])
-async def test_undispatched_roots_do_not_inherit_a_limit_from_a_timeout(parallel_batches):
+async def test_undispatched_roots_do_not_inherit_a_limit_from_a_timeout(
+    parallel_batches, monkeypatch
+):
     """A stall is not size evidence: measured live, a 5-line request timed out
     after 600s in the same window a 100-line request finished in 28s. One
     stalled root used to cap every undispatched root at half size for nothing."""
     calls = []
     completed = []
     resolver = get_batch_size_resolver()
+    # The batch size is forced below and then compared against what the resolver
+    # would allow, so the output budget must not cap the resolver underneath it.
+    monkeypatch.setattr(resolver._settings, "openrouter_max_tokens", 0)
     model = "test/dispatch-adaptation"
 
     async def send(request):
