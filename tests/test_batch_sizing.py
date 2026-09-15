@@ -615,3 +615,56 @@ class TestBudgetDerivedCap:
 
     def test_a_budget_that_is_not_a_number_is_ignored(self):
         assert self._resolver(None).resolve("some/model") == 100
+
+
+class TestModelOutputCeiling:
+    """The budget is clamped to what the model allows, so planning must see that too.
+
+    OPENROUTER_MAX_TOKENS says how much room the reply gets, but the provider then
+    trims it to the model's own output ceiling before sending. Planning from the
+    configured budget alone means a model with a lower ceiling is handed a batch it
+    can never answer: the first reply is cut short, billed and thrown away, and only
+    then does the adaptive sizer start halving.
+
+    Measured on tencent/hy-mt2-1.8b, whose ceiling is 4096: the first batch was
+    planned at 80 and the job fell 80 -> 40 -> 20 -> 10 -> 5 -> 1, spending 51
+    single-cue requests to finish a film.
+    """
+
+    def _resolver(self, budget, batch_size=100):
+        resolver = BatchSizeResolver()
+        resolver._settings = MagicMock()
+        resolver._settings.batch_size = batch_size
+        resolver._settings.openrouter_max_tokens = budget
+        return resolver
+
+    def test_a_ceiling_below_the_budget_caps_the_batch(self):
+        resolver = self._resolver(8000)
+        assert resolver.resolve("some/model", output_ceiling=4096) == 40
+
+    def test_a_ceiling_above_the_budget_changes_nothing(self):
+        resolver = self._resolver(8000)
+        assert resolver.resolve("some/model", output_ceiling=131072) == 80
+
+    def test_an_unknown_ceiling_changes_nothing(self):
+        resolver = self._resolver(8000)
+        assert resolver.resolve("some/model", output_ceiling=None) == 80
+
+    def test_the_ceiling_caps_even_when_the_budget_is_switched_off(self):
+        """With no budget the provider allows the ceiling, and the reply still
+        cannot exceed it, so the batch must still fit inside it."""
+        resolver = self._resolver(0)
+        assert resolver.resolve("some/model", output_ceiling=4096) == 40
+
+    def test_the_ceiling_never_pushes_the_batch_below_the_floor(self):
+        resolver = self._resolver(8000)
+        assert resolver.resolve("some/model", output_ceiling=1) == MIN_BATCH_SIZE
+
+    def test_a_learned_size_still_wins_over_the_ceiling(self):
+        resolver = self._resolver(8000)
+        resolver._learned_sizes["some/model"] = 12
+        assert resolver.resolve("some/model", output_ceiling=4096) == 12
+
+    def test_a_ceiling_that_is_not_a_number_is_ignored(self):
+        resolver = self._resolver(8000)
+        assert resolver.resolve("some/model", output_ceiling="4096") == 80
