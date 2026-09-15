@@ -69,6 +69,9 @@ class OpenRouterWire:
         self.catalog_stream = None
         self.started = asyncio.Event()
         self.disconnected = asyncio.Event()
+        # Endpoints that reject whatever they are sent, the way Bedrock rejects
+        # Luna over a parameter OpenRouter itself adds.
+        self.reject_endpoints = set()
 
     async def __call__(self, request):
         self.requests.append(request)
@@ -84,6 +87,11 @@ class OpenRouterWire:
         body = json.loads(request.content)
         self.completions.append(body)
         self.started.set()
+        chosen = (body.get("provider") or {}).get("only") or [None]
+        if chosen[0] in self.reject_endpoints:
+            return httpx.Response(
+                400, json={"error": {"code": 400, "message": "Provider returned error"}}
+            )
         if self.completion_gate is not None:
             try:
                 await self.completion_gate.wait()
@@ -1135,3 +1143,87 @@ async def test_no_budget_is_sent_when_the_route_cannot_hold_the_reasoning(enviro
     assert "max_tokens" not in wire.completions[0]
     assert wire.completions[0]["reasoning"] == {"max_tokens": 4000}
     assert "no answer room" in caplog.text
+
+
+def chosen_endpoints(wire):
+    return [(body.get("provider") or {}).get("only", [None])[0] for body in wire.completions]
+
+
+class TestARejectedRouteIsRetriedElsewhere:
+    """SmartFast pins one endpoint. When that endpoint rejects the request outright,
+    the batch must move to the next endpoint in the pool it already ranked.
+
+    Seen on openai/gpt-5.6-luna: SmartFast sent 3 of 17 batches to
+    amazon-bedrock/us-east-1, which answers 400 unsupported_parameter for a
+    parameter OpenRouter adds itself. Those 3 batches were lost and 240 cues went
+    missing from a run that was otherwise perfect, on the model the README
+    recommends first.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_rejected_batch_is_retried_on_another_endpoint(self, environment):
+        wire, provider, _ = environment
+        wire.reject_endpoints = {"a"}
+
+        result = await provider.translate_batch(batch(), model="fixture/model:smartfast")
+
+        assert result.translations == [
+            {"index": "0", "content": "Forditas"},
+            {"index": "1", "content": "Forditas"},
+        ]
+        assert chosen_endpoints(wire) == ["a", "b"], chosen_endpoints(wire)
+
+    @pytest.mark.asyncio
+    async def test_the_second_endpoint_is_not_the_one_that_just_refused(self, environment):
+        wire, provider, _ = environment
+        wire.reject_endpoints = {"a"}
+
+        await provider.translate_batch(batch(), model="fixture/model:smartfast")
+
+        assert chosen_endpoints(wire)[1] != "a"
+
+    @pytest.mark.asyncio
+    async def test_it_gives_up_after_one_reroute(self, environment):
+        """Every endpoint refusing is a fact about the request, not the route."""
+        wire, provider, _ = environment
+        wire.reject_endpoints = {"a", "b"}
+
+        with pytest.raises(TranslationProviderError) as raised:
+            await provider.translate_batch(batch(), model="fixture/model:smartfast")
+
+        assert "400" in str(raised.value)
+        assert len(wire.completions) == 2, chosen_endpoints(wire)
+
+    @pytest.mark.asyncio
+    async def test_a_sole_endpoint_is_not_retried(self, environment):
+        """With nowhere else to go, a second attempt only costs another request."""
+        wire, provider, _ = environment
+        wire.endpoints = [endpoint("a")]
+        wire.reject_endpoints = {"a"}
+
+        with pytest.raises(TranslationProviderError):
+            await provider.translate_batch(batch(), model="fixture/model:smartfast")
+
+        assert len(wire.completions) == 1, chosen_endpoints(wire)
+
+    @pytest.mark.asyncio
+    async def test_a_rate_limit_keeps_its_own_path(self, environment):
+        """429 has a retry policy of its own and must not be rerouted here."""
+        wire, provider, _ = environment
+        wire.reply_modes = ["http429"]
+
+        with pytest.raises(RateLimitError):
+            await provider.translate_batch(batch(), model="fixture/model:smartfast")
+
+        assert len(wire.completions) == 1
+
+    @pytest.mark.asyncio
+    async def test_routing_off_means_no_reroute(self, environment):
+        """Without SmartFast there is no ranked pool to fall back into."""
+        wire, provider, _ = environment
+        wire.reject_endpoints = {"a", "b", None}
+
+        with pytest.raises(TranslationProviderError):
+            await provider.translate_batch(batch(), model="fixture/model")
+
+        assert len(wire.completions) == 1

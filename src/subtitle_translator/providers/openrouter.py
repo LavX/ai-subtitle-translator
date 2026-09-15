@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import math
+from collections.abc import Mapping
 from copy import copy
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -447,6 +448,26 @@ MAX_TOKENS_REASONING_MODELS = [
     "deepseek/deepseek-v3.2-speciale",
     "z-ai/glm-4.6",
 ]
+
+
+# A 4xx the endpoint itself produced: it rejected the shape of the request rather
+# than reporting a condition of the account or of the model. Another endpoint
+# serving the same model may well accept it. Deliberately excluded: 401 and 402
+# belong to the account, 404 means there was no endpoint to begin with, and 408
+# and 429 have retry paths of their own.
+ROUTE_REFUSAL_STATUSES = frozenset({400, 403, 422})
+
+
+def _route_refused_the_request(error: "TranslationProviderError") -> bool:
+    """Whether this failure is one endpoint's refusal that another may not share."""
+    diagnostics = getattr(error, "routing_diagnostics", None)
+    if not isinstance(diagnostics, Mapping) or not diagnostics.get("selected_endpoint"):
+        return False
+    # With nothing else in the pool, a second attempt only costs another request.
+    pool = diagnostics.get("fast_pool") or diagnostics.get("price_pool") or []
+    if not isinstance(pool, (list, tuple)) or len(pool) < 2:
+        return False
+    return getattr(error, "status_code", None) in ROUTE_REFUSAL_STATUSES
 
 
 class OpenRouterProvider(TranslationProvider):
@@ -1065,9 +1086,27 @@ class OpenRouterProvider(TranslationProvider):
         deadline = asyncio.timeout(request_timeout)
         try:
             async with deadline:
-                return await self._translate_batch(
-                    batch, model, temperature, config_override, deadline
-                )
+                try:
+                    return await self._translate_batch(
+                        batch, model, temperature, config_override, deadline
+                    )
+                except TranslationProviderError as error:
+                    if not _route_refused_the_request(error):
+                        raise
+                    # The endpoint that refused has just been quarantined by
+                    # observe(), so selecting again picks a different one out of the
+                    # pool SmartFast already ranked. Without this the batch is lost
+                    # to one endpoint's incompatibility while the rest of the pool
+                    # would have served it. Once only: every endpoint refusing is a
+                    # fact about the request, not about the route.
+                    logger.warning(
+                        "Route %s refused the request (%s); trying another endpoint.",
+                        (error.routing_diagnostics or {}).get("selected_endpoint"),
+                        error.status_code,
+                    )
+                    return await self._translate_batch(
+                        batch, model, temperature, config_override, deadline
+                    )
         except (httpx.TimeoutException, TimeoutError) as error:
             failure = ProviderTimeoutError(
                 f"Request timed out after {request_timeout}s", provider=self.provider_name
