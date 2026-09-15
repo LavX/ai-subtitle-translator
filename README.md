@@ -71,7 +71,7 @@ export ENCRYPTION_KEY_FILE="$PWD/data/encryption.key"
 uvicorn subtitle_translator.main:app --host 0.0.0.0 --port 8765
 ```
 
-The source-build examples select Luna with local `:smartfast` routing on v2.0.0. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
+The source-build examples select Luna with local `:smartfast` routing. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
 
 ## Optional web UI
 
@@ -180,55 +180,55 @@ docker run -e ENCRYPTION_ENABLED=false ...
 
 ## Subtitle translation leaderboard
 
-**Start with Luna on SmartFast.** In the September 10, 2026 full-file English-to-Hungarian run, Luna tied Gemini 3.1 Flash Lite for the highest sampled quality and cost less, with a similar completion time. Muse Spark 1.3 placed next on sampled quality but took much longer; Muse 1.2 offers a cheaper, faster alternative to it. Mercury was fast and inexpensive, but frequent malformed Hungarian lowered its score.
+**Start with Mercury 2.5 if cost matters, Gemini 2.5 Flash Lite if speed does, Luna if quality does.** In the September 15, 2026 run, twelve models delivered a file and eight of those had no mechanical defect at all. Mercury finished a feature film for $0.0142, Gemini 2.5 Flash Lite in under 40 seconds, and Luna read best of anything tested, at three times Mercury's price.
 
-**10 of 16 models returned all 1,340 cues.** Every model below was tested on commit `f80a190`, the build that became v2.0.0, through the actual 2.0.0 queued API with OpenRouter SDK 1.1.133. No older results fill gaps in this comparison.
+**11 of 24 models returned a complete file inside ten minutes.** Every model below translated the same 1,338-cue English subtitle into Hungarian through the queued API, with SmartFast routing at its defaults and a 600-second cap.
 
-| Model ID | Result | Progress / 1,340 | Seconds | Observed cost, USD | Quality / 100 | Reviewed / 180 |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `openai/gpt-5.6-luna` | Complete | 1340 | 45.581 | $0.046563 | 93 | 180 |
-| `google/gemini-3.1-flash-lite` | Complete | 1340 | 41.820 | $0.083729 | 93 | 180 |
-| `meta/muse-spark-1.3-contributor` | Complete | 1340 | 376.741 | $0.018895 | 91 | 180 |
-| `meta/muse-spark-1.2-contributor` | Complete | 1340 | 126.772 | $0.017770 | 89 | 180 |
-| `google/gemini-3.5-flash-lite` | Complete | 1340 | 40.496 | $0.120194 | 84 | 180 |
-| `z-ai/glm-5.3-flash` | Complete | 1340 | 501.726 | $0.117077† | 81 | 180 |
-| `openai/gpt-4o-mini` | Complete | 1340 | 131.258 | $0.027982 | 81 | 180 |
-| `google/gemini-2.5-flash-lite` | Complete | 1340 | 45.534 | $0.021060 | 80 | 180 |
-| `inception/mercury-2.5` | Complete | 1340 | 50.856 | $0.013707 | 70 | 180 |
-| `qwen/qwen3.7-flash` | Complete | 1340 | 564.744 | $0.020150 | 58 | 180 |
-| `deepseek/deepseek-v4-flash-0731` | 600s cap | 400 | 600.007 | $0.081432† | 87* | 50 |
-| `qwen/qwen3.8-flash` | 600s cap | 1000 | 600.125 | $0.069066† | 79* | 144 |
-| `liquid/lfm-2.5-2.6b:free` | 600s cap | 700 | 600.094 | $0.000000† | 29* | 125 |
-| `inclusionai/ling-3.0-flash-fin:free` | Failed | 0 | 96.436 | unknown | N/A | 0 |
-| `nvidia/nemotron-3.5-lightning:free` | 600s cap | 0 | 600.099 | unknown | N/A | 0 |
-| `dots-studio/dots-3-note-preview:free` | Failed | 0 | 6.684 | $0.000000 (no requests) | N/A | 0 |
+| Model ID | Result | Seconds | Requests | Observed cost, USD | Defect cues | Reading |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| `inception/mercury-2.5` | Complete | 70.7 | 17 | $0.0142 | 0 | Usable |
+| `deepseek/deepseek-v4-flash` | Complete | 142.8 | 21 | $0.0145 | 0 | Reliable |
+| `tencent/hy-mt2-30b-a3b` | Complete | 93.2 | 41 | $0.0165 | 234 | Usable |
+| `tencent/hy-mt2-7b` | Complete | 103.1 | 42 | $0.0167 | 3 | Weak |
+| `meta/muse-spark-1.2-contributor` | Complete | 114.2 | 17 | $0.0176 | 0 | Reliable |
+| `tencent/hy-mt2-1.8b` | Partial, 1333 | 113.0 | 202 | $0.0178 | 22 | Unusable |
+| `google/gemma-4-26b-a4b-it` | Complete | 290.1 | 23 | $0.0182 | 15 | Weak |
+| `meta/muse-spark-1.3-contributor` | Complete | 192.0 | 17 | $0.0184 | 0 | Reliable |
+| `inclusionai/ling-3.0-flash-vl` | Complete | 577.2 | 19 | $0.0201 | 0 | Usable |
+| `google/gemini-2.5-flash-lite` | Complete | 39.7 | 18 | $0.0212 | 0 | Usable |
+| `openai/gpt-5.6-luna` | Complete | 85.4 | 17 | $0.0446 | 0 | Reliable |
+| `deepseek/deepseek-v4.1-flash` | Complete | 256.3 | 21 | $0.1893 | 0 | Reliable |
 
-All complete files returned 1,340 cues with preserved indices and timestamps. Failed and capped jobs returned no subtitle file; progress counts settled work, not delivered output. **\* Provisional fragment score:** only available sampled cues were reviewed, so these scores are excluded from the ranking. **† Cost lower bound:** some requests lacked usage. Total observed charges were **$0.63762675**, with **39 requests missing cost values**.
+**Defect cues** counts cues carrying a foreign writing system, invented markup, or untranslated English, over the whole delivered file. `tencent/hy-mt2-30b-a3b` writes good Hungarian but inserted 234 `<i>` and `<br>` tags into a file that has none. `google/gemma-4-26b-a4b-it` dropped Chinese, Korean and Sinhala into nine cues. **Reading** is a grouping from a fixed 14-cue sample chosen for difficulty before any output existed; it is not a score.
+
+**Twelve models did not finish inside the cap**, led by `deepseek/deepseek-v4-flash-0731` at 94% and `tencent/hy3` at 88%, down to `nvidia/nemotron-3.5-lightning:free` at 0%. **Not one free model finished the film**, in this run or in September 10's. A capped job reports no usage, so its cost is unknown rather than zero.
+
+Timing above roughly 200 seconds is a range rather than a measurement: `deepseek/deepseek-v4-flash-0731` completed in 483 seconds on one run and capped at 94% on the next. `google/gemini-2.5-flash-lite` is the steadiest, landing within a few seconds and a fraction of a cent across four runs.
+
+Worth knowing: the three Tencent Hy-MT2 models top OpenRouter's usage ranking for the translation task. On this workload they produced the three weakest results of everything that finished.
 
 ### How this was measured
 
-All 16 jobs launched in parallel using Bazarr+ compatible encrypted requests, with 100-cue batches and four parallel batches per model. Each job had a ten-minute wall-clock cap and a 600-second request timeout. Temperature was configured as 0.3, omitted for Luna because unsupported; reasoning was unspecified. The harness used the service API, not a running Bazarr+ client.
+Jobs went through `POST /api/v1/jobs/translate/content` with an encrypted per-request key, the wire format Bazarr+ uses, in waves of five against a container started fresh for each wave. 100-cue batches, four parallel batches, temperature 0.3 where supported, reasoning unspecified, a 600-second provider timeout and a 600-second cap per job. SmartFast ran at its defaults: median +50%, sparse-pool 3x, a 20% estimated-speed band, and $1 input / $3 output per million token ceilings.
 
-SmartFast checked endpoint prices before routing, excluded expensive outliers, and preferred lower prices within a 20% estimated speed band. The run used median +50% and sparse-pool 3× price filters, $1 input / $3 output per million token ceilings, and exact zero caps for free models. Stable sessions and provider affinity support caching. All 284 forwarded requests passed price, session and payload checks; all 15 admitted models passed the initial endpoint-selection audit. Advertised speed and session affinity do not guarantee the fastest actual response. See the [SmartFast guide](docs/smartfast.md) for configuration.
+SmartFast is worth having on. Routing `deepseek/deepseek-v4-flash-0731` by throughput instead sent it to an endpoint charging $0.44/$1.32 per million against the $0.04/$0.10 available elsewhere for the same model, and the same film cost **$0.3369 instead of $0.0597**.
 
-Quality used a fixed, blinded **180-cue sample per complete file**: twelve evenly spaced 12-cue scenes and 36 thematic cues, selected before output arrived. The automated editorial rubric weights meaning 50%, semantic completeness 20%, Hungarian fluency/register 20%, and terminology 10%. Each model had one primary reviewer with targeted context checks. Scores are subjective judgments, not accuracy percentages; small differences are not statistically established. Every available cue also received mechanical checks for structure, unchanged text, line length and reading speed. This was not a full-file semantic review.
-
-The incomplete runs had different causes: **Dots** had no eligible healthy endpoint; **Ling** returned 14 upstream HTTP 404 errors; **Nemotron** sent headers and whitespace keepalives without completed response bodies. **DeepSeek**, **Qwen 3.8** and **Liquid** returned partial work but missed the deadline. Native JSON support was optional for these routes. See the [routing and stall diagnosis](docs/benchmarks/2026-09-10-smartfast-full-quality-diagnosis.md) for receipts and reasoning-token counts.
+Six models could not be benchmarked for reasons outside the model: three free Ling variants are refused by an account data-policy setting, both Inkling variants are restricted to agentic harnesses, and `nex-agi/nex-n2.5-mini:free` has a single endpoint OpenRouter reports as unhealthy.
 
 ### Episode, movie and season cost estimates
 
-For a rough Luna budget, scale its measured **$0.046563165 per 1,340 cues** by your file’s cue count. At an illustrative 15 cues/minute, a 20-minute episode is about **$0.0104**, a two-hour movie **$0.0625**, and 24 forty-minute episodes **$0.5004**. These are extrapolations from this one SmartFast run, not measured season bills. Text density, reasoning, provider prices, retries and cache usage can change costs. Time does not scale linearly because batches run in parallel.
+For a rough Mercury budget, scale its measured **$0.0142 per 1,338 cues** by your file's cue count. At an illustrative 15 cues/minute, a 20-minute episode is about **$0.0032**, a two-hour movie **$0.0191**, and 24 forty-minute episodes **$0.1529**. For Luna, multiply by about 3.1. These are extrapolations from one run, not measured bills. Text density, reasoning, provider prices, retries and cache usage all move them, and time does not scale linearly because batches run in parallel.
 
 ```text
-estimated Luna cost = 0.046563165 × your cue count / 1340
+estimated Mercury cost = 0.0142 × your cue count / 1338
 ```
 
 ### Raw results and earlier runs
 
-- [Complete run report](docs/benchmarks/2026-09-10-smartfast-full-quality-report.md) and [CSV](docs/benchmarks/2026-09-10-smartfast-full-quality.csv), including requests, tokens, cache usage and returned-cue counts.
-- [Quality findings](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.md), including the mechanical checks, and the [quality CSV](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.csv).
-- The price preflight, endpoint metrics and verification records for this run are not kept in the repository. The figures taken from them are in the report and the CSVs above; the raw captures were several megabytes of JSON that nothing read.
+- [September 15 cohort report](docs/benchmarks/2026-09-15-translation-cohort.md), with the full results, the defect counts and the sampled reading, plus its [CSV](docs/benchmarks/2026-09-15-translation-cohort.csv) and [defect CSV](docs/benchmarks/2026-09-15-translation-cohort-defects.csv).
+- [September 10 run report](docs/benchmarks/2026-09-10-smartfast-full-quality-report.md) and [CSV](docs/benchmarks/2026-09-10-smartfast-full-quality.csv), on the build that became v2.0.0, with its own [quality findings](docs/benchmarks/2026-09-10-smartfast-full-quality-quality.md).
 - [Historical benchmarks](docs/benchmarks/history.md): September 7 smoke tests and September 9 routing/retry runs, with their original settings and limitations.
+- Translated subtitle text and the raw provider captures are not kept in the repository. The figures taken from them are in the reports and CSVs.
 
 ## How it fits together
 
