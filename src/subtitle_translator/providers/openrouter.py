@@ -554,6 +554,18 @@ class OpenRouterProvider(TranslationProvider):
 
         return sorted(models, key=sort_key)
 
+    async def warm_model_capabilities(self) -> None:
+        """Load the catalog before planning, so batch sizing can see the ceiling."""
+        await self._ensure_model_params_cache()
+
+    def model_output_ceiling(self, model_id: str) -> int | None:
+        """The most this model will write in one reply, as the catalog reports it.
+
+        Returns None until the catalog has been loaded, which leaves planning to
+        the configured budget alone, as it was before.
+        """
+        return _positive_int(self._capability(self._model_max_output_cache, model_id))
+
     def get_model_metadata(self, model_id: str) -> dict | None:
         if not hasattr(self, "_model_metadata_cache"):
             self._model_metadata_cache: dict[str, dict] = {}

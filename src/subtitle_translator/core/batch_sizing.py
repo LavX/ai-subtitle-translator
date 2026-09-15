@@ -26,7 +26,7 @@ class BatchSizeResolver:
         self._success_counts: dict[str, int] = {}
         self._settings = get_settings()
 
-    def _budget_cap(self) -> int | None:
+    def _budget_cap(self, output_ceiling: int | None = None) -> int | None:
         """How many cues the configured output budget can answer for, if it is set.
 
         Without this the first batch of every job is planned as if the reply had the
@@ -37,15 +37,32 @@ class BatchSizeResolver:
         """
         budget = getattr(self._settings, "openrouter_max_tokens", None)
         if isinstance(budget, bool) or not isinstance(budget, int) or budget <= 0:
-            # Unset means the provider picks the ceiling, so there is nothing to fit.
+            # Unset means no budget is sent, so only the model's own ceiling applies.
+            budget = None
+        if isinstance(output_ceiling, bool) or not isinstance(output_ceiling, int):
+            output_ceiling = None
+        elif output_ceiling <= 0:
+            output_ceiling = None
+
+        # The provider trims the budget to the model's ceiling before sending, so the
+        # room the reply really gets is the smaller of the two. Planning from the
+        # configured budget alone hands a low-ceiling model a batch it can never
+        # answer, and the cut-short reply is billed before the sizer starts halving.
+        room = (
+            min(x for x in (budget, output_ceiling) if x is not None)
+            if (budget is not None or output_ceiling is not None)
+            else None
+        )
+        if room is None:
             return None
-        return max(MIN_BATCH_SIZE, budget // OUTPUT_TOKENS_PER_LINE_ESTIMATE)
+        return max(MIN_BATCH_SIZE, room // OUTPUT_TOKENS_PER_LINE_ESTIMATE)
 
     def resolve(
         self,
         model_id: str,
         context_length: int | None = None,
         max_batch_size: int | None = None,
+        output_ceiling: int | None = None,
     ) -> int:
         global_max = self._settings.batch_size
 
@@ -55,7 +72,7 @@ class BatchSizeResolver:
             return self._learned_sizes[model_id]
 
         limits = [global_max]
-        budget_cap = self._budget_cap()
+        budget_cap = self._budget_cap(output_ceiling)
         if budget_cap is not None:
             limits.append(budget_cap)
 
