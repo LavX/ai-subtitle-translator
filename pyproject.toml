@@ -32,7 +32,6 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "httpx>=0.25.0",
     "openrouter==1.1.133",
-    "srt>=3.5.0",
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.6",
     "cryptography>=41.0.0",
@@ -64,6 +63,7 @@ subtitle_translator = [
     "server/static/index.html", "server/static/app.css", "server/static/app.js",
     "server/static/archive.mjs", "server/static/session.mjs",
     "server/static/outfit.woff2", "server/static/outfit-OFL.txt",
+    "_vendor/LICENSE.srt",
 ]
 
 [tool.black]
@@ -76,6 +76,7 @@ target-version = "py311"
 exclude = [
     "tests/battle_royale_50_lines.py",
     "tests/elimination_battle_royale.py",
+    "src/subtitle_translator/_vendor/srt.py",
 ]
 
 [tool.ruff.lint]

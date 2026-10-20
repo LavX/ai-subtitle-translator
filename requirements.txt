@@ -9,7 +9,6 @@ httpx>=0.25.0
 openrouter==1.1.133
 
 # SRT parsing
-srt>=3.5.0
 
 # Environment configuration
 python-dotenv>=1.0.0

@@ -57,7 +57,7 @@ class TestSRTParserGenericException:
 
     def test_parse_unexpected_error(self):
         parser = SRTParser()
-        with patch("srt.parse", side_effect=TypeError("boom")):
+        with patch("subtitle_translator._vendor.srt.parse", side_effect=TypeError("boom")):
             with pytest.raises(SRTParserError, match="Unexpected error parsing SRT"):
                 parser.parse("anything")
 
@@ -79,14 +79,14 @@ class TestValidateSrt:
 
     def test_invalid_srt_parse_error(self):
         parser = SRTParser()
-        with patch("srt.parse", side_effect=__import__("srt").SRTParseError(0, 0, "")):
+        with patch("subtitle_translator._vendor.srt.parse", side_effect=__import__("subtitle_translator._vendor.srt", fromlist=["srt"]).SRTParseError(0, 0, "")):
             is_valid, error = parser.validate_srt("bad content")
             assert is_valid is False
             assert "Invalid SRT format" in error
 
     def test_validate_generic_error(self):
         parser = SRTParser()
-        with patch("srt.parse", side_effect=RuntimeError("something")):
+        with patch("subtitle_translator._vendor.srt.parse", side_effect=RuntimeError("something")):
             is_valid, error = parser.validate_srt("bad content")
             assert is_valid is False
             assert "Validation error" in error
@@ -101,7 +101,7 @@ class TestGetSubtitleCount:
 
     def test_failure_returns_zero(self):
         parser = SRTParser()
-        with patch("srt.parse", side_effect=Exception("fail")):
+        with patch("subtitle_translator._vendor.srt.parse", side_effect=Exception("fail")):
             assert parser.get_subtitle_count("bad") == 0
 
 

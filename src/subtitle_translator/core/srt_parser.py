@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import timedelta
 
-import srt
+from subtitle_translator._vendor import srt
 
 logger = logging.getLogger(__name__)
 
