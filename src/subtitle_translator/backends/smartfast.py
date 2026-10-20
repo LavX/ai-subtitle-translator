@@ -22,8 +22,8 @@ from uuid import uuid4
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
-from subtitle_translator.config import Settings
-from subtitle_translator.providers.base import TranslationProviderError
+from subtitle_translator.core.provider import TranslationProviderError
+from subtitle_translator.server.config import Settings
 
 CATALOG_TTL = 300
 STATE_TTL = 1800

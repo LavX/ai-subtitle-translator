@@ -5,7 +5,7 @@ import json
 
 import httpx
 
-from subtitle_translator.providers.openrouter import OpenRouterProvider
+from subtitle_translator.backends.openrouter import OpenRouterProvider
 
 
 def install_provider(settings, evidence):

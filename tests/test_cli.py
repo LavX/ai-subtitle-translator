@@ -1,4 +1,4 @@
-"""Tests for subtitle_translator.cli module."""
+"""Tests for subtitle_translator.server.cli module."""
 
 import os
 import stat
@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from subtitle_translator.cli import main, regenerate_key
+from subtitle_translator.server.cli import main, regenerate_key
 
 
 class TestRegenerateKey:
     def test_success(self, tmp_path, capsys):
         key_file = str(tmp_path / "test.key")
-        with patch("subtitle_translator.cli.get_settings") as mock_get:
+        with patch("subtitle_translator.server.cli.get_settings") as mock_get:
             settings = MagicMock()
             settings.encryption_key = ""
             settings.encryption_enabled = True
@@ -29,7 +29,7 @@ class TestRegenerateKey:
 
     def test_success_creates_parent_dirs(self, tmp_path, capsys):
         key_file = str(tmp_path / "nested" / "dir" / "test.key")
-        with patch("subtitle_translator.cli.get_settings") as mock_get:
+        with patch("subtitle_translator.server.cli.get_settings") as mock_get:
             settings = MagicMock()
             settings.encryption_key = ""
             settings.encryption_enabled = True
@@ -41,7 +41,7 @@ class TestRegenerateKey:
         assert os.path.exists(key_file)
 
     def test_error_encryption_key_env_set(self, capsys):
-        with patch("subtitle_translator.cli.get_settings") as mock_get:
+        with patch("subtitle_translator.server.cli.get_settings") as mock_get:
             settings = MagicMock()
             settings.encryption_key = "some-key-value"
             mock_get.return_value = settings
@@ -54,7 +54,7 @@ class TestRegenerateKey:
         assert "ENCRYPTION_KEY env var is set" in captured.out
 
     def test_error_encryption_disabled(self, capsys):
-        with patch("subtitle_translator.cli.get_settings") as mock_get:
+        with patch("subtitle_translator.server.cli.get_settings") as mock_get:
             settings = MagicMock()
             settings.encryption_key = ""
             settings.encryption_enabled = False
@@ -71,7 +71,7 @@ class TestRegenerateKey:
 class TestMain:
     def test_regenerate_key_command(self):
         with (
-            patch("subtitle_translator.cli.regenerate_key") as mock_regen,
+            patch("subtitle_translator.server.cli.regenerate_key") as mock_regen,
             patch("sys.argv", ["cli", "regenerate-key"]),
         ):
             main()

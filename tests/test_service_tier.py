@@ -6,10 +6,10 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from subtitle_translator.api.models import TranslationConfig
-from subtitle_translator.providers.base import TranslationBatch
-from subtitle_translator.providers.openrouter import OpenRouterProvider
-from subtitle_translator.queue.worker import _extract_config_override_from_dict
+from subtitle_translator.backends.openrouter import OpenRouterProvider
+from subtitle_translator.core.provider import TranslationBatch
+from subtitle_translator.server.api.models import TranslationConfig
+from subtitle_translator.server.queue.worker import _extract_config_override_from_dict
 from tests.test_batch_reliability import response, settings
 
 

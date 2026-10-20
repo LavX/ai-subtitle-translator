@@ -15,8 +15,9 @@ from uuid import uuid4
 
 import httpx
 
-from subtitle_translator.config import Settings, get_settings
-from subtitle_translator.providers.base import (
+from subtitle_translator.backends.openrouter_sdk import send_completion
+from subtitle_translator.backends.smartfast import SmartFastRouter, SmartFastRoutingError
+from subtitle_translator.core.provider import (
     AuthenticationError,
     InvalidResponseError,
     ProviderTimeoutError,
@@ -26,11 +27,10 @@ from subtitle_translator.providers.base import (
     TranslationProviderError,
     TranslationResult,
 )
-from subtitle_translator.providers.openrouter_sdk import send_completion
-from subtitle_translator.providers.smartfast import SmartFastRouter, SmartFastRoutingError
+from subtitle_translator.server.config import Settings, get_settings
 
 if TYPE_CHECKING:
-    from subtitle_translator.api.models import TranslationConfig
+    from subtitle_translator.server.api.models import TranslationConfig
 
 logger = logging.getLogger(__name__)
 

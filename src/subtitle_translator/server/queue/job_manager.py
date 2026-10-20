@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
-    from subtitle_translator.queue.job_store import JobStore
+    from subtitle_translator.server.queue.job_store import JobStore
 
-from subtitle_translator.queue.job_events import JobEvents
+from subtitle_translator.server.queue.job_events import JobEvents
 
 logger = logging.getLogger(__name__)
 

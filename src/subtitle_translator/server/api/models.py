@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
-from subtitle_translator.providers.smartfast import SmartFastPolicy
+from subtitle_translator.backends.smartfast import SmartFastPolicy
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07")
 _DANGEROUS_CONTROL_CHARS = frozenset(

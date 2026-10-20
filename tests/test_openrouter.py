@@ -8,20 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from subtitle_translator.api.models import (
-    ProviderConfig,
-    ReasoningConfig,
-    TranslationConfig,
-)
-from subtitle_translator.providers.base import (
-    AuthenticationError,
-    InvalidResponseError,
-    RateLimitError,
-    TranslationBatch,
-    TranslationProviderError,
-    TranslationResult,
-)
-from subtitle_translator.providers.openrouter import (
+from subtitle_translator.backends.openrouter import (
     EFFORT_REASONING_MODELS,
     ENABLED_REASONING_MODELS,
     EXCELLENT_MODELS,
@@ -31,6 +18,19 @@ from subtitle_translator.providers.openrouter import (
     RECOMMENDED_MODELS,
     THINKING_VARIANT_MODELS,
     OpenRouterProvider,
+)
+from subtitle_translator.core.provider import (
+    AuthenticationError,
+    InvalidResponseError,
+    RateLimitError,
+    TranslationBatch,
+    TranslationProviderError,
+    TranslationResult,
+)
+from subtitle_translator.server.api.models import (
+    ProviderConfig,
+    ReasoningConfig,
+    TranslationConfig,
 )
 
 # ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ class TestInit:
         provider = OpenRouterProvider(settings=settings)
         assert provider.settings is settings
 
-    @patch("subtitle_translator.providers.openrouter.get_settings")
+    @patch("subtitle_translator.backends.openrouter.get_settings")
     def test_uses_global_settings_when_none(self, mock_get):
         mock_get.return_value = _make_settings()
         provider = OpenRouterProvider()
@@ -389,7 +389,7 @@ class TestTranslateBatch:
                 ]
             },
         )
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as factory:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = catalog_client
             await provider.translate_batch(_make_batch(), model="openai/gpt-5.6-luna:floor")
         catalog_client.get.assert_awaited_once_with("/models")
@@ -426,7 +426,7 @@ class TestTranslateBatch:
                 ]
             },
         )
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as factory:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = catalog_client
             await provider.translate_batch(
                 _make_batch(), config_override=TranslationConfig(model="openai/gpt-5.6-luna:floor")
@@ -574,7 +574,7 @@ class TestTranslateBatch:
     async def test_response_deadline_cancels_a_still_open_request(self, monkeypatch):
         from functools import partial
 
-        from subtitle_translator.config import Settings
+        from subtitle_translator.server.config import Settings
 
         cancelled = False
 
@@ -1180,7 +1180,7 @@ class TestEnsureModelParamsCache:
         mock_resp.status_code = 200
         mock_resp.json.return_value = api_data
 
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as MockClient:
             mock_ctx = AsyncMock()
             mock_ctx.get.return_value = mock_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
@@ -1196,14 +1196,14 @@ class TestEnsureModelParamsCache:
         provider = OpenRouterProvider(settings=_make_settings())
         provider._model_params_fetched = True
 
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as MockClient:
             await provider._ensure_model_params_cache()
             MockClient.assert_not_called()
 
     async def test_handles_api_failure(self):
         provider = OpenRouterProvider(settings=_make_settings())
 
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as MockClient:
             mock_ctx = AsyncMock()
             mock_ctx.get.side_effect = httpx.ConnectError("down")
             MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
@@ -1224,7 +1224,7 @@ class TestEnsureModelParamsCache:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"data": []}
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as MockClient:
             mock_ctx = AsyncMock()
             mock_ctx.get.return_value = mock_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
@@ -1238,7 +1238,7 @@ class TestEnsureModelParamsCache:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"data": [{}, {"id": "x"}, "junk"]}
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as MockClient:
             mock_ctx = AsyncMock()
             mock_ctx.get.return_value = mock_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
@@ -1267,7 +1267,7 @@ class TestEnsureModelParamsCache:
                 },
             ),
         ]
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as factory:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as factory:
             factory.return_value.__aenter__.return_value = catalog_client
             await provider.translate_batch(_make_batch(), model="openai/gpt-5.6-luna")
             assert "temperature" in json.loads(provider._client.requests[-1].content)
@@ -1282,7 +1282,7 @@ class TestEnsureModelParamsCache:
         mock_resp = MagicMock()
         mock_resp.status_code = 503
 
-        with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+        with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as MockClient:
             mock_ctx = AsyncMock()
             mock_ctx.get.return_value = mock_resp
             MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
@@ -1468,9 +1468,9 @@ class TestParseTranslations:
 
 class TestFactoryFunction:
     async def test_get_openrouter_provider(self):
-        from subtitle_translator.providers.openrouter import get_openrouter_provider
+        from subtitle_translator.backends.openrouter import get_openrouter_provider
 
-        with patch("subtitle_translator.providers.openrouter.get_settings") as mock_gs:
+        with patch("subtitle_translator.backends.openrouter.get_settings") as mock_gs:
             mock_gs.return_value = _make_settings()
             provider = await get_openrouter_provider()
             assert isinstance(provider, OpenRouterProvider)

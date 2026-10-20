@@ -6,11 +6,11 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 
-from subtitle_translator.api import routes
-from subtitle_translator.config import Settings
-from subtitle_translator.main import app
-from subtitle_translator.queue.job_manager import Job, JobManager, JobStatus, JobType
-from subtitle_translator.queue.job_store import JobStore
+from subtitle_translator.server.api import routes
+from subtitle_translator.server.config import Settings
+from subtitle_translator.server.main import app
+from subtitle_translator.server.queue.job_manager import Job, JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.job_store import JobStore
 
 
 async def settle():
@@ -124,10 +124,10 @@ async def test_http_resize_cycles_preserve_admission_and_queue_accounting(monkey
 async def test_lifespan_applies_history_limit_and_awaits_batches_before_close(
     tmp_path, monkeypatch
 ):
-    from subtitle_translator import main
+    from subtitle_translator.backends.openrouter import OpenRouterProvider
     from subtitle_translator.core.translator import SubtitleTranslator
-    from subtitle_translator.providers.openrouter import OpenRouterProvider
-    from subtitle_translator.queue.worker import process_content_translation_job
+    from subtitle_translator.server import main
+    from subtitle_translator.server.queue.worker import process_content_translation_job
 
     path = str(tmp_path / "lifespan.db")
     store = JobStore(path)

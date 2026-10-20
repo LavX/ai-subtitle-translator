@@ -2,7 +2,7 @@
 
 import logging
 
-from subtitle_translator.config import get_settings
+from subtitle_translator.server.config import get_settings
 
 logger = logging.getLogger(__name__)
 

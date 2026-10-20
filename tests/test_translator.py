@@ -5,16 +5,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
 from subtitle_translator.core.batch_processor import BatchProcessor, BatchProgress
-from subtitle_translator.core.srt_parser import SRTParser, SRTParserError, SubtitleEntry
-from subtitle_translator.core.translator import SubtitleTranslator
-from subtitle_translator.providers.base import (
+from subtitle_translator.core.provider import (
     RateLimitError,
     TranslationBatch,
     TranslationProviderError,
     TranslationResult,
 )
+from subtitle_translator.core.srt_parser import SRTParser, SRTParserError, SubtitleEntry
+from subtitle_translator.core.translator import SubtitleTranslator
+from subtitle_translator.server.api.models import SubtitleLine, TranslateContentRequest
 
 
 class TestSRTParser:

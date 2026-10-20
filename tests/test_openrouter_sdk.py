@@ -8,13 +8,13 @@ import httpx
 import pytest
 from openrouter.chat import Chat
 
-from subtitle_translator.api.models import TranslationConfig
-from subtitle_translator.providers.base import (
+from subtitle_translator.core.provider import (
     InvalidResponseError,
     ProviderTimeoutError,
     RateLimitError,
     TranslationProviderError,
 )
+from subtitle_translator.server.api.models import TranslationConfig
 from tests.test_smartfast_integration import batch, endpoint
 from tests.test_smartfast_integration import environment as environment
 

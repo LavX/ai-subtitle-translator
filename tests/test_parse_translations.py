@@ -4,14 +4,14 @@ from unittest.mock import patch
 
 import pytest
 
-from subtitle_translator.providers.base import InvalidResponseError
-from subtitle_translator.providers.openrouter import OpenRouterProvider
+from subtitle_translator.backends.openrouter import OpenRouterProvider
+from subtitle_translator.core.provider import InvalidResponseError
 
 
 @pytest.fixture
 def provider():
     """Create provider instance for testing."""
-    with patch("subtitle_translator.providers.openrouter.get_settings") as mock_settings:
+    with patch("subtitle_translator.backends.openrouter.get_settings") as mock_settings:
         settings = mock_settings.return_value
         settings.openrouter_api_key = "test-key"
         settings.openrouter_model = "test/model"
@@ -62,7 +62,7 @@ class TestParseTranslationsValidJSON:
         assert result == [{"index": "0", "content": "Szia"}]
 
     def test_two_unknown_lists_are_ambiguous(self, provider):
-        from subtitle_translator.providers.base import InvalidResponseError
+        from subtitle_translator.core.provider import InvalidResponseError
 
         content = '{"a":[{"index":"0","content":"Szia"}],"b":[{"index":"0","content":"Hali"}]}'
         with pytest.raises(InvalidResponseError, match="Unexpected response structure"):
@@ -257,7 +257,7 @@ class TestParseTranslationsFallbacks:
         assert result[0]["content"] == "caf\u00e9"
 
     def test_invalid_json_raises_error(self, provider):
-        from subtitle_translator.providers.base import InvalidResponseError
+        from subtitle_translator.core.provider import InvalidResponseError
 
         with pytest.raises(InvalidResponseError):
             provider._parse_translations("this is not json at all")

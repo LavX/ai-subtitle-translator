@@ -1,10 +1,10 @@
-"""Tests for subtitle_translator.config module."""
+"""Tests for subtitle_translator.server.config module."""
 
 from datetime import timedelta
 
 import pytest
 
-from subtitle_translator.config import (
+from subtitle_translator.server.config import (
     Settings,
     clear_runtime_overrides,
     get_runtime_overrides,

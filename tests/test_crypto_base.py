@@ -2,13 +2,18 @@
 
 import pytest
 
-from subtitle_translator.crypto import _parse_hex_key, decrypt, derive_auth_token, generate_key
-from subtitle_translator.providers.base import (
+from subtitle_translator.core.provider import (
     AuthenticationError,
     InvalidResponseError,
     RateLimitError,
     TranslationProvider,
     TranslationProviderError,
+)
+from subtitle_translator.server.crypto import (
+    _parse_hex_key,
+    decrypt,
+    derive_auth_token,
+    generate_key,
 )
 
 # ---------------------------------------------------------------------------

@@ -9,8 +9,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from subtitle_translator.crypto import decrypt, encrypt
-from subtitle_translator.queue.job_manager import Job, JobStatus, JobType
+from subtitle_translator.server.crypto import decrypt, encrypt
+from subtitle_translator.server.queue.job_manager import Job, JobStatus, JobType
 
 logger = logging.getLogger(__name__)
 

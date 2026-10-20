@@ -5,15 +5,15 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
-from subtitle_translator.config import Settings, get_settings
+from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor, summarize_batch_failure
+from subtitle_translator.core.provider import TranslationProvider
 from subtitle_translator.core.srt_parser import SRTParser, add_rtl_markers
-from subtitle_translator.providers.base import TranslationProvider
-from subtitle_translator.providers.openrouter import OpenRouterProvider
+from subtitle_translator.server.api.models import SubtitleLine, TranslateContentRequest
+from subtitle_translator.server.config import Settings, get_settings
 
 if TYPE_CHECKING:
-    from subtitle_translator.api.models import TranslationConfig
+    from subtitle_translator.server.api.models import TranslationConfig
 
 logger = logging.getLogger(__name__)
 

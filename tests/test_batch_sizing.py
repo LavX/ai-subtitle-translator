@@ -10,7 +10,7 @@ from subtitle_translator.core.batch_sizing import (
     BatchSizeResolver,
     get_batch_size_resolver,
 )
-from subtitle_translator.providers.base import (
+from subtitle_translator.core.provider import (
     InvalidResponseError,
     TranslationBatch,
     TranslationProviderError,
@@ -556,7 +556,7 @@ class TestAdaptiveRetry:
             nonlocal call_count
             call_count += 1
             if len(batch.lines) > 5:
-                from subtitle_translator.providers.base import ProviderTimeoutError
+                from subtitle_translator.core.provider import ProviderTimeoutError
 
                 raise ProviderTimeoutError("Request timeout")
             return TranslationResult(

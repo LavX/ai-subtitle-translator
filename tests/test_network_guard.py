@@ -36,7 +36,7 @@ def test_a_provider_that_stands_its_catalog_down_reaches_nothing(no_outbound_net
     """The line every provider-building test needs, and what it buys."""
     from unittest.mock import MagicMock
 
-    from subtitle_translator.providers.openrouter import OpenRouterProvider
+    from subtitle_translator.backends.openrouter import OpenRouterProvider
 
     settings = MagicMock()
     settings.openrouter_api_base = "https://openrouter.ai/api/v1"

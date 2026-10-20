@@ -7,9 +7,9 @@ from contextlib import ExitStack
 
 import pytest
 
-from subtitle_translator import gui
-from subtitle_translator.queue.job_events import JobEvents
-from subtitle_translator.queue.job_manager import JobStatus, JobType
+from subtitle_translator.server import gui
+from subtitle_translator.server.queue.job_events import JobEvents
+from subtitle_translator.server.queue.job_manager import JobStatus, JobType
 from tests import test_ui_api
 
 FILE_REQUEST = test_ui_api.FILE_REQUEST

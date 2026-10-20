@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from subtitle_translator.api.routes import _build_job_status_response
-from subtitle_translator.main import app
-from subtitle_translator.queue.job_manager import Job, JobStatus, JobType, job_manager
+from subtitle_translator.server.api.routes import _build_job_status_response
+from subtitle_translator.server.main import app
+from subtitle_translator.server.queue.job_manager import Job, JobStatus, JobType, job_manager
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def client():
 
 @pytest.fixture
 def mock_settings():
-    with patch("subtitle_translator.api.routes.get_settings") as mock:
+    with patch("subtitle_translator.server.api.routes.get_settings") as mock:
         settings = MagicMock()
         settings.openrouter_api_key = "test-api-key"
         settings.openrouter_default_model = "google/gemini-2.5-flash-preview-09-2025"
@@ -277,7 +277,7 @@ class TestSubmitContentJob:
         assert job.model == "google/gemini-2.5-flash-preview-09-2025"
 
     def test_submit_content_job_no_api_key(self, client):
-        with patch("subtitle_translator.api.routes.get_settings") as mock:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             mock.return_value = settings
@@ -288,7 +288,7 @@ class TestSubmitContentJob:
             assert resp.status_code == 401
 
     def test_submit_content_job_with_config_api_key(self, client):
-        with patch("subtitle_translator.api.routes.get_settings") as mock:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             settings.openrouter_default_model = "test-model"
@@ -382,7 +382,7 @@ class TestSubmitFileJob:
         assert resp.status_code == 400
 
     def test_submit_file_job_no_api_key(self, client):
-        with patch("subtitle_translator.api.routes.get_settings") as mock:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             mock.return_value = settings
@@ -405,7 +405,7 @@ class TestSubmitFileJob:
         assert job.model == "anthropic/claude-haiku-4.5"
 
     def test_submit_file_job_with_config_api_key(self, client):
-        with patch("subtitle_translator.api.routes.get_settings") as mock:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             settings.openrouter_default_model = "test-model"
@@ -652,7 +652,7 @@ class TestConfigEndpoints:
         assert data["apiKeyConfigured"] is True
 
     def test_get_service_status(self, client, mock_settings):
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.health_check = AsyncMock(return_value=True)
             mock_translator.return_value = translator
@@ -664,7 +664,7 @@ class TestConfigEndpoints:
             assert data["service"] == "ai-subtitle-translator"
 
     def test_get_service_status_health_check_fails(self, client, mock_settings):
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.health_check = AsyncMock(side_effect=Exception("down"))
             mock_translator.return_value = translator
@@ -675,7 +675,7 @@ class TestConfigEndpoints:
             assert data["healthy"] is False
 
     def test_update_config_model(self, client, mock_settings):
-        with patch("subtitle_translator.api.routes.update_runtime_config"):
+        with patch("subtitle_translator.server.api.routes.update_runtime_config"):
             resp = client.put("/api/v1/config", json={"model": "new-model"})
             assert resp.status_code == 200
             assert resp.json()["status"] == "updated"
@@ -686,7 +686,7 @@ class TestConfigEndpoints:
         assert resp.json()["status"] == "no_change"
 
     def test_update_config_forbidden(self, client):
-        with patch("subtitle_translator.api.routes.get_settings") as mock:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock:
             settings = MagicMock()
             settings.admin_api_key = "secret"
             mock.return_value = settings
@@ -694,11 +694,11 @@ class TestConfigEndpoints:
             assert resp.status_code == 403
 
     def test_update_config_with_admin_key(self, client):
-        with patch("subtitle_translator.api.routes.get_settings") as mock:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock:
             settings = MagicMock()
             settings.admin_api_key = "secret"
             mock.return_value = settings
-            with patch("subtitle_translator.api.routes.update_runtime_config"):
+            with patch("subtitle_translator.server.api.routes.update_runtime_config"):
                 resp = client.put(
                     "/api/v1/config",
                     json={"model": "new"},
@@ -707,19 +707,19 @@ class TestConfigEndpoints:
                 assert resp.status_code == 200
 
     def test_update_config_temperature(self, client, mock_settings):
-        with patch("subtitle_translator.api.routes.update_runtime_config"):
+        with patch("subtitle_translator.server.api.routes.update_runtime_config"):
             resp = client.put("/api/v1/config", json={"temperature": 0.5})
             assert resp.status_code == 200
             assert "temperature" in resp.json()["message"]
 
     def test_update_config_api_key(self, client, mock_settings):
-        with patch("subtitle_translator.api.routes.update_runtime_config"):
+        with patch("subtitle_translator.server.api.routes.update_runtime_config"):
             resp = client.put("/api/v1/config", json={"apiKey": "new-key"})
             assert resp.status_code == 200
             assert "apiKey" in resp.json()["message"]
 
     def test_update_config_parallel_batches(self, client, mock_settings):
-        with patch("subtitle_translator.api.routes.update_runtime_config"):
+        with patch("subtitle_translator.server.api.routes.update_runtime_config"):
             resp = client.put("/api/v1/config", json={"parallelBatchesPerJob": 6})
             assert resp.status_code == 200
             assert "parallelBatchesPerJob" in resp.json()["message"]
@@ -732,7 +732,7 @@ class TestConfigEndpoints:
 
     def test_update_config_value_error(self, client, mock_settings):
         with patch(
-            "subtitle_translator.api.routes.update_runtime_config",
+            "subtitle_translator.server.api.routes.update_runtime_config",
             side_effect=ValueError("bad value"),
         ):
             resp = client.put("/api/v1/config", json={"model": "bad"})
@@ -740,12 +740,12 @@ class TestConfigEndpoints:
             assert "invalid_config" in resp.json()["detail"]["error"]
 
     def test_get_service_status_no_api_key(self, client):
-        with patch("subtitle_translator.api.routes.get_settings") as mock:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             settings.openrouter_default_model = "test"
             mock.return_value = settings
-            with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+            with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
                 translator = AsyncMock()
                 mock_translator.return_value = translator
                 resp = client.get("/api/v1/status")

@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from subtitle_translator.crypto import generate_key
-from subtitle_translator.queue.job_manager import Job, JobManager, JobStatus, JobType
-from subtitle_translator.queue.job_store import JobStore
+from subtitle_translator.server.crypto import generate_key
+from subtitle_translator.server.queue.job_manager import Job, JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.job_store import JobStore
 
 
 def _make_job(

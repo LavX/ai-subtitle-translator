@@ -4,10 +4,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from subtitle_translator.config import Settings
 from subtitle_translator.core.batch_processor import (
     BatchProcessor,
     get_batch_processor,
+)
+from subtitle_translator.core.provider import (
+    InvalidResponseError,
+    TranslationBatch,
+    TranslationProviderError,
+    TranslationResult,
 )
 from subtitle_translator.core.srt_parser import (
     SRTParser,
@@ -15,12 +20,7 @@ from subtitle_translator.core.srt_parser import (
     add_rtl_markers,
     get_srt_parser,
 )
-from subtitle_translator.providers.base import (
-    InvalidResponseError,
-    TranslationBatch,
-    TranslationProviderError,
-    TranslationResult,
-)
+from subtitle_translator.server.config import Settings
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -579,7 +579,7 @@ class TestProcessAllBatchesEdgeCases:
     @pytest.mark.asyncio
     async def test_config_override_model_and_parallel(self):
         """Lines 402, 410: config_override.model and parallel_batches used."""
-        from subtitle_translator.api.models import TranslationConfig
+        from subtitle_translator.server.api.models import TranslationConfig
 
         provider = _mock_provider()
         settings = _make_settings()

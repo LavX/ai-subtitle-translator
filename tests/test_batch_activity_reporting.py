@@ -13,7 +13,7 @@ import pytest
 
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.batch_sizing import get_batch_size_resolver
-from subtitle_translator.providers.base import (
+from subtitle_translator.core.provider import (
     ProviderTimeoutError,
     TranslationBatch,
     TranslationResult,
@@ -114,7 +114,7 @@ class TestBatchActivityReporting:
         unmatched message is replaced by an empty one, and the browser simply stops
         reporting what the job is doing.
         """
-        from subtitle_translator.gui import _ACTIVITY
+        from subtitle_translator.server.gui import _ACTIVITY
 
         lines = [{"index": str(i), "content": f"Line {i}"} for i in range(10)]
         self.provider.translate_batch = self._timeout_over(5)
@@ -144,9 +144,9 @@ class TestTransportFailureReporting:
         """httpx.ReadError has an empty str(), which logged as 'Network error: '."""
         import httpx
 
-        from subtitle_translator.config import Settings
-        from subtitle_translator.providers.base import TranslationProviderError
-        from subtitle_translator.providers.openrouter import OpenRouterProvider
+        from subtitle_translator.backends.openrouter import OpenRouterProvider
+        from subtitle_translator.core.provider import TranslationProviderError
+        from subtitle_translator.server.config import Settings
 
         def explode(request):
             raise httpx.ReadError("")
@@ -249,9 +249,9 @@ async def test_rate_limit_exhaustion_activity_reaches_the_browser():
     """The stop after the last rate-limited attempt must pass the GUI allowlist too."""
     import httpx
 
-    from subtitle_translator.config import Settings
-    from subtitle_translator.gui import _ACTIVITY
-    from subtitle_translator.providers.openrouter import OpenRouterProvider
+    from subtitle_translator.backends.openrouter import OpenRouterProvider
+    from subtitle_translator.server.config import Settings
+    from subtitle_translator.server.gui import _ACTIVITY
 
     async def send(request):
         return httpx.Response(

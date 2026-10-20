@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from subtitle_translator.crypto import decrypt, encrypt, generate_key, load_or_generate_key
+from subtitle_translator.server.crypto import decrypt, encrypt, generate_key, load_or_generate_key
 
 
 class TestGenerateKey:

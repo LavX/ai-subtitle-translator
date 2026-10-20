@@ -8,7 +8,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from subtitle_translator import __version__
-from subtitle_translator.api.models import (
+from subtitle_translator.core.translator import SubtitleTranslator, get_translator
+from subtitle_translator.server.api.models import (
     ConfigResponse,
     ConfigUpdateRequest,
     ConfigUpdateResponse,
@@ -27,9 +28,8 @@ from subtitle_translator.api.models import (
     TranslateFileRequest,
     TranslateFileResponse,
 )
-from subtitle_translator.config import get_settings, update_runtime_config
-from subtitle_translator.core.translator import SubtitleTranslator, get_translator
-from subtitle_translator.queue.job_manager import Job, JobStatus, JobType, job_manager
+from subtitle_translator.server.config import get_settings, update_runtime_config
+from subtitle_translator.server.queue.job_manager import Job, JobStatus, JobType, job_manager
 
 # Crypto key set by main.py on startup (None = encryption disabled)
 _crypto_key: bytes | None = None
@@ -88,7 +88,7 @@ def _decrypt_api_key(api_key: str) -> str:
                 "message": "Received encrypted API key but encryption is disabled on this server",
             },
         )
-    from subtitle_translator.crypto import decrypt
+    from subtitle_translator.server.crypto import decrypt
 
     try:
         return decrypt(api_key, _crypto_key)

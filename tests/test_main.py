@@ -11,7 +11,7 @@ from fastapi import FastAPI
 # Helpers
 # ---------------------------------------------------------------------------
 
-MODULE = "subtitle_translator.main"
+MODULE = "subtitle_translator.server.main"
 
 
 def _make_settings(**overrides):
@@ -49,14 +49,14 @@ class TestCreateApp:
 
     @patch(f"{MODULE}.get_settings", return_value=_make_settings())
     def test_returns_fastapi_instance(self, mock_gs):
-        from subtitle_translator.main import create_app
+        from subtitle_translator.server.main import create_app
 
         app = create_app()
         assert isinstance(app, FastAPI)
 
     @patch(f"{MODULE}.get_settings", return_value=_make_settings())
     def test_app_metadata(self, mock_gs):
-        from subtitle_translator.main import create_app
+        from subtitle_translator.server.main import create_app
 
         app = create_app()
         assert app.title == "AI Subtitle Translator"
@@ -67,14 +67,14 @@ class TestCreateApp:
     @patch(f"{MODULE}.get_settings", return_value=_make_settings())
     def test_version_from_package(self, mock_gs):
         from subtitle_translator import __version__
-        from subtitle_translator.main import create_app
+        from subtitle_translator.server.main import create_app
 
         app = create_app()
         assert app.version == __version__
 
     @patch(f"{MODULE}.get_settings", return_value=_make_settings())
     def test_routers_included(self, mock_gs):
-        from subtitle_translator.main import create_app
+        from subtitle_translator.server.main import create_app
 
         app = create_app()
 
@@ -110,7 +110,7 @@ class TestCorsConfiguration:
         env = os.environ.copy()
         env.pop("CORS_ALLOWED_ORIGINS", None)
         with patch.dict(os.environ, env, clear=True):
-            from subtitle_translator.main import create_app
+            from subtitle_translator.server.main import create_app
 
             app = create_app()
             # Verify the CORS middleware was added with wildcard
@@ -125,7 +125,7 @@ class TestCorsConfiguration:
     def test_custom_origins(self, mock_gs):
         """Custom CORS_ALLOWED_ORIGINS are parsed and credentials enabled."""
         with patch.dict(os.environ, {"CORS_ALLOWED_ORIGINS": "https://a.com, https://b.com"}):
-            from subtitle_translator.main import create_app
+            from subtitle_translator.server.main import create_app
 
             app = create_app()
             cors_middlewares = [
@@ -173,7 +173,7 @@ class TestLifespanEncryptionDisabled:
         settings = _make_settings(encryption_enabled=False)
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -199,7 +199,7 @@ class TestLifespanEncryptionDisabled:
         settings = _make_settings(encryption_enabled=False, encryption_strict=True)
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -229,7 +229,7 @@ class TestLifespanEncryptionEnabled:
         settings = _make_settings(encryption_enabled=True)
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -260,7 +260,7 @@ class TestLifespanEncryptionEnabled:
         settings = _make_settings(encryption_enabled=True)
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -284,7 +284,7 @@ class TestLifespanEncryptionEnabled:
         settings = _make_settings(encryption_enabled=True)
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -314,7 +314,7 @@ class TestLifespanJobRecovery:
         patches = _standard_lifespan_patches(settings)
         patches[f"{MODULE}.job_manager"].recover_jobs = AsyncMock(return_value=5)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -340,7 +340,7 @@ class TestLifespanJobRecovery:
         )
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -362,7 +362,7 @@ class TestLifespanJobRecovery:
         settings = _make_settings(encryption_enabled=False, job_retention_hours=48)
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -387,7 +387,7 @@ class TestLifespanAuthToken:
         settings = _make_settings(encryption_enabled=True)
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -414,7 +414,7 @@ class TestLifespanAuthToken:
         settings = _make_settings(encryption_enabled=False)
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -442,7 +442,7 @@ class TestLifespanApiKeyWarning:
         settings = _make_settings(encryption_enabled=False, openrouter_api_key="")
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -462,7 +462,7 @@ class TestLifespanApiKeyWarning:
         settings = _make_settings(encryption_enabled=False, openrouter_api_key="sk-real")
         patches = _standard_lifespan_patches(settings)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),
@@ -489,7 +489,7 @@ class TestLifespanShutdown:
         mock_store = MagicMock()
         patches[f"{MODULE}.JobStore"] = MagicMock(return_value=mock_store)
 
-        from subtitle_translator.main import lifespan
+        from subtitle_translator.server.main import lifespan
 
         with (
             patch(f"{MODULE}.get_settings", patches[f"{MODULE}.get_settings"]),

@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from subtitle_translator.api.models import SubtitleLine
 from subtitle_translator.core.translator import ContentTranslationResult, FileTranslationResult
-from subtitle_translator.main import app
+from subtitle_translator.server.api.models import SubtitleLine
+from subtitle_translator.server.main import app
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def client():
 @pytest.fixture
 def mock_settings():
     """Mock settings with API key configured."""
-    with patch("subtitle_translator.api.routes.get_settings") as mock:
+    with patch("subtitle_translator.server.api.routes.get_settings") as mock:
         settings = MagicMock()
         settings.openrouter_api_key = "test-api-key"
         settings.openrouter_default_model = "google/gemini-2.5-flash-preview-09-2025"
@@ -32,7 +32,7 @@ class TestHealthEndpoint:
 
     def test_health_check_healthy(self, client, mock_settings):
         """Test health check when service is healthy."""
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.health_check = AsyncMock(return_value=True)
             mock_translator.return_value = translator
@@ -47,12 +47,12 @@ class TestHealthEndpoint:
 
     def test_health_check_no_api_key(self, client):
         """Test health check when API key is not configured."""
-        with patch("subtitle_translator.api.routes.get_settings") as mock_get:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock_get:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             mock_get.return_value = settings
 
-            with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+            with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
                 translator = AsyncMock()
                 translator.health_check = AsyncMock(return_value=False)
                 mock_translator.return_value = translator
@@ -86,7 +86,7 @@ class TestModelsEndpoint:
             },
         ]
 
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.get_available_models = AsyncMock(return_value=mock_models)
             mock_translator.return_value = translator
@@ -119,7 +119,7 @@ class TestTranslateContentEndpoint:
             SubtitleLine(position=2, line="Mundo"),
         ]
 
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.translate_content = AsyncMock(
                 return_value=ContentTranslationResult(
@@ -147,7 +147,7 @@ class TestTranslateContentEndpoint:
             "lines": [],
         }
 
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             mock_translator.return_value = translator
 
@@ -159,12 +159,12 @@ class TestTranslateContentEndpoint:
 
     def test_translate_content_no_api_key(self, client):
         """Test translation fails without API key."""
-        with patch("subtitle_translator.api.routes.get_settings") as mock_get:
+        with patch("subtitle_translator.server.api.routes.get_settings") as mock_get:
             settings = MagicMock()
             settings.openrouter_api_key = ""
             mock_get.return_value = settings
 
-            with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+            with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
                 translator = AsyncMock()
                 mock_translator.return_value = translator
 
@@ -189,7 +189,7 @@ class TestTranslateContentEndpoint:
             "lines": [{"position": 1, "line": "Say my name"}],
         }
 
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.translate_content = AsyncMock(
                 return_value=ContentTranslationResult(
@@ -235,7 +235,7 @@ Hola mundo
             "targetLanguage": "es",
         }
 
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.translate_file = AsyncMock(
                 return_value=FileTranslationResult(
@@ -263,7 +263,7 @@ Hola mundo
             "targetLanguage": "es",
         }
 
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             mock_translator.return_value = translator
 
@@ -279,7 +279,7 @@ Hola mundo
             "targetLanguage": "es",
         }
 
-        with patch("subtitle_translator.api.routes.get_translator") as mock_translator:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_translator:
             translator = AsyncMock()
             translator.translate_file = AsyncMock(
                 return_value=FileTranslationResult(

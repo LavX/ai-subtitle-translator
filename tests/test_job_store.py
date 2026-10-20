@@ -4,9 +4,9 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from subtitle_translator.crypto import generate_key
-from subtitle_translator.queue.job_manager import Job, JobStatus, JobType
-from subtitle_translator.queue.job_store import JobStore
+from subtitle_translator.server.crypto import generate_key
+from subtitle_translator.server.queue.job_manager import Job, JobStatus, JobType
+from subtitle_translator.server.queue.job_store import JobStore
 
 
 def make_job(

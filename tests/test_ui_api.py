@@ -8,13 +8,13 @@ import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient, MockTransport, Response
 
-from subtitle_translator import config, main, ui_api
-from subtitle_translator.api import routes
-from subtitle_translator.api.models import TranslateFileRequest
-from subtitle_translator.config import Settings
-from subtitle_translator.queue import worker
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
-from subtitle_translator.queue.job_store import JobStore
+from subtitle_translator.server import config, main, ui_api
+from subtitle_translator.server.api import routes
+from subtitle_translator.server.api.models import TranslateFileRequest
+from subtitle_translator.server.config import Settings
+from subtitle_translator.server.queue import worker
+from subtitle_translator.server.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.job_store import JobStore
 
 FILE_REQUEST = {
     "content": "1\n00:00:00,000 --> 00:00:01,000\nHello\n",

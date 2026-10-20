@@ -7,14 +7,14 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from subtitle_translator.api.models import ProviderConfig, TranslationConfig
-from subtitle_translator.providers.base import TranslationBatch
-from subtitle_translator.providers.openrouter import (
+from subtitle_translator.backends.openrouter import (
     EXCELLENT_MODELS,
     THINKING_VARIANT_MODELS,
     OpenRouterProvider,
     split_routing_suffix,
 )
+from subtitle_translator.core.provider import TranslationBatch
+from subtitle_translator.server.api.models import ProviderConfig, TranslationConfig
 
 PLAIN = "deepseek/deepseek-v4-flash"
 

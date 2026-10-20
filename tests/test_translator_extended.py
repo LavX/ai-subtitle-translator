@@ -4,11 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from subtitle_translator.api.models import (
-    SubtitleLine,
-    TranslateContentRequest,
-    TranslationConfig,
-)
 from subtitle_translator.core.batch_processor import (
     BatchProcessingResult,
     BatchProgress,
@@ -18,6 +13,11 @@ from subtitle_translator.core.translator import (
     SubtitleTranslator,
     close_translator,
     get_translator,
+)
+from subtitle_translator.server.api.models import (
+    SubtitleLine,
+    TranslateContentRequest,
+    TranslationConfig,
 )
 
 # ---------------------------------------------------------------------------

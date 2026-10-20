@@ -3,7 +3,6 @@
 import logging
 from typing import Any
 
-from subtitle_translator.api.models import TranslateContentRequest, TranslationConfig
 from subtitle_translator.core.batch_processor import (
     BatchProcessor,
     BatchProgress,
@@ -14,7 +13,8 @@ from subtitle_translator.core.translator import (
     get_translator,
     map_translations_to_lines,
 )
-from subtitle_translator.queue.job_manager import JobManager, JobType
+from subtitle_translator.server.api.models import TranslateContentRequest, TranslationConfig
+from subtitle_translator.server.queue.job_manager import JobManager, JobType
 
 logger = logging.getLogger(__name__)
 

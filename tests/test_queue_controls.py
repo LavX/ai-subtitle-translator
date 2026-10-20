@@ -11,9 +11,9 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 
-from subtitle_translator import gui, ui_api
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
-from subtitle_translator.queue.job_store import JobStore
+from subtitle_translator.server import gui, ui_api
+from subtitle_translator.server.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.job_store import JobStore
 
 REQUEST = {"content": "1\n00:00:01,000 --> 00:00:02,000\nsource\n", "targetLanguage": "hu"}
 

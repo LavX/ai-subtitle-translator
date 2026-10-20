@@ -7,16 +7,16 @@ from email.utils import format_datetime
 import httpx
 import pytest
 
+from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.batch_sizing import get_batch_size_resolver
-from subtitle_translator.providers.base import (
+from subtitle_translator.core.provider import (
     AuthenticationError,
     InvalidResponseError,
     ProviderTimeoutError,
     RateLimitError,
     TranslationProviderError,
 )
-from subtitle_translator.providers.openrouter import OpenRouterProvider
 from tests.test_batch_reliability import response, settings
 
 

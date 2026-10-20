@@ -6,15 +6,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from subtitle_translator.api.models import ReasoningConfig, TranslationConfig
-from subtitle_translator.providers.base import TranslationBatch
-from subtitle_translator.providers.openrouter import (
+from subtitle_translator.backends.openrouter import (
     EFFORT_REASONING_MODELS,
     ENABLED_REASONING_MODELS,
     MAX_TOKENS_REASONING_MODELS,
     THINKING_VARIANT_MODELS,
     OpenRouterProvider,
 )
+from subtitle_translator.core.provider import TranslationBatch
+from subtitle_translator.server.api.models import ReasoningConfig, TranslationConfig
 
 PLAIN = "deepseek/deepseek-v4-flash"
 REASONER = MAX_TOKENS_REASONING_MODELS[0]
@@ -223,7 +223,7 @@ async def _load_catalog(provider, body):
     response = MagicMock()
     response.status_code = 200
     response.json.return_value = body
-    with patch("subtitle_translator.providers.openrouter.httpx.AsyncClient") as MockClient:
+    with patch("subtitle_translator.backends.openrouter.httpx.AsyncClient") as MockClient:
         context = AsyncMock()
         context.get.return_value = response
         MockClient.return_value.__aenter__ = AsyncMock(return_value=context)

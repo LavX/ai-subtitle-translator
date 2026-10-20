@@ -6,14 +6,14 @@ import json
 import httpx
 import pytest
 
-from subtitle_translator.config import Settings
+from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+from subtitle_translator.core.provider import TranslationBatch
 from subtitle_translator.core.translator import SubtitleTranslator
-from subtitle_translator.providers.base import TranslationBatch
-from subtitle_translator.providers.openrouter import OpenRouterProvider
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
-from subtitle_translator.queue.worker import (
+from subtitle_translator.server.config import Settings
+from subtitle_translator.server.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.worker import (
     process_content_translation_job,
     process_file_translation_job,
 )
@@ -297,9 +297,9 @@ async def test_adaptive_timeout_budget_preserves_finished_subbatch_and_cleans_re
 async def test_timeout_recovery_activity_reaches_job_api_without_false_progress(
     tmp_path, monkeypatch, file_job
 ):
-    from subtitle_translator.api import routes
-    from subtitle_translator.main import app
-    from subtitle_translator.queue.job_store import JobStore
+    from subtitle_translator.server.api import routes
+    from subtitle_translator.server.main import app
+    from subtitle_translator.server.queue.job_store import JobStore
 
     started = asyncio.Event()
     release = asyncio.Event()
@@ -462,9 +462,9 @@ async def test_non_timeout_provider_errors_keep_distinct_attempts_without_splitt
 async def test_terminal_timeout_summary_preserves_unattempted_work_and_stop_reason(
     tmp_path, monkeypatch, file_job, prior_success
 ):
-    from subtitle_translator.api import routes
-    from subtitle_translator.main import app
-    from subtitle_translator.queue.job_store import JobStore
+    from subtitle_translator.server.api import routes
+    from subtitle_translator.server.main import app
+    from subtitle_translator.server.queue.job_store import JobStore
 
     calls = []
 
@@ -546,9 +546,9 @@ async def test_terminal_timeout_summary_preserves_unattempted_work_and_stop_reas
 async def test_synchronous_timeout_error_preserves_stop_summary(
     monkeypatch, file_translation, prior_success
 ):
-    from subtitle_translator.api import routes
-    from subtitle_translator.api.models import TranslateContentRequest
-    from subtitle_translator.main import app
+    from subtitle_translator.server.api import routes
+    from subtitle_translator.server.api.models import TranslateContentRequest
+    from subtitle_translator.server.main import app
 
     async def send(request):
         lines = json.loads(json.loads(request.content)["messages"][-1]["content"])

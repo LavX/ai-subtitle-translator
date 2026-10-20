@@ -3,9 +3,9 @@
 import httpx
 import pytest
 
-from subtitle_translator import main, web
-from subtitle_translator.api import routes
-from subtitle_translator.config import Settings
+from subtitle_translator.server import main, web
+from subtitle_translator.server.api import routes
+from subtitle_translator.server.config import Settings
 
 
 @pytest.fixture

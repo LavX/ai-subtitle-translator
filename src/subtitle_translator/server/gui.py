@@ -8,9 +8,9 @@ from contextlib import suppress
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from subtitle_translator import ui_api
-from subtitle_translator.api.models import TranslateFileRequest
-from subtitle_translator.queue.job_manager import Job, JobStatus
+from subtitle_translator.server import ui_api
+from subtitle_translator.server.api.models import TranslateFileRequest
+from subtitle_translator.server.queue.job_manager import Job, JobStatus
 
 AUTH_TIMEOUT = 15
 HEARTBEAT_SECONDS = 20

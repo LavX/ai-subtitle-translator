@@ -6,9 +6,9 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from subtitle_translator.api import routes
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
-from subtitle_translator.queue.job_store import JobStore
+from subtitle_translator.server.api import routes
+from subtitle_translator.server.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.job_store import JobStore
 
 
 @pytest.fixture

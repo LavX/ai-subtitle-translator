@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from subtitle_translator.api.models import TranslationConfig
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
-from subtitle_translator.queue.worker import (
+from subtitle_translator.server.api.models import TranslationConfig
+from subtitle_translator.server.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.worker import (
     _extract_config_override,
     _extract_config_override_from_dict,
     job_worker_handler,
@@ -107,13 +107,13 @@ class TestProcessContentTranslationJob:
         mock_result.batch_results = []
 
         # Mock BatchProcessor
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
-                from subtitle_translator.api.models import SubtitleLine
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
+                from subtitle_translator.server.api.models import SubtitleLine
 
                 mock_map.return_value = [SubtitleLine(position=1, line="Szia")]
 
@@ -141,7 +141,7 @@ class TestProcessContentTranslationJob:
             MagicMock(success=False, error="API error"),
         ]
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -163,7 +163,7 @@ class TestProcessContentTranslationJob:
     @pytest.mark.asyncio
     async def test_exception_sets_job_failed(self, manager, mock_translator):
         with patch(
-            "subtitle_translator.queue.worker.BatchProcessor", side_effect=Exception("boom")
+            "subtitle_translator.server.queue.worker.BatchProcessor", side_effect=Exception("boom")
         ):
             job_id = await manager.submit_job(
                 request_data={
@@ -189,13 +189,13 @@ class TestProcessContentTranslationJob:
         mock_result.model_used = "test-model"
         mock_result.batch_results = []
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
-                from subtitle_translator.api.models import SubtitleLine
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
+                from subtitle_translator.server.api.models import SubtitleLine
 
                 mock_map.return_value = [SubtitleLine(position=1, line="Szia")]
 
@@ -296,7 +296,7 @@ class TestProcessFileTranslationJob:
         mock_result.model_used = "test-model"
         mock_result.batch_results = []
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -353,11 +353,11 @@ class TestJobWorkerHandler:
         )
         manager.set_job_processing(job_id)
 
-        with patch("subtitle_translator.queue.worker.get_translator") as mock_get:
+        with patch("subtitle_translator.server.queue.worker.get_translator") as mock_get:
             translator = AsyncMock()
             mock_get.return_value = translator
             with patch(
-                "subtitle_translator.queue.worker.process_content_translation_job"
+                "subtitle_translator.server.queue.worker.process_content_translation_job"
             ) as mock_proc:
                 mock_proc.return_value = None
                 await job_worker_handler(manager, job_id, JobType.TRANSLATE_CONTENT)
@@ -375,11 +375,11 @@ class TestJobWorkerHandler:
         )
         manager.set_job_processing(job_id)
 
-        with patch("subtitle_translator.queue.worker.get_translator") as mock_get:
+        with patch("subtitle_translator.server.queue.worker.get_translator") as mock_get:
             translator = AsyncMock()
             mock_get.return_value = translator
             with patch(
-                "subtitle_translator.queue.worker.process_file_translation_job"
+                "subtitle_translator.server.queue.worker.process_file_translation_job"
             ) as mock_proc:
                 mock_proc.return_value = None
                 await job_worker_handler(manager, job_id, JobType.TRANSLATE_FILE)
@@ -393,7 +393,7 @@ class TestJobWorkerHandler:
         )
         manager.set_job_processing(job_id)
 
-        with patch("subtitle_translator.queue.worker.get_translator") as mock_get:
+        with patch("subtitle_translator.server.queue.worker.get_translator") as mock_get:
             mock_get.return_value = AsyncMock()
             # Pass an invalid type string to trigger else branch
             await job_worker_handler(manager, job_id, "unknown_type")

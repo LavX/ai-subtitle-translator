@@ -7,9 +7,9 @@ from functools import partial
 import httpx
 import pytest
 
-from subtitle_translator.config import Settings
-from subtitle_translator.providers.base import ProviderTimeoutError, TranslationBatch
-from subtitle_translator.providers.openrouter import OpenRouterProvider
+from subtitle_translator.backends.openrouter import OpenRouterProvider
+from subtitle_translator.core.provider import ProviderTimeoutError, TranslationBatch
+from subtitle_translator.server.config import Settings
 
 
 @pytest.mark.asyncio

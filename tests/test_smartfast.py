@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 
 def router_module():
-    return importlib.import_module("subtitle_translator.providers.smartfast")
+    return importlib.import_module("subtitle_translator.backends.smartfast")
 
 
 def endpoint(tag, prompt=0.1, completion=0.1, *, latency_seconds=None, throughput=None, **extra):

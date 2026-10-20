@@ -13,7 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
-from subtitle_translator.api.models import (
+from subtitle_translator.server.api.models import (
     JobDeleteResponse,
     JobListResponse,
     JobStatusResponse,
@@ -24,8 +24,8 @@ from subtitle_translator.api.models import (
     TranslateFileRequest,
     TranslationConfig,
 )
-from subtitle_translator.api.routes import _build_job_status_response
-from subtitle_translator.queue.job_manager import Job, JobStatus, JobType, job_manager
+from subtitle_translator.server.api.routes import _build_job_status_response
+from subtitle_translator.server.queue.job_manager import Job, JobStatus, JobType, job_manager
 
 _validated_keys: OrderedDict[str, float] = OrderedDict()
 _CACHE_TTL_SECONDS = 300

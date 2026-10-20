@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from subtitle_translator.api import routes
-from subtitle_translator.api.models import SubtitleLine
 from subtitle_translator.core.translator import ContentTranslationResult, FileTranslationResult
-from subtitle_translator.main import app
+from subtitle_translator.server.api import routes
+from subtitle_translator.server.api.models import SubtitleLine
+from subtitle_translator.server.main import app
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def client():
 
 @pytest.fixture
 def mock_settings():
-    with patch("subtitle_translator.api.routes.get_settings") as mock:
+    with patch("subtitle_translator.server.api.routes.get_settings") as mock:
         settings = MagicMock()
         settings.openrouter_api_key = "test-api-key"
         settings.openrouter_default_model = "google/gemini-2.5-flash-preview-09-2025"
@@ -46,7 +46,7 @@ def disable_auth():
 
 @pytest.fixture
 def mock_translator():
-    with patch("subtitle_translator.api.routes.get_translator") as mock_get:
+    with patch("subtitle_translator.server.api.routes.get_translator") as mock_get:
         translator = AsyncMock()
         translator.health_check = AsyncMock(return_value=True)
         mock_get.return_value = translator
@@ -167,7 +167,7 @@ class TestDecryptApiKey:
         routes._crypto_key = b"\x00" * 32
         from fastapi import HTTPException
 
-        with patch("subtitle_translator.crypto.decrypt", side_effect=ValueError("bad")):
+        with patch("subtitle_translator.server.crypto.decrypt", side_effect=ValueError("bad")):
             with pytest.raises(HTTPException) as exc_info:
                 routes._decrypt_api_key("enc:baddata")
             assert exc_info.value.status_code == 400
@@ -176,7 +176,7 @@ class TestDecryptApiKey:
     def test_successful_decryption(self):
         """Successful decryption returns decrypted key."""
         routes._crypto_key = b"\x00" * 32
-        with patch("subtitle_translator.crypto.decrypt", return_value="sk-or-decrypted"):
+        with patch("subtitle_translator.server.crypto.decrypt", return_value="sk-or-decrypted"):
             result = routes._decrypt_api_key("enc:validdata")
         assert result == "sk-or-decrypted"
 
@@ -191,7 +191,7 @@ class TestHealthCheckFailure:
 
     def test_health_check_exception_returns_unhealthy(self, client, mock_settings):
         """When health_check() raises, status should be unhealthy."""
-        with patch("subtitle_translator.api.routes.get_translator") as mock_get:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_get:
             translator = AsyncMock()
             translator.health_check = AsyncMock(side_effect=RuntimeError("connection failed"))
             mock_get.return_value = translator
@@ -214,7 +214,7 @@ class TestServiceStatusHealthFailure:
 
     def test_service_status_health_check_exception(self, client, mock_settings):
         """When health_check() raises during /status, healthy should be False."""
-        with patch("subtitle_translator.api.routes.get_translator") as mock_get:
+        with patch("subtitle_translator.server.api.routes.get_translator") as mock_get:
             translator = AsyncMock()
             translator.health_check = AsyncMock(side_effect=RuntimeError("timeout"))
             mock_get.return_value = translator
@@ -482,7 +482,7 @@ class TestTestConnection:
             }
         }
 
-        with patch("subtitle_translator.crypto.decrypt", return_value="sk-or-decrypted"):
+        with patch("subtitle_translator.server.crypto.decrypt", return_value="sk-or-decrypted"):
             with patch("httpx.AsyncClient") as mock_httpx:
                 mock_client_instance = AsyncMock()
                 mock_client_instance.get = AsyncMock(return_value=mock_response)
@@ -505,7 +505,7 @@ class TestTestConnection:
         """When decryption fails, returns encryption error and null apiKey."""
         routes._crypto_key = b"\x00" * 32
 
-        with patch("subtitle_translator.crypto.decrypt", side_effect=ValueError("bad")):
+        with patch("subtitle_translator.server.crypto.decrypt", side_effect=ValueError("bad")):
             response = client.post(
                 "/api/v1/test",
                 json={"apiKey": "enc:baddata"},

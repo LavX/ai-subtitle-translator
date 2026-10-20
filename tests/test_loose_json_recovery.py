@@ -12,11 +12,11 @@ import json
 import httpx
 import pytest
 
-from subtitle_translator.api.models import SubtitleLine, TranslateContentRequest
-from subtitle_translator.config import Settings
+from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.core.translator import SubtitleTranslator
-from subtitle_translator.providers.openrouter import OpenRouterProvider
+from subtitle_translator.server.api.models import SubtitleLine, TranslateContentRequest
+from subtitle_translator.server.config import Settings
 
 BAD_LINE = "7"
 

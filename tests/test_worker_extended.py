@@ -4,12 +4,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from subtitle_translator.api.models import SubtitleLine
 from subtitle_translator.core.batch_processor import (
     BatchProgress,
 )
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
-from subtitle_translator.queue.worker import (
+from subtitle_translator.server.api.models import SubtitleLine
+from subtitle_translator.server.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.worker import (
     _extract_config_override_from_dict,
     process_content_translation_job,
     process_file_translation_job,
@@ -87,12 +87,12 @@ class TestContentJobConfigLogging:
         """Lines 56-62: safe_config masks keys containing 'key', 'secret', 'password'."""
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [SubtitleLine(position=1, line="Hola")]
 
                 job_id = await manager.submit_job(
@@ -111,7 +111,7 @@ class TestContentJobConfigLogging:
                 )
                 manager.set_job_processing(job_id)
 
-                with patch("subtitle_translator.queue.worker.logger") as mock_logger:
+                with patch("subtitle_translator.server.queue.worker.logger") as mock_logger:
                     await process_content_translation_job(manager, job_id, mock_translator)
 
                     # Verify info was called with the safe config (keys masked)
@@ -140,12 +140,12 @@ class TestContentJobReasoningAndProviderLogging:
         """Lines 82-85: reasoning config triggers info log."""
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [SubtitleLine(position=1, line="Hola")]
 
                 job_id = await manager.submit_job(
@@ -161,7 +161,7 @@ class TestContentJobReasoningAndProviderLogging:
                 )
                 manager.set_job_processing(job_id)
 
-                with patch("subtitle_translator.queue.worker.logger") as mock_logger:
+                with patch("subtitle_translator.server.queue.worker.logger") as mock_logger:
                     await process_content_translation_job(manager, job_id, mock_translator)
 
                     info_calls = [str(c) for c in mock_logger.info.call_args_list]
@@ -176,12 +176,12 @@ class TestContentJobReasoningAndProviderLogging:
         """Line 87: provider config triggers info log."""
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [SubtitleLine(position=1, line="Hola")]
 
                 job_id = await manager.submit_job(
@@ -197,7 +197,7 @@ class TestContentJobReasoningAndProviderLogging:
                 )
                 manager.set_job_processing(job_id)
 
-                with patch("subtitle_translator.queue.worker.logger") as mock_logger:
+                with patch("subtitle_translator.server.queue.worker.logger") as mock_logger:
                     await process_content_translation_job(manager, job_id, mock_translator)
 
                     info_calls = [str(c) for c in mock_logger.info.call_args_list]
@@ -214,12 +214,12 @@ class TestContentJobReasoningAndProviderLogging:
         """Lines 71-72: config_override exists but has no api_key, so job.api_key_override fills it."""
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [SubtitleLine(position=1, line="Hola")]
 
                 job_id = await manager.submit_job(
@@ -255,12 +255,12 @@ class TestContentJobProgressCallback:
         """Lines 97-112: progress_callback computes message and calls update_progress."""
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [SubtitleLine(position=1, line="Hola")]
 
                 job_id = await manager.submit_job(
@@ -300,12 +300,12 @@ class TestContentJobProgressCallback:
         """Progress callback message omits failed info when no failures."""
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [SubtitleLine(position=1, line="Hola")]
 
                 job_id = await manager.submit_job(
@@ -353,12 +353,12 @@ class TestContentJobPartialFailure:
             tokens=80,
         )
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [SubtitleLine(position=1, line="Hola")]
 
                 job_id = await manager.submit_job(
@@ -398,12 +398,12 @@ class TestContentJobPartialFailure:
             translations.append({"index": "99", "content": "Nadie"})
         mock_result = _partial_result(translations=translations)
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [
                     SubtitleLine(position=1, line="Hola"),
                     SubtitleLine(position=2, line="Mundo"),
@@ -448,12 +448,12 @@ class TestContentJobPartialFailure:
             ]
         )
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [
                     SubtitleLine(position=1, line="Hola"),
                     SubtitleLine(position=1, line="Hola"),
@@ -507,7 +507,7 @@ class TestFileJobConfigOverride:
         self._setup_srt_mocks(mock_translator)
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -538,7 +538,7 @@ class TestFileJobConfigOverride:
         self._setup_srt_mocks(mock_translator)
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -567,7 +567,7 @@ class TestFileJobConfigOverride:
         self._setup_srt_mocks(mock_translator)
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -586,7 +586,7 @@ class TestFileJobConfigOverride:
             )
             manager.set_job_processing(job_id)
 
-            with patch("subtitle_translator.queue.worker.logger") as mock_logger:
+            with patch("subtitle_translator.server.queue.worker.logger") as mock_logger:
                 await process_file_translation_job(manager, job_id, mock_translator)
 
                 info_calls = [str(c) for c in mock_logger.info.call_args_list]
@@ -601,7 +601,7 @@ class TestFileJobConfigOverride:
         self._setup_srt_mocks(mock_translator)
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -617,7 +617,7 @@ class TestFileJobConfigOverride:
             )
             manager.set_job_processing(job_id)
 
-            with patch("subtitle_translator.queue.worker.logger") as mock_logger:
+            with patch("subtitle_translator.server.queue.worker.logger") as mock_logger:
                 await process_file_translation_job(manager, job_id, mock_translator)
 
                 debug_calls = [str(c) for c in mock_logger.debug.call_args_list]
@@ -651,7 +651,7 @@ class TestFileJobRTL:
         mock_translator.settings.is_rtl_language = MagicMock(return_value=True)
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -703,7 +703,7 @@ class TestFileJobPartialFailure:
             tokens=60,
         )
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -740,7 +740,7 @@ class TestFileJobPartialFailure:
         mock_translator._srt_parser.compose.return_value = "partial translated content"
         mock_result = _partial_result(translations=[{"index": "1", "content": "Hola"}])
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -769,7 +769,7 @@ class TestFileJobPartialFailure:
         ]
         mock_result = _all_failed_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -815,7 +815,7 @@ class TestFileJobProgressCallback:
         self._setup_srt_mocks(mock_translator)
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -856,7 +856,7 @@ class TestFileJobProgressCallback:
         self._setup_srt_mocks(mock_translator)
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -912,7 +912,7 @@ class TestFileJobSplitLongSubtitles:
 
         mock_result = _successful_result()
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
@@ -999,12 +999,12 @@ class TestPartialCoverageWithRepeatedPositions:
         """Two lines at one position plus one untranslated line read 2/3, not 1/2."""
         mock_result = _partial_result(translations=[{"index": "1", "content": "Hola"}])
 
-        with patch("subtitle_translator.queue.worker.BatchProcessor") as MockBP:
+        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
             processor = AsyncMock()
             processor.process_all_batches = AsyncMock(return_value=mock_result)
             MockBP.return_value = processor
 
-            with patch("subtitle_translator.queue.worker.map_translations_to_lines") as mock_map:
+            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
                 mock_map.return_value = [
                     SubtitleLine(position=1, line="Hola"),
                     SubtitleLine(position=1, line="Hola"),

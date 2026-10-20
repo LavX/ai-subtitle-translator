@@ -6,16 +6,16 @@ import json
 import httpx
 import pytest
 
-from subtitle_translator import config
-from subtitle_translator.api import routes
-from subtitle_translator.api.models import ReasoningConfig, TranslationConfig
+from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core import translator as translator_module
 from subtitle_translator.core.batch_processor import BatchProcessor
-from subtitle_translator.main import app
-from subtitle_translator.providers.base import TranslationBatch
-from subtitle_translator.providers.openrouter import OpenRouterProvider
-from subtitle_translator.queue.job_manager import JobManager, JobStatus
-from subtitle_translator.queue.worker import job_worker_handler
+from subtitle_translator.core.provider import TranslationBatch
+from subtitle_translator.server import config
+from subtitle_translator.server.api import routes
+from subtitle_translator.server.api.models import ReasoningConfig, TranslationConfig
+from subtitle_translator.server.main import app
+from subtitle_translator.server.queue.job_manager import JobManager, JobStatus
+from subtitle_translator.server.queue.worker import job_worker_handler
 from tests.test_batch_reliability import response, settings
 
 
@@ -337,7 +337,7 @@ async def test_http_runtime_defaults_snapshot_running_and_queued_jobs(monkeypatc
 @pytest.mark.asyncio
 @pytest.mark.parametrize("field", ["requestTimeout", "request_timeout"])
 async def test_timeout_override_survives_file_config_and_reaches_http(field):
-    from subtitle_translator.queue.worker import _extract_config_override_from_dict
+    from subtitle_translator.server.queue.worker import _extract_config_override_from_dict
 
     observed = []
 
@@ -368,7 +368,7 @@ async def test_timeout_override_survives_file_config_and_reaches_http(field):
 async def test_job_start_persists_effective_model_before_provider_request(
     tmp_path, monkeypatch, file_job, override
 ):
-    from subtitle_translator.queue.job_store import JobStore
+    from subtitle_translator.server.queue.job_store import JobStore
 
     config.reset_settings()
     monkeypatch.setattr(config, "_settings", settings(openrouter_default_model="old/model"))

@@ -10,20 +10,20 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from subtitle_translator.api.models import ProviderConfig, TranslationConfig
-from subtitle_translator.config import Settings
+from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor
-from subtitle_translator.core.translator import SubtitleTranslator
-from subtitle_translator.providers.base import (
+from subtitle_translator.core.provider import (
     InvalidResponseError,
     ProviderTimeoutError,
     RateLimitError,
     TranslationBatch,
     TranslationProviderError,
 )
-from subtitle_translator.providers.openrouter import OpenRouterProvider
-from subtitle_translator.queue.job_manager import JobManager, JobStatus, JobType
-from subtitle_translator.queue.worker import (
+from subtitle_translator.core.translator import SubtitleTranslator
+from subtitle_translator.server.api.models import ProviderConfig, TranslationConfig
+from subtitle_translator.server.config import Settings
+from subtitle_translator.server.queue.job_manager import JobManager, JobStatus, JobType
+from subtitle_translator.server.queue.worker import (
     process_content_translation_job,
     process_file_translation_job,
 )
@@ -618,7 +618,7 @@ async def test_sanitized_routing_diagnostics_do_not_contain_ownership_or_context
 async def test_sync_operation_retains_one_identity_without_mutating_reused_options(
     environment, origin
 ):
-    from subtitle_translator.api.models import TranslateContentRequest
+    from subtitle_translator.server.api.models import TranslateContentRequest
 
     wire, provider, settings = environment
     model = "fixture/model:smartfast"
@@ -792,7 +792,7 @@ async def test_concurrent_content_and_file_jobs_balance_new_sessions_and_pin_bat
 async def test_recovered_job_keeps_identity_and_ignores_supplied_session_scope(
     environment, tmp_path, job_type, worker, caplog
 ):
-    from subtitle_translator.queue.job_store import JobStore
+    from subtitle_translator.server.queue.job_store import JobStore
 
     wire, provider, settings = environment
     wire.completion_gate = asyncio.Event()
@@ -992,7 +992,7 @@ async def test_real_failures_quarantine_endpoint_and_allow_bounded_failover(envi
 async def test_single_endpoint_cooldown_waits_then_retries_with_same_session(
     environment, monkeypatch, model, price
 ):
-    from subtitle_translator.providers import smartfast
+    from subtitle_translator.backends import smartfast
 
     wire, provider, settings = environment
     wire.endpoints = [endpoint("a", price)]
@@ -1024,7 +1024,7 @@ async def test_single_endpoint_cooldown_waits_then_retries_with_same_session(
 
 
 async def test_quarantine_wait_stops_at_existing_batch_deadline(environment, monkeypatch):
-    from subtitle_translator.providers import smartfast
+    from subtitle_translator.backends import smartfast
 
     wire, provider, settings = environment
     wire.endpoints = [endpoint("a")]
@@ -1061,7 +1061,7 @@ async def test_permanent_routing_rejection_reports_cause_without_retry_exhaustio
 
 
 async def test_free_endpoint_failure_never_falls_through_to_paid_endpoint(environment, monkeypatch):
-    from subtitle_translator.providers import smartfast
+    from subtitle_translator.backends import smartfast
 
     wire, provider, settings = environment
     wire.endpoints = [endpoint("a", 0), endpoint("paid", 0.1)]
@@ -1127,7 +1127,7 @@ async def test_a_route_that_cannot_take_a_budget_is_sent_none(environment):
 
 async def test_no_budget_is_sent_when_the_route_cannot_hold_the_reasoning(environment, caplog):
     """Trimming here would ask for a reply the thinking alone exhausts."""
-    from subtitle_translator.providers.openrouter import MAX_TOKENS_REASONING_MODELS
+    from subtitle_translator.backends.openrouter import MAX_TOKENS_REASONING_MODELS
 
     wire, provider, _ = environment
     _budget_aware(wire, ceiling=4096)

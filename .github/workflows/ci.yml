@@ -41,6 +41,6 @@ jobs:
           node-version: "24"
       - name: Check browser modules and archive helpers
         run: |
-          node --check src/subtitle_translator/static/app.js
-          node --check src/subtitle_translator/static/session.mjs
+          node --check src/subtitle_translator/server/static/app.js
+          node --check src/subtitle_translator/server/static/session.mjs
           node --test tests/ui/*.test.mjs
