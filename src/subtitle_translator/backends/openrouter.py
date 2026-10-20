@@ -30,7 +30,7 @@ from subtitle_translator.core.provider import (
 from subtitle_translator.server.config import Settings, get_settings
 
 if TYPE_CHECKING:
-    from subtitle_translator.server.api.models import TranslationConfig
+    from subtitle_translator.core.models import TranslationConfig
 
 logger = logging.getLogger(__name__)
 

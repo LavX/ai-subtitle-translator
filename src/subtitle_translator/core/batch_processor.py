@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from typing import Optional
 
+from subtitle_translator.core.models import TranslationConfig
 from subtitle_translator.core.provider import (
     InvalidResponseError,
     ProviderTimeoutError,
@@ -16,7 +17,6 @@ from subtitle_translator.core.provider import (
     TranslationProvider,
     TranslationProviderError,
 )
-from subtitle_translator.server.api.models import TranslationConfig
 from subtitle_translator.server.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from subtitle_translator.server.api.models import TranslationConfig
+    from subtitle_translator.core.models import TranslationConfig
 
 
 @dataclass

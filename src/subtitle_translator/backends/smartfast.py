@@ -20,8 +20,8 @@ from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field
 
+from subtitle_translator.core.models import SmartFastPolicy  # noqa: F401  (re-exported)
 from subtitle_translator.core.provider import TranslationProviderError
 from subtitle_translator.server.config import Settings
 
@@ -48,18 +48,6 @@ _PRICE_KEYS = frozenset(
     }
 )
 _WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
-
-
-class SmartFastPolicy(BaseModel):
-    """Opt-in routing controls; prices are USD per million tokens."""
-
-    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, frozen=True)
-
-    medianPremiumPercent: float = Field(default=50, ge=0, le=1000)
-    speedTolerancePercent: float = Field(default=20, ge=0, le=1000)
-    sparsePremiumMultiplier: float = Field(default=3, ge=1, le=100)
-    maxPromptPrice: float = Field(default=1, ge=0, le=1000)
-    maxCompletionPrice: float = Field(default=3, ge=0, le=1000)
 
 
 class SmartFastRoutingError(TranslationProviderError):
