@@ -42,7 +42,9 @@ class TestHealthEndpoint:
             assert response.status_code == 200
             data = response.json()
             assert data["status"] == "healthy"
-            assert data["version"] == "2.1.1"
+            from subtitle_translator import __version__
+
+            assert data["version"] == __version__
             assert data["openrouterConfigured"] is True
 
     def test_health_check_no_api_key(self, client):

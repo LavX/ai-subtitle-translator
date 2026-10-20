@@ -87,18 +87,10 @@ jobs:
           fi
           VERSION="${VERSION#v}"
 
-          # Build tags
-          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}"
-          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${VERSION}"
-          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHORT_SHA}"
-          TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:py${PYTHON_VER}${JIT_SUFFIX}"
-
-          if [ "${{ inputs.push_latest }}" == "true" ] || [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          fi
-
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          REGISTRY="${{ env.REGISTRY }}" IMAGE_NAME="${{ env.IMAGE_NAME }}" \
+          VERSION_INPUT="${{ inputs.version_tag }}" PUSH_LATEST="${{ inputs.push_latest }}" \
+          SHORT_SHA="$SHORT_SHA" PYTHON_VERSION="$PYTHON_VER" JIT_SUFFIX="$JIT_SUFFIX" \
+            bash scripts/image_tags.sh >> "$GITHUB_OUTPUT"
           echo "python_version=${PYTHON_VER}" >> $GITHUB_OUTPUT
           echo "jit_enabled=${JIT_ENABLED}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
@@ -137,13 +129,10 @@ jobs:
               curl \
               && rm -rf /var/lib/apt/lists/*
 
-          COPY requirements.txt .
-          RUN pip install --no-cache-dir --upgrade pip && \
-              pip install --no-cache-dir -r requirements.txt
-
-          COPY pyproject.toml .
+          COPY pyproject.toml README.md LICENSE ./
           COPY src/ ./src/
-          RUN pip install --no-cache-dir -e .
+          RUN pip install --no-cache-dir --upgrade pip && \
+              pip install --no-cache-dir ".[server]"
 
           RUN useradd --create-home --shell /bin/bash appuser && \
               mkdir -p /app/data && \

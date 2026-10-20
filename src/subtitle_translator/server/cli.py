@@ -33,14 +33,31 @@ def regenerate_key():
     print("Share this key with Bazarr for encrypted API key transport.")
 
 
+def serve(host: str | None, port: int | None) -> None:
+    """Run the HTTP service. Needs the [server] extra."""
+    import uvicorn
+
+    settings = get_settings()
+    uvicorn.run(
+        "subtitle_translator.main:app",
+        host=host or settings.host,
+        port=port or settings.port,
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI Subtitle Translator CLI")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("regenerate-key", help="Generate a new encryption key")
+    serve_parser = sub.add_parser("serve", help="Run the HTTP service")
+    serve_parser.add_argument("--host", default=None, help="Bind address (default: HOST setting)")
+    serve_parser.add_argument("--port", type=int, default=None, help="Port (default: PORT setting)")
 
     args = parser.parse_args()
     if args.command == "regenerate-key":
         regenerate_key()
+    elif args.command == "serve":
+        serve(args.host, args.port)
     else:
         parser.print_help()
 

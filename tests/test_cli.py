@@ -89,3 +89,25 @@ class TestMain:
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 2
+
+
+class TestServe:
+    def test_serve_uses_settings_defaults(self):
+        with patch("subtitle_translator.server.cli.get_settings") as mock_get, patch("uvicorn.run") as run:
+            settings = MagicMock()
+            settings.host = "127.0.0.1"
+            settings.port = 9999
+            mock_get.return_value = settings
+            with patch("sys.argv", ["ai-subtitle-translator", "serve"]):
+                main()
+        run.assert_called_once_with("subtitle_translator.main:app", host="127.0.0.1", port=9999)
+
+    def test_serve_flags_override_settings(self):
+        with patch("subtitle_translator.server.cli.get_settings") as mock_get, patch("uvicorn.run") as run:
+            settings = MagicMock()
+            settings.host = "127.0.0.1"
+            settings.port = 9999
+            mock_get.return_value = settings
+            with patch("sys.argv", ["ai-subtitle-translator", "serve", "--host", "0.0.0.0", "--port", "8765"]):
+                main()
+        run.assert_called_once_with("subtitle_translator.main:app", host="0.0.0.0", port=8765)

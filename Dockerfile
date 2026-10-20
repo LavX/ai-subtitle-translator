@@ -13,19 +13,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copy source code and project files
-COPY pyproject.toml .
+# Copy project files and install the package with the server extra
+COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
-
-# Install the package itself (makes subtitle_translator importable)
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir ".[server]"
 
 # Create data directory for persistence and non-root user
 RUN useradd --create-home --shell /bin/bash appuser && \

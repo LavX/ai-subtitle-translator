@@ -39,6 +39,15 @@ The installer detects containers named `bazarr` or `bazarr-ui-test`, configures 
 
 On a shared custom Docker network, use `http://ai-subtitle-translator:8765`. Across separate bridge networks, use the Docker host's IP and published port. `localhost` works only when Bazarr+ shares the host network or runs directly on that host. See the [Bazarr+ Setup Guide](docs/BAZARR-SETUP.md).
 
+### As a library
+
+```bash
+pip install lavx-ai-subtitle-translator            # the core and the built-in back ends
+pip install "lavx-ai-subtitle-translator[server]"  # plus the HTTP service and GUI
+```
+
+The core never reads environment variables: build a `CoreSettings` and pass it in.
+
 ### Docker
 
 ```bash
@@ -62,13 +71,13 @@ Service runs at `http://localhost:8765`. Interactive docs at `/docs`. The named 
 git clone https://github.com/LavX/ai-subtitle-translator.git
 cd ai-subtitle-translator
 python -m venv venv && source venv/bin/activate
-pip install -e .
+pip install -e ".[server]"
 export OPENROUTER_API_KEY=sk-or-...
 export OPENROUTER_DEFAULT_MODEL=openai/gpt-5.6-luna:smartfast
 mkdir -p data
 export DB_PATH="$PWD/data/jobs.db"
 export ENCRYPTION_KEY_FILE="$PWD/data/encryption.key"
-uvicorn subtitle_translator.main:app --host 0.0.0.0 --port 8765
+ai-subtitle-translator serve --host 0.0.0.0 --port 8765
 ```
 
 The source-build examples select Luna with local `:smartfast` routing. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
@@ -400,8 +409,8 @@ The table lists application defaults. For manual runs, most settings load from e
 | `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed CORS origins |
 | `ADMIN_API_KEY` | *(empty)* | Required as `X-Admin-Key` header for PUT /config when set |
 | `UI_ENABLED` | `false` | Serve the optional web UI at `/ui/` |
-| `HOST` | `0.0.0.0` | Bind address when launched with `python -m subtitle_translator.main` |
-| `PORT` | `8765` | Port when launched with `python -m subtitle_translator.main` |
+| `HOST` | `0.0.0.0` | Bind address when launched with `ai-subtitle-translator serve` or `python -m subtitle_translator.main` |
+| `PORT` | `8765` | Port when launched with `ai-subtitle-translator serve` or `python -m subtitle_translator.main` |
 | `ENCRYPTION_ENABLED` | `true` | Enable AES-256-GCM API key encryption |
 | `ENCRYPTION_STRICT` | `false` | When true, reject plaintext API keys (require enc: prefix) |
 | `ENCRYPTION_KEY` | *(auto-generated)* | 64-char hex AES-256 key. Overrides key file when set |
@@ -516,29 +525,13 @@ This starts a temporary local service using the real API and job worker with syn
 
 ```
 src/subtitle_translator/
-  main.py                 # FastAPI application
-  config.py               # Settings from environment variables
-  crypto.py               # AES-256-GCM encryption and key management
-  cli.py                  # CLI commands (key regeneration)
-  web.py                  # Optional static UI routes
-  gui.py                  # App-owned browser commands and live job updates
-  ui_api.py               # OpenRouter key authentication and GUI job ownership
-  static/                 # Browser workspace and ZIP download helper
-  api/
-    routes.py             # REST API endpoints
-    models.py             # Pydantic request/response models
-  core/
-    translator.py         # Translation orchestration
-    srt_parser.py         # SRT file parsing and composing
-    batch_processor.py    # Parallel batch processing with adaptive retry
-    batch_sizing.py       # Per-model batch size resolution
-  providers/
-    base.py               # Abstract translation provider interface
-    openrouter.py         # OpenRouter API implementation
-  queue/
-    job_manager.py        # Async job queue with progress tracking
-    job_store.py          # SQLite persistence layer
-    worker.py             # Background job worker
+  main.py, cli.py         # shims for the documented entry points
+  _vendor/srt.py          # vendored srt 3.5.3 (MIT)
+  core/                   # importable without the server: models, settings, errors,
+                          # batch processing, the back-end interface, the engine
+  backends/               # built-in back ends: OpenRouter, the OpenAI-compatible client, Gemini
+  server/                 # the standalone service: FastAPI app, config, crypto, CLI,
+    api/  queue/  static/ # job queue, browser GUI
 ```
 
 ## License
