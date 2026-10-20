@@ -10,11 +10,11 @@ from subtitle_translator.core.batch_processor import (
 )
 from subtitle_translator.core.translator import (
     SubtitleTranslator,
-    get_translator,
     map_translations_to_lines,
 )
 from subtitle_translator.server.api.models import TranslateContentRequest, TranslationConfig
 from subtitle_translator.server.queue.job_manager import JobManager, JobType
+from subtitle_translator.server.runtime import get_translator
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ async def process_content_translation_job(
         config_override = (config_override or TranslationConfig()).for_operation(job_id)
 
         # Create batch processor
-        processor = BatchProcessor(translator.provider, translator.settings)
+        processor = BatchProcessor(translator.provider, translator.settings, translator.resolver)
 
         # Define progress callback
         def progress_callback(progress: BatchProgress) -> None:
@@ -302,7 +302,7 @@ async def process_file_translation_job(
         config_override = (config_override or TranslationConfig()).for_operation(job_id)
 
         # Create batch processor
-        processor = BatchProcessor(translator.provider, translator.settings)
+        processor = BatchProcessor(translator.provider, translator.settings, translator.resolver)
 
         # Define progress callback
         def progress_callback(progress: BatchProgress) -> None:

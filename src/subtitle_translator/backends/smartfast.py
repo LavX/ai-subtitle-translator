@@ -23,7 +23,7 @@ import httpx
 
 from subtitle_translator.core.models import SmartFastPolicy  # noqa: F401  (re-exported)
 from subtitle_translator.core.provider import TranslationProviderError
-from subtitle_translator.server.config import Settings
+from subtitle_translator.core.settings import CoreSettings
 
 CATALOG_TTL = 300
 STATE_TTL = 1800
@@ -340,7 +340,7 @@ class RoutingDecision:
 class SmartFastRouter:
     """Choose a safe provider pool using the caller's authenticated HTTP client."""
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: CoreSettings):
         self.settings = settings
         self._catalogs: OrderedDict[str, _Catalog] = OrderedDict()
         self._refreshes: dict[str, asyncio.Task[_Catalog]] = {}

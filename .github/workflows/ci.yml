@@ -32,6 +32,9 @@ jobs:
       - name: Run ruff lint
         run: ruff check src/ tests/
 
+      - name: Check package boundaries
+        run: lint-imports
+
   web-ui:
     runs-on: ubuntu-latest
     steps:

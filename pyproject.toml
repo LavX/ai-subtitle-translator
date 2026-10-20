@@ -47,6 +47,7 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
+    "import-linter>=2.15",
 ]
 
 [project.urls]
@@ -95,3 +96,22 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+
+[tool.importlinter]
+root_package = "subtitle_translator"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Package direction: server on top, then backends, then core"
+type = "layers"
+layers = [
+    "subtitle_translator.server",
+    "subtitle_translator.backends",
+    "subtitle_translator.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "The core and the back ends never load server libraries"
+type = "forbidden"
+source_modules = ["subtitle_translator.core", "subtitle_translator.backends"]
+forbidden_modules = ["fastapi", "starlette", "pydantic_settings", "dotenv", "cryptography", "uvicorn"]

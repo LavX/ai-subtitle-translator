@@ -8,17 +8,9 @@ import pytest
 
 from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor
-from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.core.provider import TranslationBatch
 from subtitle_translator.server.api.models import TranslationConfig
 from subtitle_translator.server.config import Settings
-
-
-@pytest.fixture(autouse=True)
-def reset_sizing():
-    get_batch_size_resolver().reset()
-    yield
-    get_batch_size_resolver().reset()
 
 
 def response(lines, tokens=10):
@@ -56,8 +48,6 @@ async def test_retry_resize_preserves_partial_usage_and_consumed_retry_budget(
     resized_request_fails,
 ):
     model = "test/retry-resize-accounting"
-    resolver = get_batch_size_resolver()
-    resolver.record_failure(model, 100)
     waiting = asyncio.Event()
     calls = []
     billed_tokens = []
@@ -85,6 +75,8 @@ async def test_retry_resize_preserves_partial_usage_and_consumed_retry_budget(
     provider = provider_with_transport(send)
     provider.settings.retry_delay = 0.05
     processor = BatchProcessor(provider, provider.settings)
+    resolver = processor.resolver
+    resolver.record_failure(model, 100)
 
     def activity(message):
         if "retry 1 after incomplete or invalid response" in message:
@@ -143,10 +135,6 @@ async def test_undispatched_roots_do_not_inherit_a_limit_from_a_timeout(
     stalled root used to cap every undispatched root at half size for nothing."""
     calls = []
     completed = []
-    resolver = get_batch_size_resolver()
-    # The batch size is forced below and then compared against what the resolver
-    # would allow, so the output budget must not cap the resolver underneath it.
-    monkeypatch.setattr(resolver._settings, "openrouter_max_tokens", 0)
     model = "test/dispatch-adaptation"
 
     async def send(request):
@@ -169,8 +157,13 @@ async def test_undispatched_roots_do_not_inherit_a_limit_from_a_timeout(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
     provider._model_params_fetched = True
+    processor = BatchProcessor(provider, provider.settings)
+    resolver = processor.resolver
+    # The batch size is forced below and then compared against what the resolver
+    # would allow, so the output budget must not cap the resolver underneath it.
+    monkeypatch.setattr(resolver._settings, "openrouter_max_tokens", 0)
     try:
-        result = await BatchProcessor(provider, provider.settings).process_all_batches(
+        result = await processor.process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(200)],
             "en",
             "hu",
@@ -207,8 +200,9 @@ async def test_successful_smaller_requests_allow_later_roots_to_grow():
         return response([{**line, "content": "translated"} for line in lines])
 
     provider = provider_with_transport(send)
+    processor = BatchProcessor(provider, provider.settings)
     try:
-        result = await BatchProcessor(provider, provider.settings).process_all_batches(
+        result = await processor.process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(300)],
             "en",
             "hu",
@@ -252,8 +246,6 @@ async def test_explicit_initial_batch_size_is_not_replaced_by_metadata_or_defaul
 @pytest.mark.asyncio
 async def test_pending_children_observe_a_limit_lowered_by_another_batch():
     model = "test/shared-cap"
-    resolver = get_batch_size_resolver()
-    resolver.record_failure(model, 100)
     first_entered = asyncio.Event()
     release_first = asyncio.Event()
     calls = []
@@ -272,6 +264,8 @@ async def test_pending_children_observe_a_limit_lowered_by_another_batch():
 
     provider = provider_with_transport(send)
     processor = BatchProcessor(provider, provider.settings)
+    resolver = processor.resolver
+    resolver.record_failure(model, 100)
     task = asyncio.create_task(
         processor.process_batch(
             TranslationBatch(
@@ -319,7 +313,6 @@ async def test_pending_children_observe_a_limit_lowered_by_another_batch():
 @pytest.mark.asyncio
 async def test_preemptive_children_recover_once_and_retain_partial_output_and_usage():
     model = "test/preemptive-partial"
-    get_batch_size_resolver().record_failure(model, 100)
     calls = []
 
     async def send(request):
@@ -341,8 +334,10 @@ async def test_preemptive_children_recover_once_and_retain_partial_output_and_us
         return response([{**line, "content": "translated"} for line in lines])
 
     provider = provider_with_transport(send)
+    processor = BatchProcessor(provider, provider.settings)
+    processor.resolver.record_failure(model, 100)
     try:
-        result = await BatchProcessor(provider, provider.settings).process_all_batches(
+        result = await processor.process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(100)],
             "en",
             "hu",
@@ -368,7 +363,6 @@ async def test_preemptive_children_recover_once_and_retain_partial_output_and_us
 @pytest.mark.asyncio
 async def test_preemptive_children_and_recovery_share_the_root_timeout_budget():
     model = "test/preemptive-budget"
-    get_batch_size_resolver().record_failure(model, 100)
     calls = []
     active = set()
 
@@ -386,10 +380,12 @@ async def test_preemptive_children_and_recovery_share_the_root_timeout_budget():
             active.remove(task)
 
     provider = provider_with_transport(send, request_timeout=5)
+    processor = BatchProcessor(provider, provider.settings)
+    processor.resolver.record_failure(model, 100)
     try:
         start = asyncio.get_running_loop().time()
         result = await asyncio.wait_for(
-            BatchProcessor(provider, provider.settings).process_all_batches(
+            processor.process_all_batches(
                 [{"index": str(i), "content": "source"} for i in range(100)],
                 "en",
                 "hu",
@@ -416,7 +412,6 @@ async def test_preemptive_children_and_recovery_share_the_root_timeout_budget():
 @pytest.mark.asyncio
 async def test_cancelling_a_preemptive_child_finishes_provider_cleanup():
     model = "test/preemptive-cancellation"
-    get_batch_size_resolver().record_failure(model, 100)
     entered = asyncio.Event()
     active = set()
     calls = []
@@ -435,8 +430,10 @@ async def test_cancelling_a_preemptive_child_finishes_provider_cleanup():
             active.remove(task)
 
     provider = provider_with_transport(send)
+    processor = BatchProcessor(provider, provider.settings)
+    processor.resolver.record_failure(model, 100)
     task = asyncio.create_task(
-        BatchProcessor(provider, provider.settings).process_all_batches(
+        processor.process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(100)],
             "en",
             "hu",

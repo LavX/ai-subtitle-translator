@@ -27,7 +27,7 @@ from subtitle_translator.core.provider import (
     TranslationProviderError,
     TranslationResult,
 )
-from subtitle_translator.server.config import Settings, get_settings
+from subtitle_translator.core.settings import CoreSettings
 
 if TYPE_CHECKING:
     from subtitle_translator.core.models import TranslationConfig
@@ -473,14 +473,14 @@ def _route_refused_the_request(error: "TranslationProviderError") -> bool:
 class OpenRouterProvider(TranslationProvider):
     """Translation provider using OpenRouter API."""
 
-    def __init__(self, settings: Settings | None = None):
+    def __init__(self, settings: CoreSettings | None = None):
         """
         Initialize OpenRouter provider.
 
         Args:
-            settings: Optional settings instance. Uses global settings if not provided.
+            settings: Optional settings instance. Uses CoreSettings defaults if not provided.
         """
-        self.settings = settings or get_settings()
+        self.settings = settings or CoreSettings()
         self._client: httpx.AsyncClient | None = None
         self._smartfast_router = SmartFastRouter(self.settings)
         self._model_params_cache: dict[str, list[str]] = {}
@@ -508,7 +508,7 @@ class OpenRouterProvider(TranslationProvider):
             )
         return self._client
 
-    def with_settings(self, settings: Settings) -> "OpenRouterProvider":
+    def with_settings(self, settings: CoreSettings) -> "OpenRouterProvider":
         """Share the connection pool while preserving each job's settings snapshot."""
         client = self.client
         snapshot = copy(self)
@@ -1894,7 +1894,3 @@ class OpenRouterProvider(TranslationProvider):
             position = end
         return found
 
-
-async def get_openrouter_provider() -> OpenRouterProvider:
-    """Factory function to get an OpenRouter provider instance."""
-    return OpenRouterProvider()

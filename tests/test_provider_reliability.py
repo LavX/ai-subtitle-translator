@@ -7,10 +7,10 @@ import httpx
 import pytest
 
 from subtitle_translator.backends.openrouter import OpenRouterProvider
-from subtitle_translator.core import translator as translator_module
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.provider import TranslationBatch
 from subtitle_translator.server import config
+from subtitle_translator.server import runtime as translator_module
 from subtitle_translator.server.api import routes
 from subtitle_translator.server.api.models import ReasoningConfig, TranslationConfig
 from subtitle_translator.server.main import app
@@ -214,9 +214,13 @@ async def test_catalog_effort_preserves_explicit_thinking_variant_at_http(
 async def test_http_runtime_defaults_snapshot_running_and_queued_jobs(monkeypatch):
     config.reset_settings()
     initial = settings(openrouter_default_model="old/model", openrouter_temperature=0.2)
+    # This test is about the runtime settings snapshot, not the output-budget cap:
+    # without this the first batch is 80 lines and each job sends three requests.
+    initial.openrouter_max_tokens = 0
     monkeypatch.setattr(config, "_settings", initial)
-    monkeypatch.setattr(translator_module, "_translator_instance", None)
+    monkeypatch.setattr(translator_module, "_translator", None)
     monkeypatch.setattr(translator_module, "_translator_lock", asyncio.Lock())
+    monkeypatch.setattr(translator_module, "_translator_source", None)
     manager = JobManager(max_concurrent=1)
     manager.set_worker_handler(job_worker_handler)
     monkeypatch.setattr(routes, "job_manager", manager)
@@ -372,8 +376,9 @@ async def test_job_start_persists_effective_model_before_provider_request(
 
     config.reset_settings()
     monkeypatch.setattr(config, "_settings", settings(openrouter_default_model="old/model"))
-    monkeypatch.setattr(translator_module, "_translator_instance", None)
+    monkeypatch.setattr(translator_module, "_translator", None)
     monkeypatch.setattr(translator_module, "_translator_lock", asyncio.Lock())
+    monkeypatch.setattr(translator_module, "_translator_source", None)
     manager = JobManager(max_concurrent=1)
     store = JobStore(str(tmp_path / "models.db"))
     manager.set_store(store)

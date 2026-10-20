@@ -4,10 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from subtitle_translator.core.batch_processor import (
-    BatchProcessor,
-    get_batch_processor,
-)
+from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.provider import (
     InvalidResponseError,
     TranslationBatch,
@@ -368,9 +365,6 @@ class TestFailedBatchUsageIsCounted:
 
     @pytest.mark.asyncio
     async def test_exhausted_floor_batch_counts_in_process_all_batches(self):
-        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
-
-        get_batch_size_resolver().reset()
         processor = BatchProcessor(
             self._partial_provider(), _make_settings(batch_size=5, max_retries=1, retry_delay=0.001)
         )
@@ -385,9 +379,6 @@ class TestFailedBatchUsageIsCounted:
 
     @pytest.mark.asyncio
     async def test_exhausted_floor_batch_counts_in_stream(self):
-        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
-
-        get_batch_size_resolver().reset()
         processor = BatchProcessor(
             self._partial_provider(), _make_settings(batch_size=5, max_retries=1, retry_delay=0.001)
         )
@@ -405,9 +396,6 @@ class TestFailedBatchUsageIsCounted:
 
     @pytest.mark.asyncio
     async def test_failed_adaptive_retry_keeps_sub_batch_usage(self):
-        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
-
-        get_batch_size_resolver().reset()
 
         async def _side_effect(batch, **kwargs):
             if len(batch.lines) > 5:
@@ -548,9 +536,6 @@ class TestUsageSurvivesMixedOutcomes:
 
     @pytest.mark.asyncio
     async def test_partial_top_level_reply_counts_after_the_adaptive_split(self):
-        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
-
-        get_batch_size_resolver().reset()
 
         async def _side_effect(batch, **kwargs):
             if len(batch.lines) > 5:
@@ -763,12 +748,3 @@ class TestProcessBatchesStream:
         assert results[0][0].success is False
         assert results[0][1].failed_batches == 1
         assert results[1][0].success is True
-
-
-class TestGetBatchProcessor:
-    """Line 575: get_batch_processor factory."""
-
-    def test_returns_processor_instance(self):
-        provider = AsyncMock()
-        processor = get_batch_processor(provider)
-        assert isinstance(processor, BatchProcessor)

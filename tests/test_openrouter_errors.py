@@ -9,7 +9,6 @@ import pytest
 
 from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor
-from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.core.provider import (
     AuthenticationError,
     InvalidResponseError,
@@ -104,8 +103,6 @@ async def test_retry_after_is_safe_and_supports_http_dates(header):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("code", [429, 503, 401, 402])
 async def test_embedded_provider_error_preserves_batch_size_and_known_cost(code):
-    resolver = get_batch_size_resolver()
-    resolver.reset()
     provider = OpenRouterProvider(settings())
     provider._model_params_fetched = True
     sent = []
@@ -128,8 +125,10 @@ async def test_embedded_provider_error_preserves_batch_size_and_known_cost(code)
         transport=httpx.MockTransport(send), base_url="https://synthetic.invalid"
     )
     messages = []
+    processor = BatchProcessor(provider, provider.settings)
+    resolver = processor.resolver
     try:
-        result = await BatchProcessor(provider, provider.settings).process_all_batches(
+        result = await processor.process_all_batches(
             [{"index": str(i), "content": "source"} for i in range(10)],
             "en",
             "hu",
@@ -148,7 +147,6 @@ async def test_embedded_provider_error_preserves_batch_size_and_known_cost(code)
         assert not any("invalid response" in message for message in messages)
     finally:
         await provider.close()
-        resolver.reset()
 
 
 @pytest.mark.asyncio

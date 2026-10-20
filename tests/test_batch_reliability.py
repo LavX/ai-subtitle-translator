@@ -8,7 +8,6 @@ import pytest
 
 from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor
-from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.core.provider import TranslationBatch
 from subtitle_translator.core.translator import SubtitleTranslator
 from subtitle_translator.server.config import Settings
@@ -36,15 +35,10 @@ def settings(**kwargs):
         max_retries=1,
         retry_delay=0,
         parallel_batches_per_job=1,
+        # These cases count batches; the output-budget cap has its own file.
+        openrouter_max_tokens=0,
         **kwargs,
     )
-
-
-@pytest.fixture(autouse=True)
-def reset_sizing():
-    get_batch_size_resolver().reset()
-    yield
-    get_batch_size_resolver().reset()
 
 
 @pytest.mark.asyncio
@@ -587,7 +581,6 @@ async def test_synchronous_timeout_error_preserves_stop_summary(
             assert "translated" in output
             assert "source 101" in output
         else:
-            get_batch_size_resolver().reset()
 
             async def get_translator():
                 return translator

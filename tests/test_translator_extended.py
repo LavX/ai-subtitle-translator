@@ -9,16 +9,13 @@ from subtitle_translator.core.batch_processor import (
     BatchProgress,
     BatchResult,
 )
-from subtitle_translator.core.translator import (
-    SubtitleTranslator,
-    close_translator,
-    get_translator,
-)
+from subtitle_translator.core.translator import SubtitleTranslator
 from subtitle_translator.server.api.models import (
     SubtitleLine,
     TranslateContentRequest,
     TranslationConfig,
 )
+from subtitle_translator.server.runtime import close_translator, get_translator
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -74,19 +71,12 @@ How are you?
 
 
 class TestProviderLazyCreation:
-    def test_provider_creates_openrouter_when_none(self):
-        """Accessing .provider without injecting one creates OpenRouterProvider."""
-        settings = _make_settings()
-        translator = SubtitleTranslator(provider=None, settings=settings)
+    def test_provider_without_one_says_so(self):
+        """A translator built without a provider refuses to invent one."""
+        translator = SubtitleTranslator(provider=None, settings=_make_settings())
 
-        with patch("subtitle_translator.core.translator.OpenRouterProvider") as MockOR:
-            mock_instance = MagicMock()
-            MockOR.return_value = mock_instance
-
-            result = translator.provider
-
-            MockOR.assert_called_once_with(settings)
-            assert result is mock_instance
+        with pytest.raises(RuntimeError, match="needs a provider"):
+            _ = translator.provider
 
     def test_provider_reuses_existing(self):
         """If a provider was injected, the property returns it directly."""
@@ -379,27 +369,28 @@ class TestCloseTranslator:
     @pytest.mark.asyncio
     async def test_close_translator_resets_instance(self):
         """close_translator() should close the provider and clear the global."""
-        import subtitle_translator.core.translator as mod
+        import subtitle_translator.server.runtime as mod
 
         mock_translator = AsyncMock(spec=SubtitleTranslator)
         mock_translator.close = AsyncMock()
 
         # Inject a fake global instance
-        mod._translator_instance = mock_translator
+        mod._translator = mock_translator
+        mod._translator_source = MagicMock()
 
         await close_translator()
 
         mock_translator.close.assert_awaited_once()
-        assert mod._translator_instance is None
+        assert mod._translator is None and mod._translator_source is None
 
     @pytest.mark.asyncio
     async def test_close_translator_noop_when_none(self):
         """close_translator() is safe to call when no instance exists."""
-        import subtitle_translator.core.translator as mod
+        import subtitle_translator.server.runtime as mod
 
-        mod._translator_instance = None
+        mod._translator = None
         await close_translator()  # should not raise
-        assert mod._translator_instance is None
+        assert mod._translator is None
 
 
 # ---------------------------------------------------------------------------
@@ -453,11 +444,13 @@ class TestGetTranslator:
     @pytest.mark.asyncio
     async def test_get_translator_creates_instance(self):
         """get_translator() creates a SubtitleTranslator when none exists."""
-        import subtitle_translator.core.translator as mod
+        import subtitle_translator.server.runtime as mod
 
-        mod._translator_instance = None
+        mod._translator = None
+        mod._translator_source = None
 
-        with patch("subtitle_translator.core.translator.SubtitleTranslator") as MockST:
+        with patch("subtitle_translator.server.runtime.SubtitleTranslator") as MockST, \
+                patch("subtitle_translator.server.runtime.OpenRouterProvider"):
             mock_inst = MagicMock()
             MockST.return_value = mock_inst
 
@@ -467,19 +460,21 @@ class TestGetTranslator:
             assert result is mock_inst
 
         # Clean up
-        mod._translator_instance = None
+        mod._translator = None
+        mod._translator_source = None
 
     @pytest.mark.asyncio
     async def test_get_translator_returns_existing(self):
         """get_translator() returns the existing instance if already set."""
-        import subtitle_translator.core.translator as mod
+        import subtitle_translator.server.runtime as mod
 
         sentinel = MagicMock()
-        sentinel.settings = mod.get_settings()
-        mod._translator_instance = sentinel
+        mod._translator = sentinel
+        mod._translator_source = mod.get_settings()
 
         result = await get_translator()
         assert result is sentinel
 
         # Clean up
-        mod._translator_instance = None
+        mod._translator = None
+        mod._translator_source = None

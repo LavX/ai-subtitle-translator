@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from typing import Optional
 
+from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, BatchSizeResolver
 from subtitle_translator.core.models import TranslationConfig
 from subtitle_translator.core.provider import (
     InvalidResponseError,
@@ -17,7 +18,7 @@ from subtitle_translator.core.provider import (
     TranslationProvider,
     TranslationProviderError,
 )
-from subtitle_translator.server.config import Settings, get_settings
+from subtitle_translator.core.settings import CoreSettings
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,8 @@ class BatchProcessor:
     def __init__(
         self,
         provider: TranslationProvider,
-        settings: Settings | None = None,
+        settings: CoreSettings | None = None,
+        resolver: BatchSizeResolver | None = None,
     ):
         """
         Initialize batch processor.
@@ -138,9 +140,14 @@ class BatchProcessor:
         Args:
             provider: Translation provider to use
             settings: Optional settings instance
+            resolver: Optional batch size resolver shared with the owner of the settings
         """
         self.provider = provider
-        self.settings = settings or get_settings()
+        self.settings = settings or CoreSettings()
+        # Learned batch sizes are evidence about one model under one set of limits, so a
+        # resolver belongs to whoever owns those limits: a translator, or an engine
+        # connection. Nothing is shared through a module global.
+        self.resolver = resolver or BatchSizeResolver(self.settings)
 
     def _model_output_ceiling(self, model: str) -> int | None:
         """What the catalog says this model will write, when the provider knows.
@@ -186,10 +193,9 @@ class BatchProcessor:
         if batch_size:
             size = batch_size
         elif model:
-            from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 
             metadata = self.provider.get_model_metadata(model)
-            resolver = get_batch_size_resolver()
+            resolver = self.resolver
             size = resolver.resolve(
                 model,
                 context_length=metadata.get("context_length") if metadata else None,
@@ -234,7 +240,6 @@ class BatchProcessor:
         Returns:
             BatchResult with translations or error
         """
-        from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, get_batch_size_resolver
 
         if config_override is None or config_override._smartfast_session_id is None:
             config_override = (config_override or TranslationConfig()).for_operation()
@@ -304,7 +309,7 @@ class BatchProcessor:
             # it on earlier sub-batches, so it is recorded like any other failure. A rate
             # limit, an authentication error or a local exception says nothing about the
             # size; those only interrupt the streak that grows the size back.
-            resolver = get_batch_size_resolver()
+            resolver = self.resolver
             if size_related and _is_adaptive_retry and len(batch.lines) > MIN_BATCH_SIZE:
                 resolver.record_failure(model_id, len(batch.lines))
             else:
@@ -325,7 +330,7 @@ class BatchProcessor:
             # Backoff yields to other roots, which may lower the learned cap.
             # Split only to a strictly smaller size and keep the spent retry budget.
             if _check_learned_size or retries:
-                learned_size = get_batch_size_resolver().limit_planned_size(
+                learned_size = self.resolver.limit_planned_size(
                     model_id, len(batch.lines)
                 )
                 if learned_size < len(batch.lines):
@@ -436,7 +441,7 @@ class BatchProcessor:
                         )
                     )
 
-                get_batch_size_resolver().record_success(model_id, len(batch.lines))
+                self.resolver.record_success(model_id, len(batch.lines))
 
                 return BatchResult(
                     batch_index=batch_index,
@@ -662,14 +667,13 @@ class BatchProcessor:
         The size that failed is the whole batch; the lines sent again can be a
         subset of it when the failed reply answered some of them.
         """
-        from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, get_batch_size_resolver
 
         model_id = (
             (config_override.model if config_override and config_override.model else None)
             or model
             or self.settings.openrouter_default_model
         )
-        resolver = get_batch_size_resolver()
+        resolver = self.resolver
         if _record_size_failure:
             new_size = resolver.record_failure(model_id, len(batch.lines))
         else:
@@ -726,14 +730,13 @@ class BatchProcessor:
         _prior_attempts: int = 0,
     ) -> BatchResult:
         """Dispatch smaller requests within the original root's budget and result."""
-        from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 
         model_id = (
             (config_override.model if config_override and config_override.model else None)
             or model
             or self.settings.openrouter_default_model
         )
-        resolver = get_batch_size_resolver()
+        resolver = self.resolver
 
         all_translations: list[dict[str, str]] = []
         total_tokens = 0
@@ -1120,7 +1123,3 @@ class BatchProcessor:
 
             yield result, progress
 
-
-def get_batch_processor(provider: TranslationProvider) -> BatchProcessor:
-    """Factory function to get a batch processor instance."""
-    return BatchProcessor(provider)

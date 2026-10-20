@@ -8,7 +8,6 @@ from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.batch_sizing import (
     MIN_BATCH_SIZE,
     BatchSizeResolver,
-    get_batch_size_resolver,
 )
 from subtitle_translator.core.provider import (
     InvalidResponseError,
@@ -318,8 +317,7 @@ class TestBatchProcessorAdaptiveSizing:
         self.settings.retry_delay = 0.01
         self.settings.openrouter_default_model = "default/model"
         self.processor = BatchProcessor(self.provider, self.settings)
-        get_batch_size_resolver().reset()
-        get_batch_size_resolver()._settings = self.settings
+        self.resolver = self.processor.resolver
 
     def test_create_batches_with_model_uses_resolver(self):
         """When model is provided, batch size comes from resolver."""
@@ -364,8 +362,7 @@ class TestAdaptiveRetry:
         self.settings.retry_delay = 0.01
         self.settings.openrouter_default_model = "test/model"
         self.processor = BatchProcessor(self.provider, self.settings)
-        get_batch_size_resolver().reset()
-        get_batch_size_resolver()._settings = self.settings
+        self.resolver = self.processor.resolver
 
     @pytest.mark.asyncio
     async def test_invalid_response_triggers_adaptive_retry(self):
@@ -394,12 +391,12 @@ class TestAdaptiveRetry:
 
         assert result.success is True
         assert len(result.translations) == 10
-        assert get_batch_size_resolver()._learned_sizes["test/model"] == 5
+        assert self.resolver._learned_sizes["test/model"] == 5
 
     @pytest.mark.asyncio
     async def test_invalid_response_at_floor_resets_success_streak(self):
         """A failure that cannot be split any further must not count towards growth."""
-        resolver = get_batch_size_resolver()
+        resolver = self.resolver
         resolver.record_failure("test/model", 10)
         for _ in range(2):
             resolver.record_success("test/model", 5)
@@ -423,7 +420,7 @@ class TestAdaptiveRetry:
     @pytest.mark.asyncio
     async def test_failed_adaptive_sub_batch_pulls_the_cache_below_its_size(self):
         """Three sub-batch successes grow the cache; a later sub-batch failure must not leave it there."""
-        resolver = get_batch_size_resolver()
+        resolver = self.resolver
         resolver.record_failure("test/model", 48)
         resolver.record_failure("test/model", 24)
         assert resolver.resolve("test/model") == 12
@@ -459,7 +456,7 @@ class TestAdaptiveRetry:
     @pytest.mark.asyncio
     async def test_substituted_index_is_not_a_success(self):
         """The right number of entries with a made-up index leaves a line untranslated."""
-        resolver = get_batch_size_resolver()
+        resolver = self.resolver
         resolver.record_failure("test/model", 10)
         assert resolver.resolve("test/model") == 5
 
@@ -485,7 +482,7 @@ class TestAdaptiveRetry:
     @pytest.mark.asyncio
     async def test_unrelated_error_on_a_sub_batch_does_not_shrink_the_size(self):
         """An authentication error says nothing about the batch size."""
-        resolver = get_batch_size_resolver()
+        resolver = self.resolver
         resolver.record_failure("test/model", 24)
         resolver.record_success("test/model", 12)
         assert resolver.resolve("test/model") == 12

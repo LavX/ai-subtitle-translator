@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from subtitle_translator import __version__
-from subtitle_translator.core.translator import SubtitleTranslator, get_translator
+from subtitle_translator.core.translator import SubtitleTranslator
 from subtitle_translator.server.api.models import (
     ConfigResponse,
     ConfigUpdateRequest,
@@ -30,6 +30,7 @@ from subtitle_translator.server.api.models import (
 )
 from subtitle_translator.server.config import get_settings, update_runtime_config
 from subtitle_translator.server.queue.job_manager import Job, JobStatus, JobType, job_manager
+from subtitle_translator.server.runtime import get_translator
 
 # Crypto key set by main.py on startup (None = encryption disabled)
 _crypto_key: bytes | None = None

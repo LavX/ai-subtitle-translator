@@ -13,19 +13,11 @@ import httpx
 import pytest
 
 from subtitle_translator.backends.openrouter import OpenRouterProvider
-from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.core.translator import SubtitleTranslator
 from subtitle_translator.server.api.models import SubtitleLine, TranslateContentRequest
 from subtitle_translator.server.config import Settings
 
 BAD_LINE = "7"
-
-
-@pytest.fixture(autouse=True)
-def reset_sizing():
-    get_batch_size_resolver().reset()
-    yield
-    get_batch_size_resolver().reset()
 
 
 def loose_reply(lines):

@@ -1,6 +1,5 @@
 """Tests for OpenRouterProvider._parse_translations JSON parsing."""
 
-from unittest.mock import patch
 
 import pytest
 
@@ -10,21 +9,10 @@ from subtitle_translator.core.provider import InvalidResponseError
 
 @pytest.fixture
 def provider():
-    """Create provider instance for testing."""
-    with patch("subtitle_translator.backends.openrouter.get_settings") as mock_settings:
-        settings = mock_settings.return_value
-        settings.openrouter_api_key = "test-key"
-        settings.openrouter_model = "test/model"
-        settings.openrouter_base_url = "https://openrouter.ai/api/v1"
-        settings.target_language = "Hungarian"
-        settings.batch_size = 10
-        settings.openrouter_timeout = 60
-        settings.openrouter_max_retries = 3
-        settings.openrouter_rate_limit_delay = 1.0
-        settings.parallel_batch_size = 3
-        p = OpenRouterProvider()
-        return p
+    """Create a provider for the parser tests. The parser reads no settings."""
+    from subtitle_translator.core.settings import CoreSettings
 
+    return OpenRouterProvider(CoreSettings(openrouter_api_key="test-key"))
 
 class TestParseTranslationsValidJSON:
     """Tests for well-formed JSON responses."""

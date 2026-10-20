@@ -12,7 +12,6 @@ import logging
 import pytest
 
 from subtitle_translator.core.batch_processor import BatchProcessor
-from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.core.provider import (
     ProviderTimeoutError,
     TranslationBatch,
@@ -36,8 +35,6 @@ class TestBatchActivityReporting:
         self.settings.retry_delay = 0.01
         self.settings.openrouter_default_model = "test/model"
         self.processor = BatchProcessor(self.provider, self.settings)
-        get_batch_size_resolver().reset()
-        get_batch_size_resolver()._settings = self.settings
 
     def _timeout_over(self, limit):
         """Time out above `limit` lines, translate at or below it."""
@@ -196,8 +193,6 @@ class TestTimeoutRecoveryPolicy:
         self.settings.retry_delay = 0.01
         self.settings.openrouter_default_model = "test/model"
         self.processor = BatchProcessor(self.provider, self.settings)
-        get_batch_size_resolver().reset()
-        get_batch_size_resolver()._settings = self.settings
 
     @pytest.mark.asyncio
     async def test_transient_timeout_retries_at_the_same_size(self):
@@ -240,7 +235,7 @@ class TestTimeoutRecoveryPolicy:
 
         await self.processor.process_batch(batch, batch_index=0, model="test/model")
 
-        planned = get_batch_size_resolver().limit_planned_size("test/model", 50)
+        planned = self.processor.resolver.limit_planned_size("test/model", 50)
         assert planned == 50, f"a timeout taught the resolver a smaller size: {planned}"
 
 

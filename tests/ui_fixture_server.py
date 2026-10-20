@@ -90,7 +90,7 @@ def main():
         ENCRYPTION_KEY=FIXTURE_KEY,
         DB_PATH=str(args.data_dir / "jobs.db"),
     )
-    import subtitle_translator.core.translator as translator_module
+    import subtitle_translator.server.runtime as translator_module
     import subtitle_translator.server.ui_api as ui_api
     from subtitle_translator.server.config import get_settings
     from subtitle_translator.server.main import create_app
@@ -110,9 +110,11 @@ def main():
     else:
         ui_api._fetch_model_catalog = fixture_catalog
         provider = FixtureProvider()
-    translator_module._translator_instance = translator_module.SubtitleTranslator(
-        provider=provider, settings=get_settings()
+    settings = get_settings()
+    translator_module._translator = translator_module.SubtitleTranslator(
+        provider=provider, settings=settings.core()
     )
+    translator_module._translator_source = settings
     import uvicorn
 
     uvicorn.run(create_app(), host=args.host, port=args.port, log_level="error")

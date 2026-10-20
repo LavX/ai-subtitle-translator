@@ -18,20 +18,7 @@ import pytest
 
 from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor
-from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.server.config import Settings
-
-
-@pytest.fixture(autouse=True)
-def reset_sizing(monkeypatch):
-    resolver = get_batch_size_resolver()
-    resolver.reset()
-    # The resolver holds the global settings, not the provider's, so the budget
-    # has to be pinned there or whatever an earlier test left behind decides it.
-    monkeypatch.setattr(resolver._settings, "openrouter_max_tokens", 8000)
-    monkeypatch.setattr(resolver._settings, "batch_size", 100)
-    yield
-    resolver.reset()
 
 
 def response(lines):

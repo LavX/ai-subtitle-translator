@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from subtitle_translator.core.settings import CoreSettings
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -108,6 +110,10 @@ class Settings(BaseSettings):
     def job_queue_ttl(self) -> timedelta:
         """Get job TTL as timedelta."""
         return timedelta(hours=self.job_queue_ttl_hours)
+
+    def core(self) -> CoreSettings:
+        """The env-free subset the translation core reads."""
+        return CoreSettings(**{name: getattr(self, name) for name in CoreSettings.model_fields})
 
 
 # Global settings instance with lock for thread safety

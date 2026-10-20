@@ -1,16 +1,15 @@
 """Main translation orchestration module."""
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor, summarize_batch_failure
+from subtitle_translator.core.batch_sizing import BatchSizeResolver
 from subtitle_translator.core.models import SubtitleLine, TranslateContentRequest
 from subtitle_translator.core.provider import TranslationProvider
+from subtitle_translator.core.settings import CoreSettings
 from subtitle_translator.core.srt_parser import SRTParser, add_rtl_markers
-from subtitle_translator.server.config import Settings, get_settings
 
 if TYPE_CHECKING:
     from subtitle_translator.core.models import TranslationConfig
@@ -47,24 +46,25 @@ class SubtitleTranslator:
     def __init__(
         self,
         provider: TranslationProvider | None = None,
-        settings: Settings | None = None,
+        settings: CoreSettings | None = None,
     ):
         """
         Initialize the subtitle translator.
 
         Args:
-            provider: Optional translation provider. Creates OpenRouter by default.
+            provider: Optional translation provider.
             settings: Optional settings instance.
         """
-        self.settings = settings or get_settings()
+        self.settings = settings or CoreSettings()
         self._provider = provider
+        self.resolver = BatchSizeResolver(self.settings)
         self._srt_parser = SRTParser()
 
     @property
     def provider(self) -> TranslationProvider:
-        """Get or create the translation provider."""
+        """The provider this translator was built with."""
         if self._provider is None:
-            self._provider = OpenRouterProvider(self.settings)
+            raise RuntimeError("SubtitleTranslator needs a provider")
         return self._provider
 
     async def close(self) -> None:
@@ -101,7 +101,7 @@ class SubtitleTranslator:
         lines = [{"index": str(line.position), "content": line.line} for line in request.lines]
 
         # Create batch processor
-        processor = BatchProcessor(self.provider, self.settings)
+        processor = BatchProcessor(self.provider, self.settings, self.resolver)
 
         try:
             # Process all batches
@@ -210,7 +210,7 @@ class SubtitleTranslator:
             lines = self._srt_parser.extract_lines_for_translation(entries)
 
             # Create batch processor
-            processor = BatchProcessor(self.provider, self.settings)
+            processor = BatchProcessor(self.provider, self.settings, self.resolver)
 
             # Process all batches
             result = await processor.process_all_batches(
@@ -321,7 +321,7 @@ def map_translations_to_lines(
     original_lines: list[SubtitleLine],
     translations: list[dict[str, str]],
     target_language: str,
-    settings: "Settings",
+    settings: "CoreSettings",
 ) -> list[SubtitleLine]:
     """
     Map translated content back to SubtitleLine format.
@@ -330,7 +330,7 @@ def map_translations_to_lines(
         original_lines: Original subtitle lines
         translations: Translated content
         target_language: Target language for RTL handling
-        settings: Settings instance
+        settings: CoreSettings instance
 
     Returns:
         List of SubtitleLine with translated content
@@ -365,30 +365,3 @@ def map_translations_to_lines(
 
     return result
 
-
-# Global translator instance for dependency injection
-_translator_instance: SubtitleTranslator | None = None
-_translator_lock: asyncio.Lock = asyncio.Lock()
-
-
-async def get_translator() -> SubtitleTranslator:
-    """Get or create the global translator instance."""
-    global _translator_instance
-    async with _translator_lock:
-        settings = get_settings()
-        if _translator_instance is None:
-            _translator_instance = SubtitleTranslator(settings=settings)
-        elif _translator_instance.settings is not settings:
-            provider = _translator_instance.provider
-            if isinstance(provider, OpenRouterProvider):
-                provider = provider.with_settings(settings)
-            _translator_instance = SubtitleTranslator(provider=provider, settings=settings)
-    return _translator_instance
-
-
-async def close_translator() -> None:
-    """Close the global translator instance."""
-    global _translator_instance
-    if _translator_instance is not None:
-        await _translator_instance.close()
-        _translator_instance = None

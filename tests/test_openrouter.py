@@ -170,12 +170,12 @@ class TestInit:
         provider = OpenRouterProvider(settings=settings)
         assert provider.settings is settings
 
-    @patch("subtitle_translator.backends.openrouter.get_settings")
-    def test_uses_global_settings_when_none(self, mock_get):
-        mock_get.return_value = _make_settings()
+    def test_uses_core_defaults_when_none(self):
+        from subtitle_translator.core.settings import CoreSettings
+
         provider = OpenRouterProvider()
-        mock_get.assert_called_once()
-        assert provider.settings is mock_get.return_value
+        assert isinstance(provider.settings, CoreSettings)
+        assert provider.settings.openrouter_api_base == CoreSettings().openrouter_api_base
 
     def test_provider_name(self):
         provider = OpenRouterProvider(settings=_make_settings())
@@ -1464,13 +1464,3 @@ class TestParseTranslations:
         raw = '{"index":"0","content":"Szia","index":"1","content":"Vilag"}'
         result = provider._parse_translations(raw)
         assert len(result) == 2
-
-
-class TestFactoryFunction:
-    async def test_get_openrouter_provider(self):
-        from subtitle_translator.backends.openrouter import get_openrouter_provider
-
-        with patch("subtitle_translator.backends.openrouter.get_settings") as mock_gs:
-            mock_gs.return_value = _make_settings()
-            provider = await get_openrouter_provider()
-            assert isinstance(provider, OpenRouterProvider)

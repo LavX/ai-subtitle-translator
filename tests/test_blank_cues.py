@@ -15,15 +15,7 @@ import pytest
 
 from subtitle_translator.backends.openrouter import OpenRouterProvider
 from subtitle_translator.core.batch_processor import BatchProcessor
-from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.server.config import Settings
-
-
-@pytest.fixture(autouse=True)
-def reset_sizing():
-    get_batch_size_resolver().reset()
-    yield
-    get_batch_size_resolver().reset()
 
 
 def response(lines, tokens=10):

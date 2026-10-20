@@ -9,7 +9,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from subtitle_translator import __version__
-from subtitle_translator.core.translator import close_translator
 from subtitle_translator.server.api.routes import (
     api_router,
     config_router,
@@ -24,6 +23,7 @@ from subtitle_translator.server.gui import gui_router
 from subtitle_translator.server.queue.job_manager import job_manager
 from subtitle_translator.server.queue.job_store import JobStore
 from subtitle_translator.server.queue.worker import job_worker_handler
+from subtitle_translator.server.runtime import close_translator
 from subtitle_translator.server.ui_api import ui_api_router
 from subtitle_translator.server.web import ui_router
 

@@ -681,10 +681,7 @@ async def test_streaming_operations_do_not_share_session_with_reused_config(envi
 async def test_single_endpoint_adaptive_recovery_retains_identity_and_billed_usage(
     environment, mode, model, price
 ):
-    from subtitle_translator.core.batch_sizing import get_batch_size_resolver
-
     wire, provider, settings = environment
-    get_batch_size_resolver().reset()
     settings.batch_size = 12
     wire.endpoints = [endpoint("a", price)]
     wire.reply_modes = [mode]
@@ -722,13 +719,14 @@ async def test_single_endpoint_adaptive_recovery_retains_identity_and_billed_usa
         )
         for body in wire.completions
     )
-    get_batch_size_resolver().reset()
 
 
 def operation_line_count():
-    from subtitle_translator.core.batch_sizing import get_batch_size_resolver
+    from subtitle_translator.core.batch_sizing import BatchSizeResolver
+    from subtitle_translator.core.settings import CoreSettings
 
-    return 2 * get_batch_size_resolver().resolve("fixture/model:smartfast")
+    # This file's environment runs with batch_size=2; two batches per operation.
+    return 2 * BatchSizeResolver(CoreSettings(batch_size=2)).resolve("fixture/model:smartfast")
 
 
 def job_data(job_type):
