@@ -1,0 +1,205 @@
+"""The standalone's ordered list: fail over on the four classes only, resume from checkpoints."""
+
+import asyncio
+
+import pytest
+
+from subtitle_translator.core.backends import Connection
+from subtitle_translator.core.context import Language
+from subtitle_translator.core.engine import (
+    EngineError,
+    EngineEvents,
+    Line,
+    TranslationEngine,
+    TranslationJob,
+)
+from subtitle_translator.core.errors import (
+    AuthenticationError,
+    ErrorKind,
+    InvalidConfigError,
+    InvalidResponseError,
+    ProviderTimeoutError,
+    QuotaExhaustedError,
+    RateLimitError,
+)
+from subtitle_translator.core.settings import CoreSettings
+from subtitle_translator.core.usage import reserve_request
+from tests.core.engine_fakes import ScriptedBackend, ScriptedProvider, registry_with
+
+BASE = CoreSettings(max_retries=1, retry_delay=0.0, request_timeout=5.0)
+A, B = Connection("a", "scripted"), Connection("b", "scripted")
+
+
+class Clock:
+    now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+def job(n=10):
+    return TranslationJob(Language("en", "English"), Language("hu", "Hungarian"), [Line(i, f"l{i}") for i in range(n)])
+
+
+def engine(providers, clock=None):
+    return TranslationEngine(registry_with(ScriptedBackend(providers)), BASE, clock=clock or Clock())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure",
+    [
+        QuotaExhaustedError("daily", retry_after=600),
+        RateLimitError("slow", retry_after=120),
+        AuthenticationError("bad key"),
+    ],
+)
+async def test_failover_continues_from_checkpoints(failure):
+    a = ScriptedProvider(["ok", failure])
+    b = ScriptedProvider()
+    failovers = []
+    outcome = await engine({"a": a, "b": b}).translate(job(10), [A, B], events=EngineEvents(on_failover=failovers.append))
+    assert outcome.status == "complete" and outcome.connection_id == "b"
+    assert [line["index"] for batch in b.batches for line in batch.lines] == ["5", "6", "7", "8", "9"]
+    assert [f.connection_id for f in failovers] == ["a"]
+    assert outcome.tokens == 20  # a's first batch plus b's batch, counted once
+
+
+@pytest.mark.asyncio
+async def test_content_and_config_errors_never_fail_over():
+    bad = InvalidResponseError("garbled")
+    b = ScriptedProvider()
+    partial = await engine({"a": ScriptedProvider(["ok", bad, bad]), "b": b}).translate(job(10), [A, B])
+    assert partial.status == "partial" and b.batches == []
+    with pytest.raises(EngineError) as caught:
+        await engine({"a": ScriptedProvider([InvalidConfigError("no model")]), "b": b}).translate(job(10), [A, B])
+    assert caught.value.kind is ErrorKind.INVALID_CONFIG and b.batches == []
+
+
+@pytest.mark.asyncio
+async def test_all_connections_failing_reports_the_last_error_and_all_spend():
+    a = ScriptedProvider(["ok", QuotaExhaustedError("a spent", retry_after=600)])
+    b = ScriptedProvider([RateLimitError("b slow", retry_after=90)])
+    with pytest.raises(EngineError) as caught:
+        await engine({"a": a, "b": b}).translate(job(10), [A, B])
+    error = caught.value
+    assert error.kind is ErrorKind.RATE_LIMITED and error.connection_id == "b"
+    assert error.tokens == 10 and len(error.checkpoints) == 1
+    assert [f.connection_id for f in error.failovers] == ["a", "b"]
+
+
+@pytest.mark.asyncio
+async def test_a_pinned_connection_never_fails_over_even_when_cooling():
+    clock = Clock()
+    a = ScriptedProvider([QuotaExhaustedError("spent", retry_after=600), QuotaExhaustedError("spent", retry_after=600)])
+    b = ScriptedProvider()
+    eng = engine({"a": a, "b": b}, clock)
+    with pytest.raises(EngineError):
+        await eng.translate(job(5), [A, B], pinned="a")
+    with pytest.raises(EngineError):
+        await eng.translate(job(5), [A, B], pinned="a")  # tried again: the user asked for it
+    assert len(a.batches) == 2 and b.batches == []
+
+
+@pytest.mark.asyncio
+async def test_a_cooling_connection_is_skipped_until_its_wait_ends():
+    clock = Clock()
+    a = ScriptedProvider([RateLimitError("slow", retry_after=100)])
+    b = ScriptedProvider()
+    eng = engine({"a": a, "b": b}, clock)
+    await eng.translate(job(5), [A, B])
+    calls = len(a.batches)
+    await eng.translate(job(5), [A, B])
+    assert len(a.batches) == calls  # a was skipped
+    clock.now += 101
+    await eng.translate(job(5), [A, B])
+    assert len(a.batches) == calls + 1
+
+
+@pytest.mark.asyncio
+async def test_disabled_and_missing_connections():
+    eng = engine({"a": ScriptedProvider(), "b": ScriptedProvider()})
+    with pytest.raises(EngineError) as none_on:
+        await eng.translate(job(3), [Connection("a", "scripted", enabled=False)])
+    assert none_on.value.kind is ErrorKind.INVALID_CONFIG
+    with pytest.raises(EngineError) as unknown:
+        await eng.translate(job(3), [A], pinned="zzz")
+    assert unknown.value.kind is ErrorKind.INVALID_CONFIG
+    with pytest.raises(EngineError) as off:
+        await eng.translate(job(3), [Connection("a", "scripted", enabled=False)], pinned="a")
+    assert off.value.kind is ErrorKind.INVALID_CONFIG
+
+
+@pytest.mark.asyncio
+async def test_every_connection_cooling_is_rate_limited_with_the_soonest_wait():
+    clock = Clock()
+    eng = engine({"a": ScriptedProvider([RateLimitError("x", retry_after=50)]), "b": ScriptedProvider([RateLimitError("y", retry_after=80)])}, clock)
+    with pytest.raises(EngineError):
+        await eng.translate(job(5), [A, B])
+    with pytest.raises(EngineError) as caught:
+        await eng.translate(job(5), [A, B])
+    assert caught.value.kind is ErrorKind.RATE_LIMITED and caught.value.retry_after == pytest.approx(50)
+
+
+@pytest.mark.asyncio
+async def test_budget_is_shared_across_the_list():
+    # a spends 0.04 on its first batch, then runs out of quota; b gets what is left (0.02),
+    # which cannot cover its 0.04 estimate, so b sends nothing.
+    a = ScriptedProvider(["ok", QuotaExhaustedError("spent")], cost=0.04, price=0.01)
+    b = ScriptedProvider(cost=0.04, price=0.04)
+    big = job(15)
+    big.budget = 0.06
+    with pytest.raises(EngineError) as caught:
+        await engine({"a": a, "b": b}).translate(big, [A, B])
+    assert caught.value.kind is ErrorKind.CANCELLED and b.batches == []
+    assert caught.value.cost == pytest.approx(0.04)
+
+
+@pytest.mark.asyncio
+async def test_a_call_cut_off_on_one_connection_stays_held_on_the_next():
+    # a's first request outlives the batch deadline and never reports, so it may have been
+    # billed: its worst case (0.05) stays held. Of the 0.10 budget, b may promise 0.05, which
+    # covers one request, not two.
+    class Stalls(ScriptedProvider):
+        async def translate_batch(self, batch, model=None, temperature=None, config_override=None):
+            await reserve_request(config_override, self.price, self.name)
+            self.batches.append(batch)
+            await asyncio.sleep(30)
+
+    a, b = Stalls(price=0.05), ScriptedProvider(price=0.05)
+    quick = CoreSettings(max_retries=1, retry_delay=0.0, request_timeout=0.2)
+    big = job(10)
+    big.budget = 0.10
+    with pytest.raises(EngineError) as caught:
+        await TranslationEngine(registry_with(ScriptedBackend({"a": a, "b": b})), quick).translate(big, [A, B])
+    assert caught.value.kind is ErrorKind.CANCELLED and len(b.batches) == 1
+    assert caught.value.reserved == pytest.approx(0.05)
+
+
+@pytest.mark.asyncio
+async def test_a_call_the_provider_timed_out_stays_held_on_the_next():
+    # a's first request ends with the provider's own timeout, which the server may have billed,
+    # so its worst case (0.05) stays held when the stall moves the job on. Of the 0.10 budget, b
+    # may promise 0.05, which covers one request, not two.
+    a = ScriptedProvider([ProviderTimeoutError("late")], price=0.05)
+    b = ScriptedProvider(price=0.05)
+    big = job(10)
+    big.budget = 0.10
+    with pytest.raises(EngineError) as caught:
+        await engine({"a": a, "b": b}).translate(big, [A, B])
+    assert len(a.batches) == 1 and len(b.batches) == 1
+    assert caught.value.kind is ErrorKind.CANCELLED and caught.value.reserved == pytest.approx(0.05)
+
+
+@pytest.mark.asyncio
+async def test_a_connection_saved_with_a_new_key_is_not_held_by_the_old_cooldown():
+    clock = Clock()
+    a = ScriptedProvider([AuthenticationError("bad key")])
+    b = ScriptedProvider()
+    eng = engine({"a": a, "b": b}, clock)
+    await eng.translate(job(5), [Connection("a", "scripted", secrets={"api_key": "old"}), B])
+    calls = len(a.batches)
+    await eng.translate(job(5), [Connection("a", "scripted", secrets={"api_key": "old"}), B])
+    assert len(a.batches) == calls  # the rejected key sits out its hour
+    fixed = await eng.translate(job(5), [Connection("a", "scripted", secrets={"api_key": "new"}), B])
+    assert len(a.batches) == calls + 1 and fixed.connection_id == "a"

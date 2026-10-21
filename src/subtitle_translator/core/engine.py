@@ -5,7 +5,7 @@ standalone service calls translate()."""
 import asyncio
 import time
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from subtitle_translator.core.backends import (
@@ -29,6 +29,7 @@ from subtitle_translator.core.checkpoints import (
 )
 from subtitle_translator.core.context import Language, MediaContext
 from subtitle_translator.core.errors import (
+    FAILOVER_KINDS,
     ErrorKind,
     TranslationProviderError,
     error_kind,
@@ -44,6 +45,14 @@ from subtitle_translator.core.usage import ReserveSink, Usage, UsageMeter
 # request declined, and both keep their kind instead of passing as a partial translation with
 # source lines in the gaps.
 _ATTEMPT_FAILURE_KINDS = frozenset(ErrorKind) - {ErrorKind.PARTIAL}
+
+# How long a connection sits out after a failover when the back end named no time.
+DEFAULT_COOLDOWN: dict[ErrorKind, float] = {
+    ErrorKind.RATE_LIMITED: 60.0,
+    ErrorKind.DEPENDENCY_UNAVAILABLE: 60.0,
+    ErrorKind.QUOTA_EXHAUSTED: 3600.0,
+    ErrorKind.AUTH_REQUIRED: 3600.0,
+}
 
 
 @dataclass(frozen=True)
@@ -265,6 +274,90 @@ class TranslationEngine:
         finally:
             entry.users -= 1
             await self._release(entry)
+
+    def _cooling_until(self, connection: Connection) -> float:
+        """When a connection that failed over may be tried again. The wait belongs to the
+        settings and secrets that earned it: a connection saved with a new key or model under
+        the same id is tried at once."""
+        entry = self._cooling.get(connection.id)
+        if entry is None or entry[0] != connection.fingerprint():
+            return 0.0
+        return entry[1]
+
+    async def translate(
+        self,
+        job: TranslationJob,
+        connections: Sequence[Connection],
+        *,
+        pinned: str | None = None,
+        events: EngineEvents | None = None,
+    ) -> TranslationOutcome:
+        """Walk the ordered list. Fail over only on the four failover kinds, carrying the
+        checkpoints and the spend forward; a pinned connection is tried alone."""
+        events = events or EngineEvents()
+        if pinned is not None:
+            chosen = next((c for c in connections if c.id == pinned), None)
+            if chosen is None:
+                raise EngineError(
+                    ErrorKind.INVALID_CONFIG,
+                    f"No back-end connection is named {pinned!r}",
+                    field_errors={"backend": "unknown connection"},
+                )
+            if not chosen.enabled:
+                raise EngineError(ErrorKind.INVALID_CONFIG, f"The {pinned!r} connection is turned off")
+            return await self.attempt(job, chosen, events)
+
+        enabled = [c for c in connections if c.enabled]
+        if not enabled:
+            raise EngineError(ErrorKind.INVALID_CONFIG, "No back-end connection is turned on")
+
+        checkpoints = list(job.checkpoints)
+        tokens, cost, held = 0, 0.0, 0.0
+        failovers: list[FailoverRecord] = []
+        last: EngineError | None = None
+        for connection in enabled:
+            if self._cooling_until(connection) > self._clock():
+                continue
+            # A call an earlier connection left unsettled may have been billed, so its worst
+            # case stays held, as it would within one attempt.
+            budget = None if job.budget is None else max(0.0, job.budget - cost - held)
+            try:
+                outcome = await self.attempt(
+                    replace(job, checkpoints=checkpoints, budget=budget), connection, events
+                )
+            except EngineError as error:
+                checkpoints.extend(error.checkpoints)
+                tokens += error.tokens
+                cost += error.cost
+                held += error.reserved
+                if error.kind not in FAILOVER_KINDS:
+                    error.tokens, error.cost, error.reserved = tokens, cost, held
+                    error.checkpoints, error.failovers = checkpoints, failovers
+                    raise
+                wait = error.retry_after if error.retry_after else DEFAULT_COOLDOWN[error.kind]
+                self._cooling[connection.id] = (connection.fingerprint(), self._clock() + wait)
+                record = FailoverRecord(connection.id, error.kind, error.message, error.retry_after)
+                failovers.append(record)
+                if events.on_failover is not None:
+                    events.on_failover(record)
+                last = error
+                continue
+            outcome.tokens += tokens
+            outcome.cost += cost
+            outcome.failovers = failovers
+            return outcome
+
+        if last is None:
+            soonest = min(self._cooling_until(c) for c in enabled) - self._clock()
+            raise EngineError(
+                ErrorKind.RATE_LIMITED,
+                "Every back-end connection is waiting out an earlier limit",
+                retry_after=max(0.0, soonest),
+                failovers=failovers,
+            )
+        last.tokens, last.cost, last.reserved = tokens, cost, held
+        last.checkpoints, last.failovers = checkpoints, failovers
+        raise last
 
     async def _run(
         self, job: TranslationJob, connection: Connection, entry: _Opened, events: EngineEvents
