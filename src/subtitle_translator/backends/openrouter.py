@@ -457,6 +457,15 @@ MAX_TOKENS_REASONING_MODELS = [
 # and 429 have retry paths of their own.
 ROUTE_REFUSAL_STATUSES = frozenset({400, 403, 422})
 
+# A 404 that names the data policy is this endpoint refusing because of the account's
+# data-retention filter; another endpoint in the pool may not retain data.
+_DATA_POLICY_PHRASES = ("data policy", "all providers have been ignored")
+
+
+def _is_data_policy_refusal(error: "TranslationProviderError") -> bool:
+    message = (getattr(error, "message", "") or "").lower()
+    return getattr(error, "status_code", None) == 404 and any(p in message for p in _DATA_POLICY_PHRASES)
+
 
 def _route_refused_the_request(error: "TranslationProviderError") -> bool:
     """Whether this failure is one endpoint's refusal that another may not share."""
@@ -467,7 +476,8 @@ def _route_refused_the_request(error: "TranslationProviderError") -> bool:
     pool = diagnostics.get("fast_pool") or diagnostics.get("price_pool") or []
     if not isinstance(pool, (list, tuple)) or len(pool) < 2:
         return False
-    return getattr(error, "status_code", None) in ROUTE_REFUSAL_STATUSES
+    return (getattr(error, "status_code", None) in ROUTE_REFUSAL_STATUSES
+            or _is_data_policy_refusal(error))
 
 
 class OpenRouterProvider(TranslationProvider):
@@ -1116,9 +1126,18 @@ class OpenRouterProvider(TranslationProvider):
                         (error.routing_diagnostics or {}).get("selected_endpoint"),
                         error.status_code,
                     )
-                    return await self._translate_batch(
-                        batch, model, temperature, config_override, deadline
-                    )
+                    try:
+                        result = await self._translate_batch(
+                            batch, model, temperature, config_override, deadline
+                        )
+                    except TranslationProviderError as second:
+                        # The refused request was sent too; its usage stays on the record.
+                        second.tokens_used += error.tokens_used
+                        second.cost += error.cost
+                        raise
+                    result.total_tokens = (result.total_tokens or 0) + error.tokens_used
+                    result.cost = (result.cost or 0.0) + error.cost
+                    return result
         except (httpx.TimeoutException, TimeoutError) as error:
             failure = ProviderTimeoutError(
                 f"Request timed out after {request_timeout}s", provider=self.provider_name
@@ -1459,6 +1478,8 @@ class OpenRouterProvider(TranslationProvider):
                     f"Network error: {detail}",
                     provider=self.provider_name,
                     retryable=True,
+                    # Only a connection that was never opened proves the request was not sent.
+                    billing_unknown=not isinstance(error, httpx.ConnectError),
                 )
                 failure.routing_diagnostics = getattr(error, "routing_diagnostics", None)
                 raise failure from error

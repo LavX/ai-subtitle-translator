@@ -21,6 +21,7 @@ from uuid import uuid4
 
 import httpx
 
+from subtitle_translator.core.errors import ErrorKind
 from subtitle_translator.core.models import SmartFastPolicy  # noqa: F401  (re-exported)
 from subtitle_translator.core.provider import TranslationProviderError
 from subtitle_translator.core.settings import CoreSettings
@@ -59,6 +60,7 @@ class SmartFastRoutingError(TranslationProviderError):
             provider="openrouter",
             retryable=retry_after is not None,
             retry_after=retry_after,
+            kind=ErrorKind.DEPENDENCY_UNAVAILABLE if retry_after is not None else ErrorKind.INVALID_CONFIG,
         )
 
 
