@@ -1221,6 +1221,9 @@ class OpenRouterProvider(TranslationProvider):
             batch.source_language,
             batch.context_title,
             batch.context_media_type,
+            source=batch.source,
+            target=batch.target,
+            media=batch.media,
         )
         user_content = self.format_input_for_translation(batch.lines)
 

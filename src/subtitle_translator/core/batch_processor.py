@@ -5,10 +5,11 @@ import inspect
 import logging
 from collections import Counter, defaultdict, deque
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, BatchSizeResolver
+from subtitle_translator.core.context import Language, MediaContext
 from subtitle_translator.core.errors import STOP_KINDS, ErrorKind, error_kind, most_severe
 from subtitle_translator.core.models import TranslationConfig
 from subtitle_translator.core.provider import (
@@ -793,13 +794,7 @@ class BatchProcessor:
 
         work = batch
         if _remaining_lines is not None:
-            work = TranslationBatch(
-                lines=_remaining_lines,
-                source_language=batch.source_language,
-                target_language=batch.target_language,
-                context_title=batch.context_title,
-                context_media_type=batch.context_media_type,
-            )
+            work = replace(batch, lines=_remaining_lines)
         return await self._process_sub_batches(
             work,
             batch_index,
@@ -867,13 +862,7 @@ class BatchProcessor:
             # Resizing pending work is not a failure and does not spend a retry.
             size = resolver.limit_planned_size(model_id, batch_size)
             sub_batch_lines = batch.lines[offset : offset + size]
-            sub_batch = TranslationBatch(
-                lines=sub_batch_lines,
-                source_language=batch.source_language,
-                target_language=batch.target_language,
-                context_title=batch.context_title,
-                context_media_type=batch.context_media_type,
-            )
+            sub_batch = replace(batch, lines=sub_batch_lines)
             sub_result = await self.process_batch(
                 sub_batch,
                 batch_index,
@@ -960,6 +949,9 @@ class BatchProcessor:
         batch_size: int | None = None,
         progress_callback: Callable[[BatchProgress], None] | None = None,
         config_override: Optional["TranslationConfig"] = None,
+        source: Language | None = None,
+        target: Language | None = None,
+        media: MediaContext | None = None,
         on_root_result: Callable[[BatchResult, list[dict[str, str]]], Awaitable[None]] | None = None,
     ) -> BatchProcessingResult:
         """
@@ -979,6 +971,9 @@ class BatchProcessor:
             batch_size: Optional batch size override
             progress_callback: Optional callback for progress updates
             config_override: Optional per-request configuration override
+            source: Optional named source language, with its script
+            target: Optional named target language, with its script
+            media: Optional media context handed to the prompt as reference data
             on_root_result: Optional callback for each finished root batch, with the lines it asked for
 
         Returns:
@@ -1047,6 +1042,9 @@ class BatchProcessor:
                 target_language=target_language,
                 context_title=context_title,
                 context_media_type=context_media_type,
+                source=source,
+                target=target,
+                media=media,
             )
 
             def batch_activity(message: str) -> None:
@@ -1201,6 +1199,9 @@ class BatchProcessor:
         temperature: float | None = None,
         batch_size: int | None = None,
         config_override: Optional["TranslationConfig"] = None,
+        source: Language | None = None,
+        target: Language | None = None,
+        media: MediaContext | None = None,
     ) -> AsyncGenerator[tuple[BatchResult, BatchProgress], None]:
         """
         Process batches and yield results as they complete.
@@ -1217,6 +1218,9 @@ class BatchProcessor:
             temperature: Optional temperature override
             batch_size: Optional batch size override
             config_override: Optional per-request configuration override
+            source: Optional named source language, with its script
+            target: Optional named target language, with its script
+            media: Optional media context handed to the prompt as reference data
 
         Yields:
             Tuples of (BatchResult, BatchProgress) for each completed batch
@@ -1242,6 +1246,9 @@ class BatchProcessor:
                 target_language=target_language,
                 context_title=context_title,
                 context_media_type=context_media_type,
+                source=source,
+                target=target,
+                media=media,
             )
 
             result = await self.process_batch(
