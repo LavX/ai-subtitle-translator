@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from subtitle_translator.core.errors import (  # noqa: F401  (re-exported for existing imports)
     AuthenticationError,
@@ -48,6 +48,9 @@ class TranslationBatch:
 
 class TranslationProvider(ABC):
     """Abstract base class for translation providers."""
+
+    # True when the back end calls reserve_request() itself with each request's exact worst case.
+    prices_requests: ClassVar[bool] = False
 
     @property
     @abstractmethod

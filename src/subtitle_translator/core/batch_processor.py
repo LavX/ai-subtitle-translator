@@ -4,11 +4,12 @@ import asyncio
 import inspect
 import logging
 from collections import Counter, defaultdict, deque
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Optional
 
 from subtitle_translator.core.batch_sizing import MIN_BATCH_SIZE, BatchSizeResolver
+from subtitle_translator.core.errors import STOP_KINDS, ErrorKind, error_kind, most_severe
 from subtitle_translator.core.models import TranslationConfig
 from subtitle_translator.core.provider import (
     InvalidResponseError,
@@ -19,6 +20,7 @@ from subtitle_translator.core.provider import (
     TranslationProviderError,
 )
 from subtitle_translator.core.settings import CoreSettings
+from subtitle_translator.core.usage import UsageMeter, call_scope, reserve_request
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,11 @@ logger = logging.getLogger(__name__)
 # so the batch deadline grows by the same amount and the last window is always kept
 # for the fallback: a batch never spends its whole budget on identical attempts.
 SAME_SIZE_TIMEOUT_RETRIES = 1
+
+# A rate limit that asks for a longer wait than this is handed back to the caller as
+# rate_limited instead of being slept through: the engine can use another back end, and
+# a per-day quota dressed as a short retry must not hold a worker for hours.
+RATE_LIMIT_INLINE_WAIT_MAX = 30.0
 
 # Debug logger for detailed request/response logging
 debug_logger = logging.getLogger(f"{__name__}.debug")
@@ -74,6 +81,14 @@ class BatchResult:
     error: str | None = None
     retries: int = 0
     timed_out: bool = False
+    error_kind: ErrorKind | None = None
+    retry_after: float | None = None
+    # The failure's own reason, such as budget_exhausted.
+    reason: str | None = None
+    # The model that served the call whose lines the result carries.
+    model_used: str | None = None
+    # The batch's last failure was a transport error or a 5xx that its retries did not get past.
+    unreachable: bool = False
 
 
 @dataclass
@@ -85,11 +100,24 @@ class BatchProcessingResult:
     model_used: str
     batch_results: list[BatchResult]
     progress: BatchProgress
+    stopped_by: ErrorKind | None = None
 
     @property
     def success(self) -> bool:
         """Check if all batches succeeded."""
         return all(r.success for r in self.batch_results)
+
+
+def ends_dispatch(result: BatchResult) -> bool:
+    """Whether a finished batch says that sending more batches to this connection now only
+    repeats its failure. A stop kind always does. So does a back end that is unreachable: the
+    batch's last failure was a transport error or a 5xx that its retries did not get past. A
+    batch whose last failure was a stall does not, whatever failed before it: one stalled
+    request says nothing about the next, and a cohort that stalls without output already stops
+    the job."""
+    if result.success:
+        return False
+    return result.error_kind in STOP_KINDS or result.unreachable
 
 
 def summarize_batch_failure(result: BatchProcessingResult, total_batches: int | None) -> str:
@@ -133,6 +161,7 @@ class BatchProcessor:
         provider: TranslationProvider,
         settings: CoreSettings | None = None,
         resolver: BatchSizeResolver | None = None,
+        meter: UsageMeter | None = None,
     ):
         """
         Initialize batch processor.
@@ -141,6 +170,7 @@ class BatchProcessor:
             provider: Translation provider to use
             settings: Optional settings instance
             resolver: Optional batch size resolver shared with the owner of the settings
+            meter: Optional usage meter for the attempt's budget and per-call holds
         """
         self.provider = provider
         self.settings = settings or CoreSettings()
@@ -148,6 +178,38 @@ class BatchProcessor:
         # resolver belongs to whoever owns those limits: a translator, or an engine
         # connection. Nothing is shared through a module global.
         self.resolver = resolver or BatchSizeResolver(self.settings)
+        self.meter = meter
+
+    async def _record(self, tokens: int, cost: float, model: str, holds=()) -> None:
+        if self.meter is not None:
+            await self.meter.record(tokens, cost, model, reservations=holds)
+
+    async def _send(self, batch, model, temperature, config_override, model_id, deadline):
+        """One provider call. What it may cost is held before it is sent: a back end that prices
+        its requests holds its own exact worst case, any other is sent only while money is left.
+        Its usage settles the holds before anything else happens. A call that may have been
+        billed without reporting keeps its holds: one cut off by the batch deadline or a cancel,
+        and one the provider gave up on (its own timeout, a connection broken after sending)."""
+        with call_scope() as holds:
+            if not getattr(self.provider, "prices_requests", False):
+                await reserve_request(
+                    config_override, None, self.provider.provider_name, model_id
+                )
+            try:
+                async with asyncio.timeout_at(deadline):
+                    result = await self.provider.translate_batch(
+                        batch, model=model, temperature=temperature, config_override=config_override
+                    )
+            except TimeoutError as e:
+                raise ProviderTimeoutError("Batch timeout budget exhausted") from e
+            except TranslationProviderError as error:
+                settled = () if error.billing_unknown else holds
+                await self._record(error.tokens_used, error.cost, model_id, settled)
+                raise
+            await self._record(
+                result.total_tokens or 0, result.cost or 0.0, result.model_used or model_id, holds
+            )
+            return result
 
     def _model_output_ceiling(self, model: str) -> int | None:
         """What the catalog says this model will write, when the provider knows.
@@ -243,10 +305,14 @@ class BatchProcessor:
 
         if config_override is None or config_override._smartfast_session_id is None:
             config_override = (config_override or TranslationConfig()).for_operation()
+        if self.meter is not None:
+            config_override._usage_meter = self.meter
 
         retries = 0
         timeout_retries = 0
         last_error: str | None = None
+        last_kind: ErrorKind | None = None
+        last_retry_after: float | None = None
         loop = asyncio.get_running_loop()
         request_timeout = (
             config_override.request_timeout
@@ -325,6 +391,7 @@ class BatchProcessor:
                         timed_out=True,
                         error="Batch timeout budget exhausted",
                         retries=retries,
+                        error_kind=ErrorKind.DEPENDENCY_UNAVAILABLE,
                     )
                 )
             # Backoff yields to other roots, which may lower the learned cap.
@@ -361,16 +428,9 @@ class BatchProcessor:
                 f"(attempt {_prior_attempts + retries + 1})"
             )
             try:
-                try:
-                    async with asyncio.timeout_at(_deadline):
-                        result = await self.provider.translate_batch(
-                            batch,
-                            model=model,
-                            temperature=temperature,
-                            config_override=config_override,
-                        )
-                except TimeoutError as e:
-                    raise ProviderTimeoutError("Batch timeout budget exhausted") from e
+                result = await self._send(
+                    batch, model, temperature, config_override, model_id, _deadline
+                )
 
                 # Every requested position has to come back. A response with the right
                 # count but substituted or repeated indices leaves lines untranslated and
@@ -438,6 +498,7 @@ class BatchProcessor:
                             success=False,
                             error=last_error,
                             retries=retries,
+                            error_kind=ErrorKind.PARTIAL,
                         )
                     )
 
@@ -450,6 +511,7 @@ class BatchProcessor:
                     tokens_used=spent_tokens + (result.total_tokens or 0),
                     cost=spent_cost + (result.cost or 0.0),
                     retries=retries,
+                    model_used=result.model_used or model_id,
                 )
 
             except InvalidResponseError as e:
@@ -486,6 +548,7 @@ class BatchProcessor:
                             success=False,
                             error=e.message,
                             retries=retries,
+                            error_kind=ErrorKind.PARTIAL,
                         )
                     )
 
@@ -493,6 +556,20 @@ class BatchProcessor:
                 non_timeout_failure = True
                 spent_tokens += e.tokens_used
                 spent_cost += e.cost
+                last_kind, last_retry_after = ErrorKind.RATE_LIMITED, e.retry_after
+                if e.retry_after is not None and e.retry_after > RATE_LIMIT_INLINE_WAIT_MAX:
+                    activity(f"rate limited for {e.retry_after:g}s; handing the batch back")
+                    _note_unsplittable_failure(size_related=False)
+                    return _billed(
+                        BatchResult(
+                            batch_index=batch_index,
+                            success=False,
+                            error=str(e),
+                            error_kind=ErrorKind.RATE_LIMITED,
+                            retry_after=e.retry_after,
+                            retries=retries,
+                        )
+                    )
                 # Rate limits: start at 5s, exponential backoff, cap at 30s.
                 # Use lock to serialize retries so parallel batches don't all
                 # hammer the API simultaneously after a 429.
@@ -526,6 +603,8 @@ class BatchProcessor:
                             success=False,
                             error="Rate-limit retry budget exhausted",
                             retries=retries,
+                            error_kind=ErrorKind.RATE_LIMITED,
+                            retry_after=e.retry_after,
                         )
                     )
 
@@ -588,6 +667,7 @@ class BatchProcessor:
                         timed_out=True,
                         error="Batch timeout budget exhausted" if exhausted else e.message,
                         retries=retries,
+                        error_kind=ErrorKind.DEPENDENCY_UNAVAILABLE,
                     )
                 )
 
@@ -595,6 +675,21 @@ class BatchProcessor:
                 non_timeout_failure = True
                 spent_tokens += e.tokens_used
                 spent_cost += e.cost
+                kind = error_kind(e)
+                last_kind, last_retry_after = kind, e.retry_after
+                if kind in STOP_KINDS:
+                    _note_unsplittable_failure(size_related=False)
+                    return _billed(
+                        BatchResult(
+                            batch_index=batch_index,
+                            success=False,
+                            error=e.message,
+                            error_kind=kind,
+                            retry_after=e.retry_after,
+                            reason=getattr(e, "reason", None),
+                            retries=retries,
+                        )
+                    )
                 if e.retryable and retries < max_retries:
                     delay = (
                         e.retry_after
@@ -622,6 +717,9 @@ class BatchProcessor:
                                 else e.message
                             ),
                             retries=retries,
+                            error_kind=kind,
+                            retry_after=e.retry_after,
+                            unreachable=kind is ErrorKind.DEPENDENCY_UNAVAILABLE,
                         )
                     )
 
@@ -634,6 +732,7 @@ class BatchProcessor:
                         success=False,
                         error=str(e),
                         retries=retries,
+                        error_kind=ErrorKind.INTERNAL,
                     )
                 )
 
@@ -644,6 +743,8 @@ class BatchProcessor:
                 success=False,
                 error=f"Max retries exceeded. Last error: {last_error}",
                 retries=retries,
+                error_kind=last_kind or ErrorKind.INTERNAL,
+                retry_after=last_retry_after,
             )
         )
 
@@ -744,6 +845,11 @@ class BatchProcessor:
         total_retries = 0
         failures: list[str] = []
         failed_timed_out = True
+        failure_kinds: list[ErrorKind | None] = []
+        retry_afters: list[float] = []
+        stop_reason: str | None = None
+        model_used: str | None = None
+        unreachable = False
         loop = asyncio.get_running_loop()
 
         offset = 0
@@ -755,6 +861,7 @@ class BatchProcessor:
                     f"cues {remaining[0]['index']}-{remaining[-1]['index']} not attempted "
                     "(batch budget exhausted)"
                 )
+                failure_kinds.append(ErrorKind.DEPENDENCY_UNAVAILABLE)
                 break
             # Another in-flight request may lower the cap between these children.
             # Resizing pending work is not a failure and does not spend a retry.
@@ -784,6 +891,8 @@ class BatchProcessor:
                 _prior_attempts=_prior_attempts,
             )
             all_translations.extend(sub_result.translations)
+            if sub_result.translations and sub_result.model_used:
+                model_used = sub_result.model_used
             total_tokens += sub_result.tokens_used
             total_cost += sub_result.cost
             total_retries += sub_result.retries
@@ -797,6 +906,19 @@ class BatchProcessor:
                     f"cues {sub_batch_lines[0]['index']}-{sub_batch_lines[-1]['index']} "
                     f"at size {len(sub_batch_lines)}: {sub_result.error}"
                 )
+                failure_kinds.append(sub_result.error_kind)
+                if sub_result.retry_after is not None:
+                    retry_afters.append(sub_result.retry_after)
+                if ends_dispatch(sub_result):
+                    stop_reason = sub_result.reason
+                    unreachable = sub_result.unreachable
+                    rest = batch.lines[offset:]
+                    if rest:
+                        failures.append(
+                            f"cues {rest[0]['index']}-{rest[-1]['index']} not attempted "
+                            f"({sub_result.error_kind})"
+                        )
+                    break
 
         if failures:
             failure_context = "Adaptive retry" if _is_adaptive_retry else "Smaller batch"
@@ -809,6 +931,11 @@ class BatchProcessor:
                 error=f"{failure_context} failed for {'; '.join(failures)}",
                 retries=total_retries,
                 timed_out=failed_timed_out,
+                error_kind=most_severe(failure_kinds) or ErrorKind.PARTIAL,
+                retry_after=max(retry_afters, default=None),
+                reason=stop_reason,
+                model_used=model_used,
+                unreachable=unreachable,
             )
 
         return BatchResult(
@@ -818,6 +945,7 @@ class BatchProcessor:
             tokens_used=total_tokens,
             cost=total_cost,
             retries=total_retries,
+            model_used=model_used,
         )
 
     async def process_all_batches(
@@ -832,6 +960,7 @@ class BatchProcessor:
         batch_size: int | None = None,
         progress_callback: Callable[[BatchProgress], None] | None = None,
         config_override: Optional["TranslationConfig"] = None,
+        on_root_result: Callable[[BatchResult, list[dict[str, str]]], Awaitable[None]] | None = None,
     ) -> BatchProcessingResult:
         """
         Process all batches with parallel processing support.
@@ -850,12 +979,15 @@ class BatchProcessor:
             batch_size: Optional batch size override
             progress_callback: Optional callback for progress updates
             config_override: Optional per-request configuration override
+            on_root_result: Optional callback for each finished root batch, with the lines it asked for
 
         Returns:
             BatchProcessingResult with all translations
         """
         if config_override is None or config_override._smartfast_session_id is None:
             config_override = (config_override or TranslationConfig()).for_operation()
+        if self.meter is not None:
+            config_override._usage_meter = self.meter
 
         # Determine model to use (config override takes precedence)
         if config_override and config_override.model:
@@ -950,6 +1082,7 @@ class BatchProcessor:
         cohort_done: dict[int, int] = defaultdict(int)
         cohort_disproved: set[int] = set()
         stopped = False
+        stopped_by: ErrorKind | None = None
 
         logger.info(
             f"Processing {len(batches)} batches, up to {parallel_count} in flight - "
@@ -1001,6 +1134,12 @@ class BatchProcessor:
                     if progress_callback:
                         progress_callback(progress)
 
+                    if on_root_result is not None:
+                        await on_root_result(result, batch_lines)
+                    if ends_dispatch(result):
+                        stopped_by = most_severe([stopped_by, result.error_kind])
+                        stopped = True
+
                     cohort = batch_index // parallel_count
                     cohort_done[cohort] += 1
                     if not (result.timed_out and not result.translations):
@@ -1018,7 +1157,9 @@ class BatchProcessor:
                     task.cancel()
             await asyncio.gather(*running, return_exceptions=True)
 
-        if stopped and pending:
+        if stopped_by is not None and pending:
+            activity(f"Stopped after {stopped_by}; {len(pending)} batches were not sent")
+        elif stopped and pending:
             activity("Provider requests timed out without usable output; remaining batches stopped")
 
         # A position that a request repeats can land in two roots. When one root
@@ -1046,6 +1187,7 @@ class BatchProcessor:
             model_used=model_to_use,
             batch_results=batch_results,
             progress=progress,
+            stopped_by=stopped_by,
         )
 
     async def process_batches_stream(
@@ -1081,6 +1223,8 @@ class BatchProcessor:
         """
         if config_override is None or config_override._smartfast_session_id is None:
             config_override = (config_override or TranslationConfig()).for_operation()
+        if self.meter is not None:
+            config_override._usage_meter = self.meter
         await self._warm_model_capabilities()
         batches = self.create_batches(lines, batch_size, model=config_override.model or model)
 

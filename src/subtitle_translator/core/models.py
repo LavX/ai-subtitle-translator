@@ -2,7 +2,7 @@
 
 import re
 from hashlib import sha256
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
@@ -129,6 +129,8 @@ class TranslationConfig(BaseModel):
     """Per-request configuration that can override defaults."""
 
     _smartfast_session_id: str | None = PrivateAttr(default=None)
+    # The meter of the attempt this request belongs to; attached by the batch processor.
+    _usage_meter: Any = PrivateAttr(default=None)
 
     def for_operation(self, job_id: str | None = None) -> "TranslationConfig":
         """Copy options and bind an opaque internal identity to one operation."""
