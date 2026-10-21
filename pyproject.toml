@@ -34,6 +34,9 @@ dependencies = [
     "tzdata>=2026.4",
 ]
 
+[project.entry-points."subtitle_translator.backends"]
+openai_compatible = "subtitle_translator.backends.openai_compatible:OpenAICompatibleBackendType"
+
 [project.optional-dependencies]
 server = [
     "fastapi>=0.104.0",
