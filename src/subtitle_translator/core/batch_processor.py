@@ -208,7 +208,10 @@ class BatchProcessor:
                 await self._record(error.tokens_used, error.cost, model_id, settled)
                 raise
             await self._record(
-                result.total_tokens or 0, result.cost or 0.0, result.model_used or model_id, holds
+                result.total_tokens or 0,
+                result.cost or 0.0,
+                result.model_used or model_id,
+                () if getattr(result, "billing_unknown", False) else holds,
             )
             return result
 

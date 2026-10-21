@@ -34,6 +34,9 @@ class TranslationResult:
     raw_response: dict | None = None
     note: str | None = None  # why the reply had to be repaired or cut down
     routing_diagnostics: dict | None = None
+    # The call answered but reported nothing about what it used, so its hold stays: it may have
+    # been billed. Priced back ends set this when the reply carries no usage.
+    billing_unknown: bool = False
 
 
 @dataclass
