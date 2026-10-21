@@ -104,6 +104,12 @@ class ProviderConfig(BaseModel):
         default=None, max_length=20, description="List of provider slugs to skip"
     )
 
+    data_collection: Literal["allow", "deny"] | None = Field(
+        default=None,
+        alias="dataCollection",
+        description="'deny' uses only providers that do not store or train on request data",
+    )
+
     smart_fast: SmartFastPolicy | None = Field(
         default=None, alias="smartFast", description="SmartFast price and speed policy"
     )

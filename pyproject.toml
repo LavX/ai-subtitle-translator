@@ -37,6 +37,7 @@ dependencies = [
 [project.entry-points."subtitle_translator.backends"]
 openai_compatible = "subtitle_translator.backends.openai_compatible:OpenAICompatibleBackendType"
 gemini = "subtitle_translator.backends.gemini:GeminiBackendType"
+openrouter = "subtitle_translator.backends.openrouter_backend:OpenRouterBackendType"
 
 [project.optional-dependencies]
 server = [

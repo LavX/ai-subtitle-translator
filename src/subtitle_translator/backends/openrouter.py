@@ -31,6 +31,7 @@ from subtitle_translator.core.provider import (
     TranslationResult,
 )
 from subtitle_translator.core.settings import CoreSettings
+from subtitle_translator.core.usage import BudgetExhaustedError, reserve_request
 
 if TYPE_CHECKING:
     from subtitle_translator.core.models import TranslationConfig
@@ -439,6 +440,7 @@ class OpenRouterProvider(ChatCompletionsProvider):
 
     error_label = "OpenRouter"
     debug_logger = debug_logger
+    prices_requests = True
 
     def __init__(self, settings: CoreSettings | None = None):
         """
@@ -453,6 +455,7 @@ class OpenRouterProvider(ChatCompletionsProvider):
         self._model_params_cache: dict[str, list[str]] = {}
         self._model_reasoning_cache: dict[str, dict] = {}
         self._model_max_output_cache: dict[str, int] = {}
+        self._model_price_cache: dict[str, tuple[float, float]] = {}
         self._model_params_fetched: bool = False
         # A failed catalog fetch is retried after this deadline instead of never.
         self._model_params_retry_at: float = 0.0
@@ -675,6 +678,20 @@ class OpenRouterProvider(ChatCompletionsProvider):
                         )
                         if model_id and ceiling:
                             ceilings[model_id] = ceiling
+                        pricing = model.get("pricing")
+                        if model_id and isinstance(pricing, dict):
+                            try:
+                                prompt = float(pricing.get("prompt"))
+                                completion = float(pricing.get("completion"))
+                            except (TypeError, ValueError):
+                                prompt = completion = math.nan
+                            if (
+                                math.isfinite(prompt)
+                                and math.isfinite(completion)
+                                and prompt >= 0
+                                and completion >= 0
+                            ):
+                                self._model_price_cache[model_id] = (prompt, completion)
                 if cached:
                     self._model_max_output_cache.update(ceilings)
                     logger.info(
@@ -1003,6 +1020,8 @@ class OpenRouterProvider(ChatCompletionsProvider):
                 provider_params["only"] = provider_config.only
             if provider_config.ignore:
                 provider_params["ignore"] = provider_config.ignore
+            if provider_config.data_collection:
+                provider_params["data_collection"] = provider_config.data_collection
 
         slug, typed_shortcut = split_routing_suffix(model_id)
         typed_shortcut = typed_shortcut or typed_routing
@@ -1385,7 +1404,15 @@ class OpenRouterProvider(ChatCompletionsProvider):
                 payload["provider"] = dict(decision.provider)
                 if provider_config and provider_config.allow_fallbacks is False:
                     payload["provider"]["allow_fallbacks"] = False
+                if provider_config and provider_config.data_collection:
+                    payload["provider"]["data_collection"] = provider_config.data_collection
                 payload["session_id"] = decision.session_id
+            await reserve_request(
+                config_override,
+                self._worst_case_charge(payload, bare_model),
+                self.provider_name,
+                bare_model,
+            )
             started = monotonic()
             # Authentication belongs to the request, never to mutable client defaults.
             response = await send_completion(
@@ -1414,8 +1441,10 @@ class OpenRouterProvider(ChatCompletionsProvider):
                 logger.info("SmartFast routing: %s", result.routing_diagnostics)
             return result
         except (Exception, asyncio.CancelledError) as error:
-            if decision is not None and (
-                not isinstance(error, asyncio.CancelledError) or deadline.expired()
+            if (
+                decision is not None
+                and not isinstance(error, BudgetExhaustedError)
+                and (not isinstance(error, asyncio.CancelledError) or deadline.expired())
             ):
                 try:
                     raw = response.json() if response is not None else None
@@ -1450,6 +1479,37 @@ class OpenRouterProvider(ChatCompletionsProvider):
 
     def _output_ceiling(self, model_used: str) -> int | None:
         return _positive_int(self._capability(self._model_max_output_cache, model_used))
+
+    def _worst_case_charge(self, payload: dict, bare_model: str) -> float | None:
+        """The most this request can be charged, in USD.
+
+        Every byte of the messages counts as a token (no token is shorter than a byte), plus a
+        small allowance for the message framing; the output is the limit the request carries,
+        or the model's output ceiling when it carries none. The rates are the request's own
+        SmartFast price caps when it has them, else the catalog's. None when a rate or the
+        output bound is unknown, which leaves the budget to reported cost.
+        """
+        if bare_model.endswith(":free"):
+            return 0.0
+        rates = None
+        caps = (payload.get("provider") or {}).get("max_price")
+        if isinstance(caps, dict) and "prompt" in caps and "completion" in caps:
+            try:
+                rates = (float(caps["prompt"]) / 1_000_000, float(caps["completion"]) / 1_000_000)
+            except (TypeError, ValueError):
+                rates = None
+        rates = rates or self._capability(self._model_price_cache, bare_model)
+        if rates is None:
+            return None
+        output = (
+            payload.get("max_tokens")
+            or payload.get("max_completion_tokens")
+            or self._output_ceiling(bare_model)
+        )
+        if not output:
+            return None
+        input_tokens = len(json.dumps(payload.get("messages", []), ensure_ascii=False).encode()) + 16
+        return input_tokens * rates[0] + output * rates[1]
 
     def _length_remedy(self, model_used: str, max_tokens: int | None) -> str:
         ceiling = self._output_ceiling(model_used)

@@ -1225,3 +1225,16 @@ class TestARejectedRouteIsRetriedElsewhere:
             await provider.translate_batch(batch(), model="fixture/model")
 
         assert len(wire.completions) == 1
+
+
+@pytest.mark.parametrize("smartfast", [True, False])
+async def test_deny_data_collection_is_sent_on_every_route(environment, smartfast):
+    wire, provider, _ = environment
+    wire.endpoints = [endpoint("a"), endpoint("b")]
+    config = TranslationConfig(
+        provider=ProviderConfig(sort=None if smartfast else "throughput", dataCollection="deny")
+    )
+    await provider.translate_batch(
+        batch(), model="fixture/model:smartfast" if smartfast else "fixture/model", config_override=config
+    )
+    assert wire.completions[-1]["provider"]["data_collection"] == "deny"
