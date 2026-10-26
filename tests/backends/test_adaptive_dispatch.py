@@ -12,6 +12,12 @@ from subtitle_translator.core.models import TranslationConfig
 from subtitle_translator.core.provider import TranslationBatch
 from subtitle_translator.core.settings import CoreSettings
 
+# A request window long enough that a loaded machine cannot eat the margin between "the split
+# shares the root's budget" (3 windows) and "the split got a fresh one" (4 windows), and a guard
+# against a hang that no healthy run comes near.
+WINDOW = 1.0
+HANG_GUARD = 30
+
 
 def response(lines, tokens=10):
     translations = [{**line, "content": "translated"} for line in lines]
@@ -91,14 +97,14 @@ async def test_retry_resize_preserves_partial_usage_and_consumed_retry_budget(
         )
     )
     try:
-        await asyncio.wait_for(waiting.wait(), 1)
+        await asyncio.wait_for(waiting.wait(), HANG_GUARD)
         # Another batch lowers the shared cap through size failures while this one
         # waits out its retry delay. Recorded directly so the lowering is complete
         # before this batch re-plans; a stalled request no longer lowers the cap.
         resolver.record_failure(model, 20)
         resolver.record_failure(model, 10)
         assert resolver.limit_planned_size(model, 100) == 5
-        result = await asyncio.wait_for(task, 2)
+        result = await asyncio.wait_for(task, HANG_GUARD)
         assert result.success is not resized_request_fails
         assert all(size <= cap for _, size, cap in calls)
         assert result.retries == 1
@@ -274,7 +280,7 @@ async def test_pending_children_observe_a_limit_lowered_by_another_batch():
         )
     )
     try:
-        await asyncio.wait_for(first_entered.wait(), 1)
+        await asyncio.wait_for(first_entered.wait(), HANG_GUARD)
         other = await processor.process_batch(
             TranslationBatch(
                 lines=[{"index": str(i), "content": "source"} for i in range(1000, 1020)],
@@ -388,12 +394,13 @@ async def test_preemptive_children_and_recovery_share_the_root_timeout_budget():
                 model=model,
                 batch_size=100,
                 # Compress the request override below its public API minimum for this test.
-                config_override=TranslationConfig.model_construct(request_timeout=0.25),
+                config_override=TranslationConfig.model_construct(request_timeout=WINDOW),
             ),
-            1.1,
+            HANG_GUARD,
         )
-        # Three request windows: attempt, one same-size retry, then the split.
-        assert asyncio.get_running_loop().time() - start < 0.9
+        # Three request windows: attempt, one same-size retry, then the split. A fresh window
+        # for the split would make it four.
+        assert asyncio.get_running_loop().time() - start < 3.5 * WINDOW
         assert calls == [50, 50, 50, 25]
         assert not result.success
         assert result.progress.completed_lines == 50
@@ -438,7 +445,7 @@ async def test_cancelling_a_preemptive_child_finishes_provider_cleanup():
         )
     )
     try:
-        await asyncio.wait_for(entered.wait(), 1)
+        await asyncio.wait_for(entered.wait(), HANG_GUARD)
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
@@ -489,7 +496,7 @@ async def test_completed_parallel_root_preserves_the_other_roots_current_activit
         )
     )
     try:
-        await asyncio.wait_for(first_completed.wait(), 2)
+        await asyncio.wait_for(first_completed.wait(), HANG_GUARD)
         first_update = progress_events[-1]
         assert first_update[:3] == (1, 100, 10)
         assert "Batch 2:" in first_update[3]

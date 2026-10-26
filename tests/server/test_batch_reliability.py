@@ -18,6 +18,13 @@ from subtitle_translator.server.queue.worker import (
 )
 
 
+# A request window long enough that a loaded machine cannot eat the margin between "the split
+# shares the root's budget" (3 windows) and "the split got a fresh one" (4 windows), and a guard
+# against a hang that no healthy run comes near.
+WINDOW = 1.0
+HANG_GUARD = 30
+
+
 def response(lines, tokens=10, cost=0.01):
     return httpx.Response(
         200,
@@ -260,7 +267,7 @@ async def test_adaptive_timeout_budget_preserves_finished_subbatch_and_cleans_re
         finally:
             active.remove(asyncio.current_task())
 
-    provider = OpenRouterProvider(settings(request_timeout=0.2))
+    provider = OpenRouterProvider(settings(request_timeout=WINDOW))
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
@@ -271,10 +278,11 @@ async def test_adaptive_timeout_budget_preserves_finished_subbatch_and_cleans_re
             BatchProcessor(provider, provider.settings).process_all_batches(
                 [{"index": str(i), "content": "source"} for i in range(10)], "en", "hu"
             ),
-            0.9,
+            HANG_GUARD,
         )
         elapsed = asyncio.get_running_loop().time() - start
-        assert elapsed < 0.7
+        # Three windows share the root budget; a fresh window for the split would be a fourth.
+        assert elapsed < 3.5 * WINDOW
         # One same-size retry precedes the split; the split still keeps its own window.
         assert calls == [10, 10, 5, 5]
         assert not result.success
@@ -346,7 +354,7 @@ async def test_timeout_recovery_activity_reaches_job_api_without_false_progress(
     )
     await manager.start_workers()
     try:
-        await asyncio.wait_for(started.wait(), 2)
+        await asyncio.wait_for(started.wait(), HANG_GUARD)
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as api:
@@ -358,7 +366,7 @@ async def test_timeout_recovery_activity_reaches_job_api_without_false_progress(
         assert all("sensitive upstream" not in value[0] for value in history)
         assert store.load_job(job_id).message == state["message"]
         release.set()
-        await asyncio.wait_for(manager.queue.join(), 2)
+        await asyncio.wait_for(manager.queue.join(), HANG_GUARD)
         assert manager.get_job(job_id).status == JobStatus.COMPLETED
     finally:
         await manager.stop_workers()
@@ -402,7 +410,7 @@ async def test_cancel_awaits_multiple_requests_and_network_retry_backoff():
         )
     )
     try:
-        await asyncio.wait_for(entered.wait(), 2)
+        await asyncio.wait_for(entered.wait(), HANG_GUARD)
         assert len(active) == 2
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
@@ -500,7 +508,7 @@ async def test_terminal_timeout_summary_preserves_unattempted_work_and_stop_reas
     )
     await manager.start_workers()
     try:
-        await asyncio.wait_for(manager.queue.join(), 2)
+        await asyncio.wait_for(manager.queue.join(), HANG_GUARD)
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as api:
