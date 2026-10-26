@@ -13,6 +13,13 @@ services:
       - OPENROUTER_DEFAULT_MODEL=${OPENROUTER_DEFAULT_MODEL:-google/gemini-2.5-flash-preview-09-2025}
       - OPENROUTER_TEMPERATURE=${OPENROUTER_TEMPERATURE:-0.3}
       - OPENROUTER_MAX_TOKENS=${OPENROUTER_MAX_TOKENS:-8000}
+      # Back ends, tried in this order when one is rate limited, out of quota or unreachable
+      # - BACKEND_ORDER=${BACKEND_ORDER:-openrouter,gemini}
+      # - GEMINI_API_KEYS=${GEMINI_API_KEYS}
+      # - GEMINI_KEY_PROJECTS=${GEMINI_KEY_PROJECTS}
+      # - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.6-flash}
+      # - GEMINI_PRICE_INPUT=${GEMINI_PRICE_INPUT:-0}
+      # - GEMINI_PRICE_OUTPUT=${GEMINI_PRICE_OUTPUT:-0}
       # Server Configuration
       - HOST=0.0.0.0
       - PORT=8765

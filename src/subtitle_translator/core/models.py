@@ -195,6 +195,11 @@ class TranslationConfig(BaseModel):
         le=10,
         description="Number of batches to process in parallel per job (default: 4)",
     )
+    backend: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Use only this configured back-end connection, with no failover",
+    )
 
     model_config = {"populate_by_name": True}
 

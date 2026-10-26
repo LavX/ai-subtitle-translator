@@ -214,3 +214,14 @@ async def test_a_paid_test_call_that_timed_out_keeps_its_hold():
     )
     assert outcome.ok is False and outcome.kind is ErrorKind.DEPENDENCY_UNAVAILABLE
     assert meter.reserved == pytest.approx(0.02) and settled == []
+
+
+def test_override_serves_a_configured_instance():
+    registry = BackendRegistry.discover(
+        BackendScope.everything(),
+        fakes.entry_points_from(fakes.FakeEntryPoint("echo", fakes.EchoBackend, dist=BUILTIN_DISTRIBUTION)),
+    )
+    configured = fakes.EchoBackend()
+    registry.override(configured)
+    assert registry.get("echo") is configured
+    assert [e.distribution for e in registry.entries() if e.type_id == "echo"] == [BUILTIN_DISTRIBUTION]

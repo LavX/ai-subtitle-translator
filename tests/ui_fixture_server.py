@@ -111,10 +111,7 @@ def main():
         ui_api._fetch_model_catalog = fixture_catalog
         provider = FixtureProvider()
     settings = get_settings()
-    translator_module._translator = translator_module.SubtitleTranslator(
-        provider=provider, settings=settings.core()
-    )
-    translator_module._translator_source = settings
+    translator_module._runtime = translator_module.single_provider_runtime(provider, settings)
     import uvicorn
 
     uvicorn.run(create_app(), host=args.host, port=args.port, log_level="error")

@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from subtitle_translator.backends.gemini import GEMINI_DEFAULT_MODEL
 from subtitle_translator.core.settings import CoreSettings
 
 
@@ -31,6 +32,23 @@ class Settings(BaseSettings):
     openrouter_default_model: str = "amazon/nova-2-lite-v1:free"
     openrouter_temperature: float = 0.3
     openrouter_max_tokens: int = 8000
+
+    # Back ends, tried in this order; a back end with no key or sign-in is skipped.
+    backend_order: str = "openrouter,gemini"
+    openrouter_deny_data_collection: bool = False
+
+    # Gemini: comma-separated keys, and optionally the Google Cloud project of each, so keys
+    # from one project share its limits.
+    gemini_api_keys: str = ""
+    gemini_key_projects: str = ""
+    gemini_model: str = GEMINI_DEFAULT_MODEL
+    gemini_batch_size: int = 300
+    gemini_reasoning: str = "disabled"
+    gemini_price_input: float = 0.0
+    gemini_price_output: float = 0.0
+
+    # Per-back-end data folders (sign-ins of installed harness back ends).
+    backends_data_dir: str = "/app/data/backends"
 
     # Translation Configuration
     batch_size: int = 100

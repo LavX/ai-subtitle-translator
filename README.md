@@ -398,6 +398,22 @@ The table lists application defaults. For manual runs, most settings load from e
 | `OPENROUTER_DEFAULT_MODEL` | `amazon/nova-2-lite-v1:free` | Default translation model |
 | `OPENROUTER_TEMPERATURE` | `0.3` | Sampling temperature |
 | `OPENROUTER_MAX_TOKENS` | `8000` | Room the reply gets for the translation itself, sent as `max_tokens`. Reasoning is paid for out of the same allowance, so a reasoning request raises what is sent: a declared reasoning budget is added on top, and an effort level (or a model that always reasons) multiplies it, because effort buys a share of the total. The result is held under the output ceiling the catalog publishes for the model's top provider, and a model that accepts no budget parameter is sent none. `0` or any non-positive value sends no budget, which lets OpenRouter reserve the model's full output ceiling against your balance: a free account rarely has the credit for that |
+| `BACKEND_ORDER` | `openrouter,gemini` | Back ends to try, in order. A back end with no key or sign-in is skipped; add `openai_compatible` or the type id of an installed back-end package to use it |
+| `OPENROUTER_DENY_DATA_COLLECTION` | `false` | Send `provider.data_collection: deny`, so OpenRouter uses only providers that do not collect user data |
+| `GEMINI_API_KEYS` | *(empty)* | Comma-separated Google Gemini API keys |
+| `GEMINI_KEY_PROJECTS` | *(empty)* | The Google Cloud project of each key, in the same order, so keys from one project share its limits |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model |
+| `GEMINI_BATCH_SIZE` | `300` | Max subtitle lines per Gemini batch |
+| `GEMINI_REASONING` | `disabled` | Gemini reasoning mode |
+| `GEMINI_PRICE_INPUT` | `0` | USD per million input tokens; `0` reports usage with no cost and holds nothing |
+| `GEMINI_PRICE_OUTPUT` | `0` | USD per million output tokens |
+| `OPENAI_COMPATIBLE_PRESET` | *(empty)* | `openai`, `lmstudio`, `ollama` or `custom` |
+| `OPENAI_COMPATIBLE_BASE_URL` | *(preset)* | Server address, for example `http://192.168.1.10:1234/v1` |
+| `OPENAI_COMPATIBLE_MODEL` | *(empty)* | Model name the server serves |
+| `OPENAI_COMPATIBLE_API_KEY` | *(empty)* | Only if the server asks for one |
+| `OPENAI_COMPATIBLE_PRICE_INPUT`, `OPENAI_COMPATIBLE_PRICE_OUTPUT` | `0` | USD per million input and output tokens; required for the OpenAI preset |
+| `OPENAI_COMPATIBLE_TEMPERATURE`, `OPENAI_COMPATIBLE_BATCH_SIZE`, `OPENAI_COMPATIBLE_PARALLEL_BATCHES`, `OPENAI_COMPATIBLE_MAX_TOKENS` | *(back-end defaults)* | Request tuning for the OpenAI-compatible back end |
+| `BACKENDS_DATA_DIR` | `/app/data/backends` | Folder for per-back-end data, such as the sign-ins of installed back-end packages |
 | `BATCH_SIZE` | `100` | Max subtitle lines per batch (auto-adjusted per model) |
 | `PARALLEL_BATCHES_PER_JOB` | `4` | Concurrent batches per translation job |
 | `JOB_QUEUE_MAX_CONCURRENT` | `15` | Concurrent translation job workers at startup |
@@ -417,6 +433,14 @@ The table lists application defaults. For manual runs, most settings load from e
 | `ENCRYPTION_KEY_FILE` | `/app/data/encryption.key` | Path to persistent encryption key file |
 | `DB_PATH` | `/app/data/jobs.db` | SQLite database path for job persistence |
 | `JOB_RETENTION_HOURS` | `24` | Hours to keep completed/failed jobs before cleanup |
+
+Inside a container `localhost` is the container itself, so an OpenAI-compatible server on the
+host takes the host's LAN address or `host.docker.internal`.
+
+Requests that carry their own OpenRouter key (the Bazarr+ 2.7 integration and the web GUI) run only
+on that key. Other requests use the back ends in `BACKEND_ORDER`; when one is rate limited, out of
+quota, rejects its key or cannot be reached, the next one continues where it stopped. Put `backend`
+in a request's `config` to use one back end only.
 
 `OPENROUTER_MAX_TOKENS` and `BATCH_SIZE` have to fit each other. A batch that cannot
 answer inside the budget comes back cut short, and the adaptive sizer then halves the

@@ -415,6 +415,19 @@ class BackendRegistry:
                 )
         return cls(entries)
 
+    def override(self, backend: BackendType) -> None:
+        """Serve a type with a configured instance, keeping where it came from."""
+        current = self._active.get(backend.type_id)
+        entry = RegisteredBackend(
+            backend.type_id,
+            backend,
+            current.distribution if current else None,
+            current.version if current else None,
+            None,
+        )
+        self._all = [entry if e is current else e for e in self._all] if current else [*self._all, entry]
+        self._active[backend.type_id] = entry
+
     def get(self, type_id: str) -> BackendType:
         entry = self._active.get(type_id)
         if entry is None or entry.refused:

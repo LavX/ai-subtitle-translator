@@ -218,9 +218,8 @@ async def test_http_runtime_defaults_snapshot_running_and_queued_jobs(monkeypatc
     # without this the first batch is 80 lines and each job sends three requests.
     initial.openrouter_max_tokens = 0
     monkeypatch.setattr(config, "_settings", initial)
-    monkeypatch.setattr(translator_module, "_translator", None)
-    monkeypatch.setattr(translator_module, "_translator_lock", asyncio.Lock())
-    monkeypatch.setattr(translator_module, "_translator_source", None)
+    monkeypatch.setattr(translator_module, "_runtime", None)
+    monkeypatch.setattr(translator_module, "_runtime_lock", asyncio.Lock())
     manager = JobManager(max_concurrent=1)
     manager.set_worker_handler(job_worker_handler)
     monkeypatch.setattr(routes, "job_manager", manager)
@@ -376,9 +375,8 @@ async def test_job_start_persists_effective_model_before_provider_request(
 
     config.reset_settings()
     monkeypatch.setattr(config, "_settings", settings(openrouter_default_model="old/model"))
-    monkeypatch.setattr(translator_module, "_translator", None)
-    monkeypatch.setattr(translator_module, "_translator_lock", asyncio.Lock())
-    monkeypatch.setattr(translator_module, "_translator_source", None)
+    monkeypatch.setattr(translator_module, "_runtime", None)
+    monkeypatch.setattr(translator_module, "_runtime_lock", asyncio.Lock())
     manager = JobManager(max_concurrent=1)
     store = JobStore(str(tmp_path / "models.db"))
     manager.set_store(store)
