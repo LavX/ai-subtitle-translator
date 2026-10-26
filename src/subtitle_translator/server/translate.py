@@ -95,7 +95,10 @@ async def run_lines(
         return RunResult(out, set(done), model_used, error.tokens, error.cost, "partial", reason)
     missing = set(outcome.missing)
     done = {line.position for line in lines if line.position not in missing}
-    if lines and not done:
+    # A cue with no text comes back as it went in: it is not a translation. Only the cues that
+    # carry text decide whether anything was translated.
+    worth_translating = {line.position for line in lines if line.text.strip()}
+    if worth_translating and not (done & worth_translating):
         # Nothing came back: every attempt was billed, but no line is a translation.
         return RunResult(
             list(lines), set(), outcome.model, outcome.tokens, outcome.cost, "failed",
