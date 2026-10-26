@@ -532,6 +532,13 @@ class TranslationEngine:
                 text = merged[line.position]
                 if job.add_rtl_marks and job.target.rtl and text.strip():
                     text = add_rtl_markers(text)
+                if len(text) > MAX_LINE_CHARS:
+                    # The marks pushed a translation past the longest line a caller can take.
+                    # That position keeps its source text, as the cap already does for a
+                    # translation that was too long without them.
+                    missing.append(line.position)
+                    out.append(line)
+                    continue
                 out.append(Line(line.position, text))
             else:
                 missing.append(line.position)

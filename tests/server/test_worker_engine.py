@@ -183,3 +183,27 @@ async def test_a_file_job_config_with_only_a_backend_pin_is_kept(manager):
     from subtitle_translator.server.queue.worker import _extract_config_override_from_dict
 
     assert _extract_config_override_from_dict({"backend": "gemini"}).backend == "gemini"
+
+
+@pytest.mark.asyncio
+async def test_a_translation_the_rtl_marks_push_past_the_line_cap_does_not_fail_the_job(manager):
+    from subtitle_translator.core.models import MAX_LINE_CHARS
+    from subtitle_translator.core.provider import TranslationResult
+
+    def long_first(batch):
+        return TranslationResult(
+            translations=[
+                {"index": line["index"], "content": "x" * (MAX_LINE_CHARS - 1) if line["index"] == "0" else "ok"}
+                for line in batch.lines
+            ],
+            model_used="scripted-model",
+            total_tokens=10,
+            cost=0.01,
+        )
+
+    job_id = await submit(manager, targetLanguage="ar")
+    await process_content_translation_job(manager, job_id, translator(ScriptedProvider([long_first])))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.PARTIAL, job.error
+    assert job.result["lines"][0]["line"] == "l0"      # the source text, as in 2.1.1
+    assert job.error.startswith("3/4 lines translated. ")

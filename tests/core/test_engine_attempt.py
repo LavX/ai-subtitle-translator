@@ -128,6 +128,33 @@ async def test_rtl_marks_only_when_asked():
 
 
 @pytest.mark.asyncio
+async def test_a_translation_pushed_past_the_cap_by_rtl_marks_keeps_its_source_text():
+    from subtitle_translator.core.provider import TranslationResult
+
+    def long_for_the_first(batch):
+        return TranslationResult(
+            translations=[
+                {"index": line["index"], "content": "x" * (MAX_LINE_CHARS - 1) if line["index"] == "0" else "ok"}
+                for line in batch.lines
+            ],
+            model_used="scripted-model",
+            total_tokens=10,
+            cost=0.01,
+        )
+
+    target_job = TranslationJob(source=ENGLISH, target=HEBREW, lines=[Line(0, "first"), Line(1, "second")])
+    outcome = await engine({"c1": ScriptedProvider([long_for_the_first])}).attempt(target_job, CONN)
+    # 1999 characters is inside the cap; the two marks the target needs make it 2001.
+    assert [line.text for line in outcome.lines][0] == "first"
+    assert outcome.lines[1].text.startswith("‫") and outcome.missing == [0]
+    assert all(len(line.text) <= MAX_LINE_CHARS for line in outcome.lines)
+    # without marks the same translation fits and is kept
+    plain = TranslationJob(source=ENGLISH, target=HEBREW, lines=target_job.lines, add_rtl_marks=False)
+    kept = await engine({"c1": ScriptedProvider([long_for_the_first])}).attempt(plain, CONN)
+    assert kept.missing == [] and len(kept.lines[0].text) == MAX_LINE_CHARS - 1
+
+
+@pytest.mark.asyncio
 async def test_media_and_languages_reach_the_provider_and_the_connection_is_opened_once():
     provider = ScriptedProvider()
     backend = ScriptedBackend({"c1": provider})

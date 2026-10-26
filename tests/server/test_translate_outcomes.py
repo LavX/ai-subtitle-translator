@@ -56,3 +56,44 @@ async def test_the_sync_content_route_answers_500_when_only_blank_cues_came_back
     response = TestClient(app).post("/api/v1/translate/content", json=body)
     assert response.status_code == 500, response.text
     assert response.json()["detail"]["error"] == "translation_failed"
+
+
+def _long_first(batch):
+    from subtitle_translator.core.models import MAX_LINE_CHARS
+    from subtitle_translator.core.provider import TranslationResult
+
+    return TranslationResult(
+        translations=[
+            {"index": line["index"], "content": "x" * (MAX_LINE_CHARS - 1) if line["index"] == "0" else "ok"}
+            for line in batch.lines
+        ],
+        model_used="scripted-model",
+        total_tokens=10,
+        cost=0.01,
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_checkpointed_line_the_rtl_marks_push_past_the_cap_keeps_its_source_after_a_stop():
+    from subtitle_translator.core.errors import QuotaExhaustedError
+
+    lines = [Line(i, f"l{i}") for i in range(4)]
+    provider = ScriptedProvider([_long_first, QuotaExhaustedError("spent")])
+    result = await run_lines(runtime(provider), lines, source="en", target="ar")
+    assert result.status == "partial"
+    assert result.lines[0].text == "l0" and 0 not in result.done
+    assert result.lines[1].text.startswith("‫") and 1 in result.done
+
+
+@pytest.mark.asyncio
+async def test_the_sync_content_translator_returns_the_source_for_a_line_the_marks_overflow():
+    from subtitle_translator.core.models import SubtitleLine, TranslateContentRequest
+
+    translator = EngineTranslator(runtime(ScriptedProvider([_long_first])))
+    request = TranslateContentRequest(
+        sourceLanguage="en",
+        targetLanguage="ar",
+        lines=[SubtitleLine(position=i, line=f"l{i}") for i in range(2)],
+    )
+    result = await translator.translate_content(request)
+    assert [item.line for item in result.lines][0] == "l0"

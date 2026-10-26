@@ -13,7 +13,7 @@ from subtitle_translator.core.engine import (
     Progress,
     TranslationJob,
 )
-from subtitle_translator.core.models import TranslationConfig
+from subtitle_translator.core.models import MAX_LINE_CHARS, TranslationConfig
 from subtitle_translator.core.srt_parser import add_rtl_markers
 from subtitle_translator.core.translator import SubtitleTranslator
 from subtitle_translator.server.runtime import EngineTranslator, Runtime, single_provider_runtime
@@ -86,13 +86,20 @@ async def run_lines(
         if not done:
             return RunResult(list(lines), set(), model_used, error.tokens, error.cost, "failed", reason)
         mark = add_rtl_marks and target_language.rtl
-        out = [
-            Line(line.position, (add_rtl_markers(done[line.position]) if mark else done[line.position]))
-            if line.position in done
-            else line
-            for line in lines
-        ]
-        return RunResult(out, set(done), model_used, error.tokens, error.cost, "partial", reason)
+        out: list[Line] = []
+        kept: set[int] = set()
+        for line in lines:
+            text = done.get(line.position)
+            if text is not None and mark:
+                text = add_rtl_markers(text)
+            if text is None or len(text) > MAX_LINE_CHARS:
+                out.append(line)
+                continue
+            kept.add(line.position)
+            out.append(Line(line.position, text))
+        if not kept:
+            return RunResult(list(lines), set(), model_used, error.tokens, error.cost, "failed", reason)
+        return RunResult(out, kept, model_used, error.tokens, error.cost, "partial", reason)
     missing = set(outcome.missing)
     done = {line.position for line in lines if line.position not in missing}
     # A cue with no text comes back as it went in: it is not a translation. Only the cues that
