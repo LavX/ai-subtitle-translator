@@ -3,6 +3,7 @@ of connections with failover. Bazarr+ drives failover itself and calls attempt()
 standalone service calls translate()."""
 
 import asyncio
+import logging
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Sequence
@@ -40,6 +41,8 @@ from subtitle_translator.core.models import MAX_LINE_CHARS
 from subtitle_translator.core.settings import CoreSettings
 from subtitle_translator.core.srt_parser import add_rtl_markers
 from subtitle_translator.core.usage import ReserveSink, Usage, UsageMeter
+
+logger = logging.getLogger(__name__)
 
 # Every kind but partial ends an attempt with an error: partial results are only for per-batch
 # content failures. An unexpected failure is internal and a back end that cannot take the
@@ -351,7 +354,8 @@ class TranslationEngine:
         tokens, cost, held = 0, 0.0, 0.0
         failovers: list[FailoverRecord] = []
         last: EngineError | None = None
-        for connection in self._candidates(enabled):
+        candidates = self._candidates(enabled)
+        for position, connection in enumerate(candidates):
             # A call an earlier connection left unsettled may have been billed, so its worst
             # case stays held, as it would within one attempt.
             budget = None if job.budget is None else max(0.0, job.budget - cost - held)
@@ -377,6 +381,14 @@ class TranslationEngine:
                 )
                 record = FailoverRecord(connection.id, error.kind, error.message, error.retry_after)
                 failovers.append(record)
+                # Ids and kinds only: an error message can carry a URL, and keys never belong here.
+                following = candidates[position + 1] if position + 1 < len(candidates) else None
+                logger.info(
+                    "Failover: connection %s ended with %s, %s",
+                    connection.id,
+                    error.kind.value,
+                    f"next is {following.id}" if following else "no connection left to try",
+                )
                 if events.on_failover is not None:
                     events.on_failover(record)
                 last = error

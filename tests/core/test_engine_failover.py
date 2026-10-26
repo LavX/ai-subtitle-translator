@@ -286,3 +286,21 @@ async def test_a_connection_saved_with_a_new_key_is_not_held_by_the_old_cooldown
     assert len(a.batches) == calls  # the rejected key sits out its hour
     fixed = await eng.translate(job(5), [Connection("a", "scripted", secrets={"api_key": "new"}), B])
     assert len(a.batches) == calls + 1 and fixed.connection_id == "a"
+
+
+@pytest.mark.asyncio
+async def test_each_failover_logs_one_info_line_with_ids_and_kind_only(caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="subtitle_translator.core.engine")
+    a = ScriptedProvider([RateLimitError("https://secret.example/x?key=SECRET-KEY", retry_after=120)])
+    b = ScriptedProvider([AuthenticationError("bad SECRET-KEY")])
+    with pytest.raises(EngineError):
+        await engine({"a": a, "b": b}).translate(
+            job(5), [Connection("a", "scripted", secrets={"api_key": "SECRET-KEY"}), B]
+        )
+    lines = [r.getMessage() for r in caplog.records if r.name == "subtitle_translator.core.engine"]
+    assert len(lines) == 2 and all(r.levelno == logging.INFO for r in caplog.records if r.name.endswith("engine"))
+    assert lines[0] == "Failover: connection a ended with rate_limited, next is b"
+    assert lines[1].startswith("Failover: connection b ended with auth_required") and "no connection left" in lines[1]
+    assert "SECRET" not in " ".join(lines) and "secret.example" not in " ".join(lines)
