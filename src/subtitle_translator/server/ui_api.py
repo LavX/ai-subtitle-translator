@@ -206,6 +206,14 @@ async def models(identity: Identity) -> ModelsResponse:
     return ModelsResponse(models=await _fetch_model_catalog(), default_model=UI_DEFAULT_MODEL)
 
 
+@ui_api_router.get("/backends")
+async def backends(identity: Identity) -> dict:
+    from subtitle_translator.server.backends_status import backend_status
+    from subtitle_translator.server.runtime import get_runtime
+
+    return await backend_status(await get_runtime())
+
+
 @ui_api_router.post("/jobs/translate/file", response_model=JobSubmitResponse)
 async def submit_file(request: TranslateFileRequest, identity: Identity) -> JobSubmitResponse:
     return await submit_gui_file(request, identity)

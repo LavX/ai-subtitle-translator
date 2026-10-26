@@ -1055,3 +1055,14 @@ async def test_connection(
 
     return results
 
+
+@config_router.get(
+    "/backends",
+    summary="Back ends",
+    description="Installed back ends and the configured list, without secrets.",
+)
+async def list_backends() -> dict:
+    from subtitle_translator.server.backends_status import backend_status
+    from subtitle_translator.server.runtime import get_runtime
+
+    return await backend_status(await get_runtime())

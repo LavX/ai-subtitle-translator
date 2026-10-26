@@ -12,6 +12,7 @@ ASSET_TYPES = {
     "app.js": "text/javascript",
     "session.mjs": "text/javascript",
     "archive.mjs": "text/javascript",
+    "backends.mjs": "text/javascript",
     "outfit.woff2": "font/woff2",
     "outfit-OFL.txt": "text/plain",
 }

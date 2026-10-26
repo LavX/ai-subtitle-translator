@@ -1,4 +1,5 @@
 import { GuiSession } from './session.mjs';
+import { renderBackends } from './backends.mjs';
 import { safeName, uniqueName, routeModel, routingConfig, zip, parseCues, latestFirst } from './archive.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -90,6 +91,10 @@ async function connect() {
    if (!current() || generation !== session.generation) return;
    modelCatalog = catalog.models || []; renderModels(); updateModelDetails();
   } catch { if (current()) notify('The model list is unavailable. You can enter a model ID.'); }
+  try {
+   const status = await session.request('backends');
+   if (current() && generation === session.generation) { $('backends').innerHTML = renderBackends(status); $('backends-panel').hidden = false; }
+  } catch { /* the panel stays hidden; translation does not depend on it */ }
  } catch (error) {
   if (current()) notify(error.status === 503 ? 'OpenRouter key validation is temporarily unavailable. Try again shortly.' : error.status === 429 ? 'Key validation is rate limited. Wait a moment before connecting again.' : 'Could not connect. Check your key and try again.', true);
  } finally { if (current()) $('connect').disabled = false; }

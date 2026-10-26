@@ -46,6 +46,7 @@ jobs:
         run: |
           node --check src/subtitle_translator/server/static/app.js
           node --check src/subtitle_translator/server/static/session.mjs
+          node --check src/subtitle_translator/server/static/backends.mjs
           node --test tests/ui/*.test.mjs
 
   core-only:

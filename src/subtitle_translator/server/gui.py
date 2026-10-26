@@ -231,6 +231,8 @@ class GuiSession:
                     )
             elif command.type == "models" and not payload:
                 value = (await ui_api.models(self.identity)).model_dump(mode="json", by_alias=True)
+            elif command.type == "backends" and not payload:
+                value = await ui_api.backends(self.identity)
             elif command.type == "restore" and not payload:
                 self.changed.set()
                 value = {"restored": True}

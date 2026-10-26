@@ -75,7 +75,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 subtitle_translator = [
     "server/static/index.html", "server/static/app.css", "server/static/app.js",
-    "server/static/archive.mjs", "server/static/session.mjs",
+    "server/static/archive.mjs", "server/static/session.mjs", "server/static/backends.mjs",
     "server/static/outfit.woff2", "server/static/outfit-OFL.txt",
     "_vendor/LICENSE.srt",
 ]

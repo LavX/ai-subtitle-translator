@@ -40,6 +40,6 @@ def test_console_script_and_no_requirements_file():
 
 def test_gui_assets_are_package_data():
     data = PYPROJECT["tool"]["setuptools"]["package-data"]["subtitle_translator"]
-    for asset in ("index.html", "app.css", "app.js", "archive.mjs", "session.mjs", "outfit.woff2", "outfit-OFL.txt"):
+    for asset in ("index.html", "app.css", "app.js", "archive.mjs", "session.mjs", "backends.mjs", "outfit.woff2", "outfit-OFL.txt"):
         assert f"server/static/{asset}" in data, asset
     assert "_vendor/LICENSE.srt" in data
