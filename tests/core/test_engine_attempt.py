@@ -287,3 +287,88 @@ async def test_each_batch_names_the_model_that_served_it():
     )
     assert outcome.batches == [BatchModel((0, 1, 2, 3, 4), "scripted-model"), BatchModel((5, 6, 7, 8, 9), "routed/model-b")]
     assert [c.model for c in checkpoints] == ["scripted-model", "routed/model-b"]
+
+
+class _FreshProviders(ScriptedBackend):
+    """Every open hands out a new provider, as a request with its own key does."""
+
+    def __init__(self):
+        super().__init__({})
+        self.made = []
+
+    def open(self, connection, base, context):
+        provider = ScriptedProvider()
+        self.made.append(provider)
+        self.providers = {connection.id: provider}
+        return super().open(connection, base, context)
+
+
+@pytest.mark.asyncio
+async def test_opened_back_ends_are_bounded_and_the_evicted_ones_are_closed():
+    from subtitle_translator.core.engine import MAX_OPENED
+
+    backend = _FreshProviders()
+    eng = TranslationEngine(registry_with(backend), BASE)
+    count = MAX_OPENED + 25
+    for n in range(count):
+        await eng.attempt(job(2), Connection("request", "scripted", secrets={"api_key": f"key-{n}"}))
+    assert len(eng._opened) == MAX_OPENED and len(backend.made) == count
+    assert sum(p.closed for p in backend.made) == count - MAX_OPENED
+    assert not backend.made[-1].closed and backend.made[0].closed
+    assert eng._retired == []
+
+
+@pytest.mark.asyncio
+async def test_a_recently_used_back_end_is_kept_over_older_ones():
+    from subtitle_translator.core.engine import MAX_OPENED
+
+    backend = _FreshProviders()
+    eng = TranslationEngine(registry_with(backend), BASE)
+    first = Connection("request", "scripted", secrets={"api_key": "keep"})
+    await eng.attempt(job(2), first)
+    for n in range(MAX_OPENED + 5):
+        await eng.attempt(job(2), first)  # in use again: stays the newest
+        await eng.attempt(job(2), Connection("request", "scripted", secrets={"api_key": f"k{n}"}))
+    assert len(backend.made) == MAX_OPENED + 6  # "keep" was opened once
+
+
+@pytest.mark.asyncio
+async def test_an_eviction_waits_for_the_attempt_still_running_on_it():
+    from subtitle_translator.core.engine import MAX_OPENED
+
+    gate = asyncio.Event()
+
+    class Held(ScriptedProvider):
+        async def translate_batch(self, batch, model=None, temperature=None, config_override=None):
+            await gate.wait()
+            return await super().translate_batch(batch, model, temperature, config_override)
+
+    class Backend(_FreshProviders):
+        def open(self, connection, base, context):
+            if not self.made:
+                provider = Held()
+                self.made.append(provider)
+                self.providers = {connection.id: provider}
+                return ScriptedBackend.open(self, connection, base, context)
+            return super().open(connection, base, context)
+
+    backend = Backend()
+    eng = TranslationEngine(registry_with(backend), BASE)
+    running = asyncio.create_task(
+        eng.attempt(job(2), Connection("request", "scripted", secrets={"api_key": "slow"}))
+    )
+    await asyncio.sleep(0.05)
+    for n in range(MAX_OPENED + 3):
+        await eng.attempt(job(2), Connection("request", "scripted", secrets={"api_key": f"k{n}"}))
+    assert not backend.made[0].closed  # still serving the running attempt
+    gate.set()
+    await running
+    assert backend.made[0].closed and eng._retired == []
+
+
+def test_an_opened_back_end_and_the_engine_do_not_show_a_key_in_their_reprs():
+    backend = _FreshProviders()
+    eng = TranslationEngine(registry_with(backend), BASE)
+    connection = Connection("request", "scripted", secrets={"api_key": "SECRET-key"})
+    entry = eng._open(connection)
+    assert "SECRET" not in repr(entry) and "SECRET" not in repr(entry.opened) and "SECRET" not in repr(eng._opened)

@@ -4,6 +4,7 @@ standalone service calls translate()."""
 
 import asyncio
 import time
+from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Literal
@@ -92,6 +93,12 @@ class FailoverRecord:
     kind: ErrorKind
     message: str
     retry_after: float | None
+
+
+# How many opened back ends an engine keeps. A request with its own key opens one per distinct
+# key, so the cache is a small LRU: the least recently used one is retired and closed once no
+# attempt runs on it, and its key leaves memory with it.
+MAX_OPENED = 32
 
 
 @dataclass
@@ -186,7 +193,7 @@ class TranslationEngine:
         self._registry = registry
         self._base = base or CoreSettings()
         self._context_for = context_for or (lambda type_id: BackendContext())
-        self._opened: dict[str, _Opened] = {}
+        self._opened: OrderedDict[str, _Opened] = OrderedDict()
         self._retired: list[_Opened] = []
         # connection id -> (fingerprint, when it may be tried again, whether the provider named
         # that wait). A wait the provider named is honoured; one of the defaults is a guess.
@@ -209,6 +216,11 @@ class TranslationEngine:
             )
             entry = _Opened(opened, BatchSizeResolver(opened.settings))
             self._opened[key] = entry
+            while len(self._opened) > MAX_OPENED:
+                _, oldest = self._opened.popitem(last=False)
+                self._retired.append(oldest)
+        else:
+            self._opened.move_to_end(key)
         return entry
 
     def provider_for(self, connection: Connection):
@@ -230,7 +242,7 @@ class TranslationEngine:
         self._base = base
         if context_for is not None:
             self._context_for = context_for
-        retired, self._opened = list(self._opened.values()), {}
+        retired, self._opened = list(self._opened.values()), OrderedDict()
         self._retired.extend(retired)
         for entry in retired:
             await self._release(entry)
@@ -272,6 +284,9 @@ class TranslationEngine:
             ) from error
         entry.users += 1
         try:
+            # What the cache evicted to make room for this entry is closed once nothing uses it.
+            for evicted in list(self._retired):
+                await self._release(evicted)
             return await self._run(job, connection, entry, events or EngineEvents())
         finally:
             entry.users -= 1

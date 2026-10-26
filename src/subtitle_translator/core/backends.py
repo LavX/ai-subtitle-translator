@@ -164,7 +164,7 @@ class BackendContext:
 class OpenedBackend:
     provider: TranslationProvider
     settings: CoreSettings
-    config: TranslationConfig
+    config: TranslationConfig = field(repr=False)
     model: str
     batch_size: int | None = None
 
