@@ -271,3 +271,32 @@ def test_a_legacy_request_never_reaches_a_server_with_gemini_enabled():
     connections, pinned = run.plan(TranslationConfig(apiKey="user-key", model="x/y"))
     assert pinned == REQUEST_CONNECTION
     assert [c.id for c in connections] == [REQUEST_CONNECTION] and connections[0].backend_type == "openrouter"
+
+
+@pytest.mark.asyncio
+async def test_the_next_keyless_job_is_sent_after_the_only_connection_timed_out():
+    # Default BACKEND_ORDER with Gemini off leaves one enabled connection. A read timeout
+    # puts it into its default cooldown, and the next job must still be sent, as in 2.1.1.
+    from subtitle_translator.core.errors import ProviderTimeoutError
+    from subtitle_translator.server.translate import run_lines
+
+    provider = ScriptedProvider([ProviderTimeoutError("read timed out")])
+    run = single_provider_runtime(provider, settings(openrouter_api_key="server"))
+    first = await run_lines(run, [Line(0, "Hello")], source="en", target="hu")
+    assert first.status == "failed"
+    sent = len(provider.batches)
+    second = await run_lines(run, [Line(0, "Hello")], source="en", target="hu")
+    assert second.status == "completed" and len(provider.batches) > sent
+
+
+@pytest.mark.asyncio
+async def test_the_next_keyless_job_is_still_attempted_after_a_402():
+    from subtitle_translator.core.errors import QuotaExhaustedError
+    from subtitle_translator.server.translate import run_lines
+
+    provider = ScriptedProvider([QuotaExhaustedError("payment required")])
+    run = single_provider_runtime(provider, settings(openrouter_api_key="server"))
+    assert (await run_lines(run, [Line(0, "Hello")], source="en", target="hu")).status == "failed"
+    sent = len(provider.batches)
+    again = await run_lines(run, [Line(0, "Hello")], source="en", target="hu")
+    assert again.status == "completed" and len(provider.batches) > sent

@@ -131,14 +131,97 @@ async def test_disabled_and_missing_connections():
 
 
 @pytest.mark.asyncio
-async def test_every_connection_cooling_is_rate_limited_with_the_soonest_wait():
+async def test_every_connection_cooling_on_a_provider_wait_is_rate_limited_with_the_soonest_wait():
+    # Both waits are the provider's own (a Retry-After), so they are honoured: nothing is sent.
     clock = Clock()
-    eng = engine({"a": ScriptedProvider([RateLimitError("x", retry_after=50)]), "b": ScriptedProvider([RateLimitError("y", retry_after=80)])}, clock)
+    a = ScriptedProvider([RateLimitError("x", retry_after=50)])
+    b = ScriptedProvider([RateLimitError("y", retry_after=80)])
+    eng = engine({"a": a, "b": b}, clock)
     with pytest.raises(EngineError):
         await eng.translate(job(5), [A, B])
+    sent = len(a.batches), len(b.batches)
     with pytest.raises(EngineError) as caught:
         await eng.translate(job(5), [A, B])
     assert caught.value.kind is ErrorKind.RATE_LIMITED and caught.value.retry_after == pytest.approx(50)
+    assert (len(a.batches), len(b.batches)) == sent
+
+
+@pytest.mark.asyncio
+async def test_the_only_connection_is_tried_again_after_a_timeout_with_no_provider_wait():
+    # A timeout names no wait, so the default cooldown is a guess. With nothing else to try,
+    # the next request is sent instead of being refused.
+    clock = Clock()
+    only = ScriptedProvider([ProviderTimeoutError("read timed out")])
+    eng = engine({"a": only}, clock)
+    with pytest.raises(EngineError) as first:
+        await eng.translate(job(5), [A])
+    assert first.value.kind is ErrorKind.DEPENDENCY_UNAVAILABLE
+    sent = len(only.batches)
+    again = await eng.translate(job(5), [A])
+    assert again.status == "complete" and len(only.batches) > sent
+
+
+@pytest.mark.asyncio
+async def test_the_only_connection_is_tried_again_after_a_402_once_the_operator_tops_up():
+    clock = Clock()
+    only = ScriptedProvider([QuotaExhaustedError("payment required")])
+    eng = engine({"a": only}, clock)
+    with pytest.raises(EngineError):
+        await eng.translate(job(5), [A])
+    sent = len(only.batches)
+    # Same connection, same key, no time passed: the credits may have been topped up.
+    again = await eng.translate(job(5), [A])
+    assert again.status == "complete" and len(only.batches) > sent
+
+
+@pytest.mark.asyncio
+async def test_the_only_connection_is_tried_again_after_a_401_with_no_provider_wait():
+    only = ScriptedProvider([AuthenticationError("bad key")])
+    eng = engine({"a": only})
+    with pytest.raises(EngineError):
+        await eng.translate(job(5), [A])
+    again = await eng.translate(job(5), [A])
+    assert again.status == "complete"
+
+
+@pytest.mark.asyncio
+async def test_with_every_connection_cooling_the_one_whose_wait_ends_soonest_is_tried():
+    clock = Clock()
+    # Both fail with no provider wait: a sits out the 60 s default, b (a 402) the 3600 s one.
+    a = ScriptedProvider([ProviderTimeoutError("late")])
+    b = ScriptedProvider([QuotaExhaustedError("spent")])
+    eng = engine({"a": a, "b": b}, clock)
+    with pytest.raises(EngineError):
+        await eng.translate(job(5), [A, B])
+    calls = len(a.batches), len(b.batches)
+    again = await eng.translate(job(5), [A, B])
+    assert again.connection_id == "a"
+    assert len(a.batches) == calls[0] + 1 and len(b.batches) == calls[1]
+
+
+@pytest.mark.asyncio
+async def test_a_cooling_connection_is_still_skipped_while_another_one_is_healthy():
+    clock = Clock()
+    a = ScriptedProvider([ProviderTimeoutError("late")])
+    b = ScriptedProvider()
+    eng = engine({"a": a, "b": b}, clock)
+    await eng.translate(job(5), [A, B])
+    calls = len(a.batches)
+    for _ in range(3):
+        outcome = await eng.translate(job(5), [A, B])
+        assert outcome.connection_id == "b"
+    assert len(a.batches) == calls
+
+
+@pytest.mark.asyncio
+async def test_a_success_clears_the_connections_cooldown():
+    clock = Clock()
+    a = ScriptedProvider([RateLimitError("slow", retry_after=100)])
+    eng = engine({"a": a, "b": ScriptedProvider()}, clock)
+    await eng.translate(job(5), [A, B])
+    clock.now += 101
+    assert (await eng.translate(job(5), [A, B])).connection_id == "a"
+    assert (await eng.translate(job(5), [A, B])).connection_id == "a"
 
 
 @pytest.mark.asyncio

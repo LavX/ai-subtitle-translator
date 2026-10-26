@@ -188,7 +188,9 @@ class TranslationEngine:
         self._context_for = context_for or (lambda type_id: BackendContext())
         self._opened: dict[str, _Opened] = {}
         self._retired: list[_Opened] = []
-        self._cooling: dict[str, tuple[str, float]] = {}
+        # connection id -> (fingerprint, when it may be tried again, whether the provider named
+        # that wait). A wait the provider named is honoured; one of the defaults is a guess.
+        self._cooling: dict[str, tuple[str, float, bool]] = {}
         self._clock = clock
 
     @property
@@ -284,6 +286,25 @@ class TranslationEngine:
             return 0.0
         return entry[1]
 
+    def _cooling_on_provider_wait(self, connection: Connection) -> bool:
+        entry = self._cooling.get(connection.id)
+        return entry is not None and entry[0] == connection.fingerprint() and entry[2]
+
+    def _candidates(self, enabled: Sequence[Connection]) -> list[Connection]:
+        """The connections a request walks. Those not cooling, in order. When every one is
+        cooling, the cooldown is only a guess unless the provider named the wait, so the one
+        whose guess ends soonest is tried: a request is never refused with nothing sent just
+        because the only connection failed a minute ago (or ran out of credit before the
+        operator topped it up). A wait the provider named, such as a Retry-After, is honoured."""
+        now = self._clock()
+        ready = [c for c in enabled if self._cooling_until(c) <= now]
+        if ready:
+            return ready
+        guessed = [c for c in enabled if not self._cooling_on_provider_wait(c)]
+        if guessed:
+            return [min(guessed, key=self._cooling_until)]
+        return []
+
     async def translate(
         self,
         job: TranslationJob,
@@ -315,9 +336,7 @@ class TranslationEngine:
         tokens, cost, held = 0, 0.0, 0.0
         failovers: list[FailoverRecord] = []
         last: EngineError | None = None
-        for connection in enabled:
-            if self._cooling_until(connection) > self._clock():
-                continue
+        for connection in self._candidates(enabled):
             # A call an earlier connection left unsettled may have been billed, so its worst
             # case stays held, as it would within one attempt.
             budget = None if job.budget is None else max(0.0, job.budget - cost - held)
@@ -334,14 +353,20 @@ class TranslationEngine:
                     error.tokens, error.cost, error.reserved = tokens, cost, held
                     error.checkpoints, error.failovers = checkpoints, failovers
                     raise
-                wait = error.retry_after if error.retry_after else DEFAULT_COOLDOWN[error.kind]
-                self._cooling[connection.id] = (connection.fingerprint(), self._clock() + wait)
+                named = bool(error.retry_after)
+                wait = error.retry_after if named else DEFAULT_COOLDOWN[error.kind]
+                self._cooling[connection.id] = (
+                    connection.fingerprint(),
+                    self._clock() + wait,
+                    named,
+                )
                 record = FailoverRecord(connection.id, error.kind, error.message, error.retry_after)
                 failovers.append(record)
                 if events.on_failover is not None:
                     events.on_failover(record)
                 last = error
                 continue
+            self._cooling.pop(connection.id, None)
             outcome.tokens += tokens
             outcome.cost += cost
             outcome.failovers = failovers
