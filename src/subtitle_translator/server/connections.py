@@ -3,12 +3,15 @@
 OPENROUTER_* and GEMINI_* configure those two built-in back ends. Any other back end named in
 BACKEND_ORDER, the built-in OpenAI-compatible one or an installed back-end package, reads each
 of its settings from <TYPE>_<FIELD>, for example OPENAI_COMPATIBLE_BASE_URL or VENDOR_CLI_MODEL,
-and is turned on when its settings validate.
+and is turned on when its settings validate. They are read from the process environment and
+from the same .env file as every other setting; the environment wins, as it does for them.
 """
 
 import logging
 import os
 from collections.abc import Mapping
+
+from dotenv import dotenv_values
 
 from subtitle_translator.core.backends import BackendRegistry, Connection, FieldType, SettingField
 from subtitle_translator.core.errors import TranslationProviderError
@@ -38,11 +41,25 @@ def _parse(spec: SettingField, raw: str):
     return raw
 
 
+def environment() -> dict[str, str]:
+    """The process environment over the .env file the other settings are read from."""
+    values: dict[str, str] = {}
+    env_file = Settings.model_config.get("env_file")
+    for name in (env_file,) if isinstance(env_file, (str, os.PathLike)) else tuple(env_file or ()):
+        try:
+            values.update({k: v for k, v in dotenv_values(name).items() if v is not None})
+        except OSError:
+            continue
+    values.update(os.environ)
+    return values
+
+
 def _configured(name: str, backend, environ: Mapping[str, str]) -> Connection:
     values, secrets = {}, {}
     for spec in backend.fields():
         raw = environ.get(env_name(name, spec.key))
-        if raw is None:
+        if raw is None or not raw.strip():
+            # Docker Compose hands a variable the .env file lacks through as an empty string.
             continue
         try:
             (secrets if spec.secret else values)[spec.key] = _parse(spec, raw)
@@ -55,8 +72,10 @@ def _configured(name: str, backend, environ: Mapping[str, str]) -> Connection:
 
 
 def build_connections(
-    settings: Settings, registry: BackendRegistry, environ: Mapping[str, str] = os.environ
+    settings: Settings, registry: BackendRegistry, environ: Mapping[str, str] | None = None
 ) -> list[Connection]:
+    if environ is None:
+        environ = environment()
     connections: list[Connection] = []
     for name in _split(settings.backend_order):
         if any(c.id == name for c in connections):

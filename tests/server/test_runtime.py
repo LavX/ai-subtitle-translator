@@ -327,3 +327,51 @@ def test_an_opened_back_end_does_not_show_a_request_key_in_its_repr():
     entry = run.engine._open(connections[0])
     assert "SECRET" not in repr(entry) and "SECRET" not in repr(entry.opened) and "SECRET" not in repr(run.engine._opened)
     assert isinstance(connections[0], Connection)
+
+
+LM_STUDIO_ENV = (
+    "OPENAI_COMPATIBLE_PRESET=lmstudio\n"
+    "OPENAI_COMPATIBLE_BASE_URL=http://192.168.1.10:1234/v1\n"
+    "OPENAI_COMPATIBLE_MODEL=from-dotenv\n"
+)
+
+
+def test_openai_compatible_settings_in_the_dotenv_file_turn_the_back_end_on(tmp_path, monkeypatch):
+    for name in ("PRESET", "BASE_URL", "MODEL", "API_KEY"):
+        monkeypatch.delenv(f"OPENAI_COMPATIBLE_{name}", raising=False)
+    (tmp_path / ".env").write_text(LM_STUDIO_ENV)
+    monkeypatch.chdir(tmp_path)
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    connections = build_connections(settings(backend_order="openai_compatible"), registry)
+    assert [(c.id, c.enabled) for c in connections] == [("openai_compatible", True)]
+    assert connections[0].settings["model"] == "from-dotenv"
+
+
+def test_the_process_environment_wins_over_the_dotenv_file(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text(LM_STUDIO_ENV)
+    monkeypatch.setenv("OPENAI_COMPATIBLE_MODEL", "from-environment")
+    monkeypatch.chdir(tmp_path)
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    connections = build_connections(settings(backend_order="openai_compatible"), registry)
+    assert connections[0].settings["model"] == "from-environment"
+
+
+def test_a_blank_value_from_compose_counts_as_not_set(tmp_path, monkeypatch):
+    # docker-compose passes ${VAR:-} as an empty string when the .env file has no such line.
+    for name, value in {"PRESET": "lmstudio", "BASE_URL": "http://127.0.0.1:1234/v1", "MODEL": "m",
+                        "PRICE_INPUT": "", "BATCH_SIZE": "", "API_KEY": ""}.items():
+        monkeypatch.setenv(f"OPENAI_COMPATIBLE_{name}", value)
+    monkeypatch.chdir(tmp_path)
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    connection = build_connections(settings(backend_order="openai_compatible"), registry)[0]
+    assert connection.enabled and connection.secrets == {}
+    assert connection.settings["batch_size"] == 100 and connection.settings["price_input"] == 0.0
+
+
+def test_no_dotenv_file_is_fine(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    for name in ("PRESET", "BASE_URL", "MODEL"):
+        monkeypatch.delenv(f"OPENAI_COMPATIBLE_{name}", raising=False)
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    connection = build_connections(settings(backend_order="openai_compatible"), registry)[0]
+    assert not connection.enabled
