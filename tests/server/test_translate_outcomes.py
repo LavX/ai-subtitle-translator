@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
+from subtitle_translator.core.engine import Line
 from subtitle_translator.core.errors import InvalidResponseError
 from subtitle_translator.core.settings import CoreSettings
 from subtitle_translator.server.api import routes
 from subtitle_translator.server.config import Settings
 from subtitle_translator.server.main import app
 from subtitle_translator.server.runtime import EngineTranslator, single_provider_runtime
-from subtitle_translator.core.engine import Line
 from subtitle_translator.server.translate import run_lines
 from tests.core.engine_fakes import ScriptedProvider
 

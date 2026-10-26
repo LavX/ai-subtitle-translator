@@ -17,7 +17,6 @@ from subtitle_translator.server.queue.worker import (
     process_file_translation_job,
 )
 
-
 # A request window long enough that a loaded machine cannot eat the margin between "the split
 # shares the root's budget" (3 windows) and "the split got a fresh one" (4 windows), and a guard
 # against a hang that no healthy run comes near.
