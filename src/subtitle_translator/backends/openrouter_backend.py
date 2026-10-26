@@ -49,6 +49,7 @@ _PROVIDER_KEYS = (
     "ignore",
     "smart_fast",
     "deny_data_collection",
+    "data_collection",
 )
 SERVICE_TIERS = ("default", "flex", "priority")
 
@@ -76,10 +77,13 @@ def translation_config(
         "order": settings.get("provider_order") or None,
         "allowFallbacks": settings.get("allow_fallbacks", True),
         "sort": routing,
+        # An empty list is the unset value of a list field, not "no provider allowed".
         "only": settings.get("only") or None,
         "ignore": settings.get("ignore") or None,
         "smartFast": SmartFastPolicy(**policy) if isinstance(policy, dict) else None,
-        "dataCollection": "deny" if settings.get("deny_data_collection") else None,
+        # A request's explicit choice ("allow" or "deny") wins; the toggle can only deny.
+        "dataCollection": settings.get("data_collection")
+        or ("deny" if settings.get("deny_data_collection") else None),
     }
     has_provider = any(key in settings for key in _PROVIDER_KEYS)
     return TranslationConfig(
@@ -116,6 +120,7 @@ def settings_from_config(config: TranslationConfig) -> dict[str, Any]:
             ignore=p.ignore,
             smart_fast=p.smart_fast.model_dump() if p.smart_fast else None,
             deny_data_collection=True if p.data_collection == "deny" else None,
+            data_collection=p.data_collection,
         )
     return settings
 

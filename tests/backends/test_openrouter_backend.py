@@ -157,3 +157,37 @@ def test_the_builtin_back_ends_are_discovered_from_the_installed_package():
     assert registry.types() == ["gemini", "openai_compatible", "openrouter"]
     assert all(entry.builtin for entry in registry.entries())
     assert OPENROUTER_DEFAULT_MODEL
+
+
+@pytest.mark.parametrize("value", ["allow", "deny"])
+def test_a_request_data_collection_choice_survives_the_pinned_connection(value):
+    config = TranslationConfig(
+        apiKey="k", model="x/y", provider=ProviderConfig(sort="throughput", dataCollection=value)
+    )
+    rebuilt = translation_config(
+        {k: v for k, v in settings_from_config(config).items() if v is not None}, {"api_key": "k"}
+    )
+    assert rebuilt.provider.data_collection == value
+    _, params = OpenRouterProvider(CoreSettings())._build_provider_payload(rebuilt, "x/y")
+    assert params["provider"]["data_collection"] == value
+
+
+def test_a_request_that_says_nothing_about_data_collection_sends_nothing():
+    config = TranslationConfig(apiKey="k", model="x/y", provider=ProviderConfig(sort="throughput"))
+    rebuilt = translation_config(
+        {k: v for k, v in settings_from_config(config).items() if v is not None}, {"api_key": "k"}
+    )
+    assert rebuilt.provider.data_collection is None
+
+
+def test_an_empty_only_list_restricts_nothing_through_a_connection_and_in_the_payload():
+    # An empty list is the unset value of a list field; it must not become "no provider allowed".
+    config = TranslationConfig(
+        apiKey="k", model="x/y", provider=ProviderConfig(sort="throughput", only=[], ignore=[])
+    )
+    rebuilt = translation_config(
+        {k: v for k, v in settings_from_config(config).items() if v is not None}, {"api_key": "k"}
+    )
+    assert rebuilt.provider.only is None and rebuilt.provider.ignore is None
+    _, params = OpenRouterProvider(CoreSettings())._build_provider_payload(rebuilt, "x/y")
+    assert "only" not in params["provider"] and "ignore" not in params["provider"]
