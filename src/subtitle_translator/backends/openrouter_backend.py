@@ -115,7 +115,7 @@ def settings_from_config(config: TranslationConfig) -> dict[str, Any]:
             only=p.only,
             ignore=p.ignore,
             smart_fast=p.smart_fast.model_dump() if p.smart_fast else None,
-            deny_data_collection=p.data_collection == "deny",
+            deny_data_collection=True if p.data_collection == "deny" else None,
         )
     return settings
 

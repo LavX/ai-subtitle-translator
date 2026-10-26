@@ -15,7 +15,7 @@ class CoreSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    openrouter_api_key: str = ""
+    openrouter_api_key: str = Field("", repr=False)
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
     openrouter_default_model: str = "amazon/nova-2-lite-v1:free"
     openrouter_temperature: float = 0.3

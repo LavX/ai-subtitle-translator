@@ -284,7 +284,9 @@ async def process_file_translation_job(
 def _progress_reporter(job_manager: JobManager, job_id: str) -> Callable[[Progress], None]:
     def report(progress: Progress) -> None:
         percent = (
-            int(100 * progress.done_lines / progress.total_lines) if progress.total_lines else 100
+            int(100 * progress.done_batches / progress.total_batches)
+            if progress.total_batches
+            else 100
         )
         failed = f", {progress.failed_batches} failed" if progress.failed_batches else ""
         message = progress.message or (
@@ -376,6 +378,7 @@ def _extract_config_override_from_dict(
             "service_tier",
             "parallelBatches",
             "parallel_batches",
+            "backend",
         ]
     ):
         return None

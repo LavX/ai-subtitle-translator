@@ -4,6 +4,7 @@ import threading
 from datetime import timedelta
 from typing import Any
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from subtitle_translator.backends.gemini import GEMINI_DEFAULT_MODEL
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     ui_enabled: bool = False
 
     # OpenRouter Configuration
-    openrouter_api_key: str = ""
+    openrouter_api_key: str = Field("", repr=False)
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
     openrouter_default_model: str = "amazon/nova-2-lite-v1:free"
     openrouter_temperature: float = 0.3
@@ -39,7 +40,7 @@ class Settings(BaseSettings):
 
     # Gemini: comma-separated keys, and optionally the Google Cloud project of each, so keys
     # from one project share its limits.
-    gemini_api_keys: str = ""
+    gemini_api_keys: str = Field("", repr=False)
     gemini_key_projects: str = ""
     gemini_model: str = GEMINI_DEFAULT_MODEL
     gemini_batch_size: int = 300

@@ -95,5 +95,11 @@ async def run_lines(
         return RunResult(out, set(done), model_used, error.tokens, error.cost, "partial", reason)
     missing = set(outcome.missing)
     done = {line.position for line in lines if line.position not in missing}
+    if lines and not done:
+        # Nothing came back: every attempt was billed, but no line is a translation.
+        return RunResult(
+            list(lines), set(), outcome.model, outcome.tokens, outcome.cost, "failed",
+            outcome.summary or "Translation failed",
+        )
     status = "completed" if outcome.status == "complete" else "partial"
     return RunResult(outcome.lines, done, outcome.model, outcome.tokens, outcome.cost, status, outcome.summary or None)

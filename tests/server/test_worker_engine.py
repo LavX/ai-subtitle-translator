@@ -142,3 +142,44 @@ async def test_request_config_is_logged_without_key_material(manager, caplog):
     job_id = await submit(manager, config={"apiKey": "sk-visible-nowhere", "model": "x/y"})
     await process_content_translation_job(manager, job_id, translator(ScriptedProvider()))
     assert "sk-visible-nowhere" not in caplog.text and "***" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_every_batch_failing_on_content_fails_the_job(manager):
+    bad = InvalidResponseError("garbled")
+    job_id = await submit(manager)
+    await process_content_translation_job(manager, job_id, translator(ScriptedProvider([bad] * 10)))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.FAILED
+    assert job.error.startswith("All 2 batches failed") and "garbled" in job.error
+    assert not job.result
+
+
+@pytest.mark.asyncio
+async def test_a_file_where_every_batch_fails_on_content_fails_the_job(manager):
+    bad = InvalidResponseError("garbled")
+    job_id = await submit(manager, job_type=JobType.TRANSLATE_FILE, content=SRT)
+    await process_file_translation_job(manager, job_id, translator(ScriptedProvider([bad] * 10)))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.FAILED and "garbled" in job.error
+
+
+@pytest.mark.asyncio
+async def test_the_sync_surface_returns_no_lines_when_every_batch_fails():
+    from subtitle_translator.core.models import SubtitleLine, TranslateContentRequest
+
+    bad = InvalidResponseError("garbled")
+    t = translator(ScriptedProvider([bad] * 10))
+    content = await t.translate_content(
+        TranslateContentRequest(sourceLanguage="en", targetLanguage="hu", lines=[SubtitleLine(position=1, line="Hi")])
+    )
+    assert content.success is False and content.lines == [] and "garbled" in content.error
+    file_result = await translator(ScriptedProvider([bad] * 10)).translate_file(SRT, "en", "hu")
+    assert file_result.success is False and file_result.content == ""
+
+
+@pytest.mark.asyncio
+async def test_a_file_job_config_with_only_a_backend_pin_is_kept(manager):
+    from subtitle_translator.server.queue.worker import _extract_config_override_from_dict
+
+    assert _extract_config_override_from_dict({"backend": "gemini"}).backend == "gemini"

@@ -38,6 +38,22 @@ def _parse(spec: SettingField, raw: str):
     return raw
 
 
+def _configured(name: str, backend, environ: Mapping[str, str]) -> Connection:
+    values, secrets = {}, {}
+    for spec in backend.fields():
+        raw = environ.get(env_name(name, spec.key))
+        if raw is None:
+            continue
+        try:
+            (secrets if spec.secret else values)[spec.key] = _parse(spec, raw)
+        except ValueError:
+            logger.warning("%s is not a valid %s", env_name(name, spec.key), spec.type)
+    validation = backend.validate(values, secrets)
+    if not validation.ok:
+        logger.warning("%s is off: %s", name, ", ".join(f"{k}: {v}" for k, v in validation.errors.items()))
+    return Connection(name, name, enabled=validation.ok, settings=validation.patch or values, secrets=secrets)
+
+
 def build_connections(
     settings: Settings, registry: BackendRegistry, environ: Mapping[str, str] = os.environ
 ) -> list[Connection]:
@@ -86,19 +102,8 @@ def build_connections(
         except TranslationProviderError as error:
             logger.warning("BACKEND_ORDER names %s, which is not available: %s", name, error.message)
             continue
-        values, secrets = {}, {}
-        for spec in backend.fields():
-            raw = environ.get(env_name(name, spec.key))
-            if raw is None:
-                continue
-            try:
-                (secrets if spec.secret else values)[spec.key] = _parse(spec, raw)
-            except ValueError:
-                logger.warning("%s is not a valid %s", env_name(name, spec.key), spec.type)
-        validation = backend.validate(values, secrets)
-        if not validation.ok:
-            logger.warning("%s is off: %s", name, ", ".join(f"{k}: {v}" for k, v in validation.errors.items()))
-        connections.append(
-            Connection(name, name, enabled=validation.ok, settings=validation.patch or values, secrets=secrets)
-        )
+        try:
+            connections.append(_configured(name, backend, environ))
+        except Exception as error:  # noqa: BLE001 - a broken extension must not stop the service
+            logger.warning("%s is off: its setup failed (%s: %s)", name, type(error).__name__, error)
     return connections

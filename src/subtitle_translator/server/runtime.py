@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from subtitle_translator import __version__
@@ -48,8 +48,8 @@ class _SharedOpenRouter:
 
 @dataclass
 class Runtime:
-    settings: object
-    core: CoreSettings
+    settings: object = field(repr=False)
+    core: CoreSettings = field(repr=False)
     registry: BackendRegistry
     engine: TranslationEngine
     connections: list[Connection]

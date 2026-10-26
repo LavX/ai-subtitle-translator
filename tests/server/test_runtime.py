@@ -224,3 +224,50 @@ def test_the_gemini_connection_carries_its_prices():
     assert (gemini.settings["price_input"], gemini.settings["price_output"]) == (1.5, 3.0)
     default = next(c for c in build_connections(settings(gemini_api_keys="k"), registry, environ={}) if c.id == "gemini")
     assert (default.settings["price_input"], default.settings["price_output"]) == (0.0, 0.0)
+
+
+def test_a_keyless_request_with_routing_leaves_the_servers_data_retention_option_alone():
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    run = single_provider_runtime(ScriptedProvider(), settings(openrouter_api_key="k"))
+    run.connections = build_connections(
+        settings(openrouter_api_key="k", openrouter_deny_data_collection=True), registry, environ={}
+    )
+    config = TranslationConfig(provider=ProviderConfig(order=["x"]))
+    connections, _ = run.plan(config)
+    server = next(c for c in connections if c.id == "openrouter")
+    assert server.settings["deny_data_collection"] is True
+
+
+def test_the_runtime_and_settings_reprs_hide_keys():
+    run = single_provider_runtime(
+        ScriptedProvider(), settings(openrouter_api_key="SECRET-or", gemini_api_keys="SECRET-g")
+    )
+    assert "SECRET" not in repr(run) and "SECRET" not in repr(run.settings)
+
+
+def test_a_back_end_whose_setup_raises_is_skipped_not_fatal():
+    class Exploding(fakes.EchoBackend):
+        type_id = "exploding"
+
+        def fields(self):
+            raise RuntimeError("boom")
+
+    registry = BackendRegistry.discover(
+        BackendScope.everything(),
+        fakes.entry_points_from(fakes.FakeEntryPoint("exploding", Exploding, dist="other")),
+    )
+    connections = build_connections(
+        settings(openrouter_api_key="k", backend_order="exploding,openrouter"), registry, environ={}
+    )
+    assert [c.id for c in connections] == ["openrouter"]
+
+
+def test_a_legacy_request_never_reaches_a_server_with_gemini_enabled():
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    run = single_provider_runtime(ScriptedProvider(), settings(openrouter_api_key="server"))
+    run.connections = build_connections(
+        settings(openrouter_api_key="server", gemini_api_keys="g"), registry, environ={}
+    )
+    connections, pinned = run.plan(TranslationConfig(apiKey="user-key", model="x/y"))
+    assert pinned == REQUEST_CONNECTION
+    assert [c.id for c in connections] == [REQUEST_CONNECTION] and connections[0].backend_type == "openrouter"
