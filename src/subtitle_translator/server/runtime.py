@@ -1,6 +1,7 @@
 """The standalone service's engine, its connection list and the translator the routes use."""
 
 import asyncio
+import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -24,6 +25,8 @@ from subtitle_translator.core.provider import TranslationProvider
 from subtitle_translator.core.settings import CoreSettings
 from subtitle_translator.server.config import Settings, get_settings
 from subtitle_translator.server.connections import build_connections
+
+logger = logging.getLogger(__name__)
 
 REQUEST_CONNECTION = "request"
 
@@ -216,11 +219,137 @@ class EngineTranslator:
         self.provider = runtime.openrouter
 
     async def translate_content(self, request, config_override=None):
-        raise NotImplementedError("the routes do not run on the engine yet")
+        from subtitle_translator.core.engine import Line
+        from subtitle_translator.core.models import SubtitleLine
+        from subtitle_translator.core.translator import ContentTranslationResult
+        from subtitle_translator.server.translate import run_lines
 
-    async def translate_file(self, content, source_language, target_language, title=None, model=None,
-                             temperature=None, config_override=None):
-        raise NotImplementedError("the routes do not run on the engine yet")
+        config = config_override or request.config
+        lines = [Line(item.position, item.line) for item in request.lines]
+        if not lines:
+            return ContentTranslationResult(
+                lines=[],
+                model_used=request.model or self.settings.openrouter_default_model,
+                tokens_used=0,
+            )
+        try:
+            result = await run_lines(
+                self.runtime,
+                lines,
+                source=request.sourceLanguage,
+                target=request.targetLanguage,
+                title=request.title,
+                media_type=request.mediaType,
+                config=config,
+                model=request.model,
+                temperature=request.temperature,
+            )
+        except Exception as error:  # noqa: BLE001 - reported to the caller as 2.1.1 reported it
+            logger.exception("Translation failed: %s", error)
+            return ContentTranslationResult(
+                lines=[],
+                model_used=request.model or self.settings.openrouter_default_model,
+                success=False,
+                error=str(error),
+            )
+        out = [SubtitleLine(position=item.position, line=item.text) for item in result.lines]
+        if result.status == "completed":
+            return ContentTranslationResult(
+                lines=out, model_used=result.model_used, tokens_used=result.tokens
+            )
+        if result.status == "partial":
+            return ContentTranslationResult(
+                lines=out,
+                model_used=result.model_used,
+                tokens_used=result.tokens,
+                success=False,
+                error=f"Partial failure: {result.error}",
+            )
+        return ContentTranslationResult(
+            lines=[],
+            model_used=result.model_used,
+            tokens_used=result.tokens,
+            success=False,
+            error=result.error,
+        )
+
+    async def translate_file(
+        self,
+        content,
+        source_language,
+        target_language,
+        title=None,
+        model=None,
+        temperature=None,
+        config_override=None,
+    ):
+        from subtitle_translator.core.engine import Line
+        from subtitle_translator.core.srt_parser import SRTParser
+        from subtitle_translator.core.translator import FileTranslationResult
+        from subtitle_translator.server.translate import run_lines
+
+        parser = SRTParser()
+        model_used = (
+            (config_override.model if config_override and config_override.model else None)
+            or model
+            or self.settings.openrouter_default_model
+        )
+        try:
+            entries = parser.parse(content)
+            if not entries:
+                return FileTranslationResult(content=content, model_used=model_used, subtitle_count=0)
+            lines = [
+                Line(int(item["index"]), item["content"])
+                for item in parser.extract_lines_for_translation(entries)
+            ]
+            result = await run_lines(
+                self.runtime,
+                lines,
+                source=source_language,
+                target=target_language,
+                title=title,
+                config=config_override,
+                model=model,
+                temperature=temperature,
+                add_rtl_marks=False,
+            )
+            if result.status == "failed":
+                return FileTranslationResult(
+                    content="",
+                    model_used=result.model_used,
+                    tokens_used=result.tokens,
+                    success=False,
+                    error=result.error,
+                )
+            translations = [
+                {"index": str(line.position), "content": line.text}
+                for line in result.lines
+                if line.position in result.done
+            ]
+            translated = parser.apply_translations(
+                entries, translations, is_rtl=self.settings.is_rtl_language(target_language)
+            )
+            if result.status == "completed":
+                translated = parser.split_long_subtitles(translated)
+                return FileTranslationResult(
+                    content=parser.compose(translated),
+                    model_used=result.model_used,
+                    tokens_used=result.tokens,
+                    subtitle_count=len(entries),
+                )
+            return FileTranslationResult(
+                content=parser.compose(translated),
+                model_used=result.model_used,
+                tokens_used=result.tokens,
+                subtitle_count=len(entries),
+                success=False,
+                error=f"Partial failure: {result.error}",
+            )
+        except Exception as error:  # noqa: BLE001 - reported to the caller as 2.1.1 reported it
+            logger.exception("File translation failed: %s", error)
+            return FileTranslationResult(
+                content="", model_used=model_used, success=False, error=str(error)
+            )
 
     def _server_openrouter(self) -> TranslationProvider:
         """The provider for the health probe and the model list. It is the one the engine opened

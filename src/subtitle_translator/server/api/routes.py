@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from subtitle_translator import __version__
+from subtitle_translator.core.models import TranslationConfig
 from subtitle_translator.core.translator import SubtitleTranslator
 from subtitle_translator.server.api.models import (
     ConfigResponse,
@@ -30,7 +31,7 @@ from subtitle_translator.server.api.models import (
 )
 from subtitle_translator.server.config import get_settings, update_runtime_config
 from subtitle_translator.server.queue.job_manager import Job, JobStatus, JobType, job_manager
-from subtitle_translator.server.runtime import get_translator
+from subtitle_translator.server.runtime import get_runtime, get_translator
 
 # Crypto key set by main.py on startup (None = encryption disabled)
 _crypto_key: bytes | None = None
@@ -114,6 +115,20 @@ health_router = APIRouter(tags=["Health"])
 api_router = APIRouter(prefix="/api/v1", tags=["Translation"])
 jobs_router = APIRouter(prefix="/api/v1/jobs", tags=["Jobs"], dependencies=[AuthDep])
 config_router = APIRouter(prefix="/api/v1", tags=["Configuration"], dependencies=[AuthDep])
+
+NO_BACK_END = (
+    "No back end is configured. Set OPENROUTER_API_KEY or GEMINI_API_KEYS, configure another "
+    "back end in BACKEND_ORDER, or pass apiKey in the request config."
+)
+
+
+async def has_back_end(config: TranslationConfig | None) -> bool:
+    """Whether a translation request has a back end to run on: its own OpenRouter key, or any
+    back end the server has turned on."""
+    if config is not None and config.api_key:
+        return True
+    runtime = await get_runtime()
+    return any(connection.enabled for connection in runtime.connections)
 
 
 # Dependency for getting translator
@@ -245,18 +260,10 @@ async def translate_content(
                 safe_config[key] = value
         logger.info(f"API request config: {safe_config}")
 
-    # Check if API key is available (either from env or request config)
-    has_api_key = bool(settings.openrouter_api_key)
-    if request.config and request.config.api_key:
-        has_api_key = True
-
-    if not has_api_key:
+    if not await has_back_end(request.config):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "configuration_error",
-                "message": "OpenRouter API key is not configured. Set OPENROUTER_API_KEY or pass apiKey in request config.",
-            },
+            detail={"error": "configuration_error", "message": NO_BACK_END},
         )
 
     # Decrypt API key if provided with enc: prefix
@@ -331,20 +338,10 @@ async def translate_file(
     - `model`: Model to use for translation
     - `temperature`: Sampling temperature (0.0-2.0)
     """
-    settings = get_settings()
-
-    # Check if API key is available (either from env or request config)
-    has_api_key = bool(settings.openrouter_api_key)
-    if request.config and request.config.api_key:
-        has_api_key = True
-
-    if not has_api_key:
+    if not await has_back_end(request.config):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "configuration_error",
-                "message": "OpenRouter API key is not configured. Set OPENROUTER_API_KEY or pass apiKey in request config.",
-            },
+            detail={"error": "configuration_error", "message": NO_BACK_END},
         )
 
     # Decrypt API key if provided with enc: prefix
@@ -483,18 +480,10 @@ async def submit_translate_content_job(
     """
     settings = get_settings()
 
-    # Check if API key is available (either from env or request config)
-    has_api_key = bool(settings.openrouter_api_key)
-    if request.config and request.config.api_key:
-        has_api_key = True
-
-    if not has_api_key:
+    if not await has_back_end(request.config):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "configuration_error",
-                "message": "OpenRouter API key is not configured. Set OPENROUTER_API_KEY or pass apiKey in request config.",
-            },
+            detail={"error": "configuration_error", "message": NO_BACK_END},
         )
 
     try:
@@ -590,18 +579,10 @@ async def submit_translate_file_job(
     """
     settings = get_settings()
 
-    # Check if API key is available (either from env or request config)
-    has_api_key = bool(settings.openrouter_api_key)
-    if request.config and request.config.api_key:
-        has_api_key = True
-
-    if not has_api_key:
+    if not await has_back_end(request.config):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "configuration_error",
-                "message": "OpenRouter API key is not configured. Set OPENROUTER_API_KEY or pass apiKey in request config.",
-            },
+            detail={"error": "configuration_error", "message": NO_BACK_END},
         )
 
     # Validate request
@@ -1073,3 +1054,4 @@ async def test_connection(
         results["apiKey"] = {"status": "error", "message": f"Connection failed: {e}"}
 
     return results
+

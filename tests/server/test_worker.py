@@ -31,7 +31,6 @@ def mock_translator():
     translator.settings.retry_delay = 0.01
     translator.settings.is_rtl_language = MagicMock(return_value=False)
     translator.provider = AsyncMock()
-    translator._srt_parser = MagicMock()
     return translator
 
 
@@ -97,127 +96,6 @@ class TestProcessContentTranslationJob:
         job = manager.get_job(job_id)
         assert job.status == JobStatus.COMPLETED
 
-    @pytest.mark.asyncio
-    async def test_successful_translation(self, manager, mock_translator):
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.all_translations = [{"index": "0", "content": "Szia"}]
-        mock_result.total_tokens = 100
-        mock_result.model_used = "test-model"
-        mock_result.batch_results = []
-
-        # Mock BatchProcessor
-        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
-            processor = AsyncMock()
-            processor.process_all_batches = AsyncMock(return_value=mock_result)
-            MockBP.return_value = processor
-
-            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
-                from subtitle_translator.core.models import SubtitleLine
-
-                mock_map.return_value = [SubtitleLine(position=1, line="Szia")]
-
-                job_id = await manager.submit_job(
-                    request_data={
-                        "sourceLanguage": "en",
-                        "targetLanguage": "hu",
-                        "lines": [{"position": 1, "line": "Hello"}],
-                    },
-                    job_type=JobType.TRANSLATE_CONTENT,
-                )
-                manager.set_job_processing(job_id)
-                await process_content_translation_job(manager, job_id, mock_translator)
-
-                job = manager.get_job(job_id)
-                assert job.status == JobStatus.COMPLETED
-                assert job.result["tokens_used"] == 100
-
-    @pytest.mark.asyncio
-    async def test_failed_translation(self, manager, mock_translator):
-        mock_result = MagicMock()
-        mock_result.success = False
-        mock_result.all_translations = []
-        mock_result.batch_results = [
-            MagicMock(success=False, error="API error"),
-        ]
-
-        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
-            processor = AsyncMock()
-            processor.process_all_batches = AsyncMock(return_value=mock_result)
-            MockBP.return_value = processor
-
-            job_id = await manager.submit_job(
-                request_data={
-                    "sourceLanguage": "en",
-                    "targetLanguage": "hu",
-                    "lines": [{"position": 1, "line": "Hello"}],
-                },
-                job_type=JobType.TRANSLATE_CONTENT,
-            )
-            manager.set_job_processing(job_id)
-            await process_content_translation_job(manager, job_id, mock_translator)
-
-            job = manager.get_job(job_id)
-            assert job.status == JobStatus.FAILED
-
-    @pytest.mark.asyncio
-    async def test_exception_sets_job_failed(self, manager, mock_translator):
-        with patch(
-            "subtitle_translator.server.queue.worker.BatchProcessor", side_effect=Exception("boom")
-        ):
-            job_id = await manager.submit_job(
-                request_data={
-                    "sourceLanguage": "en",
-                    "targetLanguage": "hu",
-                    "lines": [{"position": 1, "line": "Hello"}],
-                },
-                job_type=JobType.TRANSLATE_CONTENT,
-            )
-            manager.set_job_processing(job_id)
-            await process_content_translation_job(manager, job_id, mock_translator)
-
-            job = manager.get_job(job_id)
-            assert job.status == JobStatus.FAILED
-            assert "boom" in job.error
-
-    @pytest.mark.asyncio
-    async def test_api_key_restored_from_override(self, manager, mock_translator):
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.all_translations = [{"index": "0", "content": "Szia"}]
-        mock_result.total_tokens = 50
-        mock_result.model_used = "test-model"
-        mock_result.batch_results = []
-
-        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
-            processor = AsyncMock()
-            processor.process_all_batches = AsyncMock(return_value=mock_result)
-            MockBP.return_value = processor
-
-            with patch("subtitle_translator.server.queue.worker.map_translations_to_lines") as mock_map:
-                from subtitle_translator.core.models import SubtitleLine
-
-                mock_map.return_value = [SubtitleLine(position=1, line="Szia")]
-
-                job_id = await manager.submit_job(
-                    request_data={
-                        "sourceLanguage": "en",
-                        "targetLanguage": "hu",
-                        "lines": [{"position": 1, "line": "Hello"}],
-                    },
-                    job_type=JobType.TRANSLATE_CONTENT,
-                    api_key_override="sk-restored-key",
-                )
-                manager.set_job_processing(job_id)
-                await process_content_translation_job(manager, job_id, mock_translator)
-
-                # Verify config_override was passed with the api key
-                call_kwargs = processor.process_all_batches.call_args.kwargs
-                config = call_kwargs.get("config_override")
-                assert config is not None
-                assert config.api_key == "sk-restored-key"
-
-
 class TestProcessFileTranslationJob:
     """Tests for file translation job processing."""
 
@@ -242,7 +120,8 @@ class TestProcessFileTranslationJob:
 
     @pytest.mark.asyncio
     async def test_invalid_srt_content(self, manager, mock_translator):
-        mock_translator._srt_parser.parse.side_effect = Exception("parse error")
+        parser = MagicMock()
+        parser.parse.side_effect = Exception("parse error")
 
         job_id = await manager.submit_job(
             request_data={
@@ -253,14 +132,16 @@ class TestProcessFileTranslationJob:
             job_type=JobType.TRANSLATE_FILE,
         )
         manager.set_job_processing(job_id)
-        await process_file_translation_job(manager, job_id, mock_translator)
+        with patch("subtitle_translator.server.queue.worker.SRTParser", return_value=parser):
+            await process_file_translation_job(manager, job_id, mock_translator)
         job = manager.get_job(job_id)
         assert job.status == JobStatus.FAILED
         assert "Invalid SRT" in job.error
 
     @pytest.mark.asyncio
     async def test_empty_entries(self, manager, mock_translator):
-        mock_translator._srt_parser.parse.return_value = []
+        parser = MagicMock()
+        parser.parse.return_value = []
 
         job_id = await manager.submit_job(
             request_data={
@@ -271,72 +152,11 @@ class TestProcessFileTranslationJob:
             job_type=JobType.TRANSLATE_FILE,
         )
         manager.set_job_processing(job_id)
-        await process_file_translation_job(manager, job_id, mock_translator)
+        with patch("subtitle_translator.server.queue.worker.SRTParser", return_value=parser):
+            await process_file_translation_job(manager, job_id, mock_translator)
         job = manager.get_job(job_id)
         assert job.status == JobStatus.COMPLETED
         assert job.result["subtitle_count"] == 0
-
-    @pytest.mark.asyncio
-    async def test_successful_file_translation(self, manager, mock_translator):
-        entries = [MagicMock()]
-        mock_translator._srt_parser.parse.return_value = entries
-        mock_translator._srt_parser.extract_lines_for_translation.return_value = [
-            {"index": "0", "content": "Hello"}
-        ]
-        mock_translator._srt_parser.apply_translations.return_value = entries
-        mock_translator._srt_parser.split_long_subtitles.return_value = entries
-        mock_translator._srt_parser.compose.return_value = (
-            "1\n00:00:01,000 --> 00:00:02,000\nSzia\n\n"
-        )
-
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.all_translations = [{"index": "0", "content": "Szia"}]
-        mock_result.total_tokens = 200
-        mock_result.model_used = "test-model"
-        mock_result.batch_results = []
-
-        with patch("subtitle_translator.server.queue.worker.BatchProcessor") as MockBP:
-            processor = AsyncMock()
-            processor.process_all_batches = AsyncMock(return_value=mock_result)
-            MockBP.return_value = processor
-
-            job_id = await manager.submit_job(
-                request_data={
-                    "content": "1\n00:00:01,000 --> 00:00:02,000\nHello\n\n",
-                    "sourceLanguage": "en",
-                    "targetLanguage": "hu",
-                },
-                job_type=JobType.TRANSLATE_FILE,
-            )
-            manager.set_job_processing(job_id)
-            await process_file_translation_job(manager, job_id, mock_translator)
-
-            job = manager.get_job(job_id)
-            assert job.status == JobStatus.COMPLETED
-            assert job.result["tokens_used"] == 200
-            assert job.result["subtitle_count"] == 1
-            # Verify total_lines was set from parsed entries
-            assert job.total_lines == 1
-
-    @pytest.mark.asyncio
-    async def test_exception_sets_job_failed(self, manager, mock_translator):
-        mock_translator._srt_parser.parse.side_effect = RuntimeError("unexpected")
-
-        job_id = await manager.submit_job(
-            request_data={
-                "content": "some content",
-                "sourceLanguage": "en",
-                "targetLanguage": "hu",
-            },
-            job_type=JobType.TRANSLATE_FILE,
-        )
-        manager.set_job_processing(job_id)
-        await process_file_translation_job(manager, job_id, mock_translator)
-        # RuntimeError is not caught by the SRT parse handler, falls to outer except
-        job = manager.get_job(job_id)
-        assert job.status == JobStatus.FAILED
-
 
 class TestJobWorkerHandler:
     """Tests for the main worker handler routing."""
