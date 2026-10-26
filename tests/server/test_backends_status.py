@@ -82,3 +82,18 @@ def test_the_api_route_lists_back_ends_without_secrets(monkeypatch):
     assert {b["type"] for b in body["backends"]} >= {"openrouter", "gemini", "openai_compatible"}
     assert [c["id"] for c in body["connections"]] == ["openrouter", "gemini"]
     assert "sk-or-hidden" not in response.text and "AIza" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_one_broken_connection_does_not_hide_the_others():
+    from subtitle_translator.core.backends import Connection
+
+    run = single_provider_runtime(ScriptedProvider(), Settings(_env_file=None, openrouter_api_key="k"))
+
+    def broken(connection):
+        raise RuntimeError("boom")
+
+    run.engine.provider_for = broken
+    run.connections = [Connection("openrouter", "openrouter", enabled=True), Connection("x", "openrouter", enabled=False)]
+    status = await backend_status(run)
+    assert [c["id"] for c in status["connections"]] == ["openrouter", "x"]

@@ -10,7 +10,7 @@ services:
     environment:
       # OpenRouter Configuration
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OPENROUTER_DEFAULT_MODEL=${OPENROUTER_DEFAULT_MODEL:-google/gemini-2.5-flash-preview-09-2025}
+      - OPENROUTER_DEFAULT_MODEL=${OPENROUTER_DEFAULT_MODEL:-google/gemini-2.5-flash-lite}
       - OPENROUTER_TEMPERATURE=${OPENROUTER_TEMPERATURE:-0.3}
       - OPENROUTER_MAX_TOKENS=${OPENROUTER_MAX_TOKENS:-8000}
       # Back ends, tried in this order when one is rate limited, out of quota or unreachable
