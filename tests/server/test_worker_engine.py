@@ -207,3 +207,107 @@ async def test_a_translation_the_rtl_marks_push_past_the_line_cap_does_not_fail_
     assert job.status == JobStatus.PARTIAL, job.error
     assert job.result["lines"][0]["line"] == "l0"      # the source text, as in 2.1.1
     assert job.error.startswith("3/4 lines translated. ")
+
+
+def _provider_returning(text):
+    from subtitle_translator.core.provider import TranslationResult
+
+    def reply(batch):
+        return TranslationResult(
+            translations=[{"index": line["index"], "content": text} for line in batch.lines],
+            model_used="scripted-model",
+            total_tokens=10,
+            cost=0.01,
+        )
+
+    return reply
+
+
+LONG = "this translated line is much longer than a single subtitle line should be"
+
+
+@pytest.mark.asyncio
+async def test_a_completed_file_job_splits_long_subtitles(manager):
+    job_id = await submit(manager, job_type=JobType.TRANSLATE_FILE, content=SRT)
+    await process_file_translation_job(manager, job_id, translator(ScriptedProvider([_provider_returning(LONG)] * 2)))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.COMPLETED
+    blocks = [b for b in job.result["content"].strip().split("\n\n") if b]
+    assert all(len(b.split("\n")) == 4 for b in blocks)           # number, time, two text lines
+    assert "this translated line is much longer than a\nsingle subtitle line should be" in job.result["content"]
+    assert all(len(text) <= 42 for b in blocks for text in b.split("\n")[2:])
+
+
+@pytest.mark.asyncio
+async def test_a_partial_file_job_leaves_long_subtitles_unsplit(manager):
+    bad = InvalidResponseError("garbled")
+    three = SRT + "3\n00:00:05,000 --> 00:00:06,000\nThird\n\n"
+    job_id = await submit(manager, job_type=JobType.TRANSLATE_FILE, content=three)
+    await process_file_translation_job(
+        manager, job_id, translator(ScriptedProvider([_provider_returning(LONG), bad, bad]))
+    )
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.PARTIAL
+    assert "\n" + LONG + "\n" in job.result["content"]
+
+
+def _watch_translate(runtime):
+    seen = {}
+    real = runtime.engine.translate
+
+    async def translate(job, connections, *, pinned=None, events=None):
+        seen["connections"], seen["pinned"] = connections, pinned
+        return await real(job, connections, pinned=pinned, events=events)
+
+    runtime.engine.translate = translate
+    return seen
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["content", "file"])
+async def test_a_job_key_is_restored_into_a_config_that_has_none(manager, kind):
+    runtime = single_provider_runtime(ScriptedProvider(), SETTINGS)
+    seen = _watch_translate(runtime)
+    job_type = JobType.TRANSLATE_CONTENT if kind == "content" else JobType.TRANSLATE_FILE
+    extra = {"content": SRT} if kind == "file" else {}
+    job_id = await submit(manager, job_type=job_type, key="sk-job-key", config={"model": "gpt-4"}, **extra)
+    work = process_content_translation_job if kind == "content" else process_file_translation_job
+    await work(manager, job_id, EngineTranslator(runtime))
+    assert manager.get_job(job_id).status == JobStatus.COMPLETED
+    assert seen["pinned"] is not None
+    pinned = next(c for c in seen["connections"] if c.id == seen["pinned"])
+    assert pinned.secrets == {"api_key": "sk-job-key"} and pinned.settings["model"] == "gpt-4"
+
+
+@pytest.mark.asyncio
+async def test_a_file_partial_counts_repeated_cue_numbers_as_lines(manager):
+    bad = InvalidResponseError("garbled")
+    srt = (
+        "1\n00:00:01,000 --> 00:00:02,000\nHello\n\n"
+        "1\n00:00:03,000 --> 00:00:04,000\nHello again\n\n"
+        "2\n00:00:05,000 --> 00:00:06,000\nWorld\n\n"
+    )
+    job_id = await submit(manager, job_type=JobType.TRANSLATE_FILE, content=srt)
+    await process_file_translation_job(manager, job_id, translator(ScriptedProvider(["ok", bad, bad])))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.PARTIAL
+    assert job.error.startswith("2/3 lines translated. ")
+
+
+@pytest.mark.asyncio
+async def test_reasoning_and_provider_settings_are_logged_without_keys(manager, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="subtitle_translator.server.queue.worker")
+    config = {
+        "apiKey": "SECRET-request-key",
+        "reasoning": {"effort": "medium"},
+        "provider": {"order": ["deepinfra"], "allowFallbacks": False},
+    }
+    job_id = await submit(manager, config=config)
+    await process_content_translation_job(manager, job_id, translator(ScriptedProvider()))
+    assert manager.get_job(job_id).status == JobStatus.COMPLETED
+    messages = [r.getMessage() for r in caplog.records]
+    assert sum("Reasoning config" in m for m in messages) == 1
+    assert sum("Provider config configured" in m for m in messages) == 1
+    assert "SECRET" not in " ".join(messages)
