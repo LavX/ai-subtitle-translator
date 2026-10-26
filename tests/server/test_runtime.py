@@ -300,3 +300,30 @@ async def test_the_next_keyless_job_is_still_attempted_after_a_402():
     sent = len(provider.batches)
     again = await run_lines(run, [Line(0, "Hello")], source="en", target="hu")
     assert again.status == "completed" and len(provider.batches) > sent
+
+
+def test_settings_and_request_config_reprs_hide_every_secret():
+    s = settings(
+        openrouter_api_key="SECRET-or",
+        gemini_api_keys="SECRET-g",
+        encryption_key="SECRET-enc",
+        admin_api_key="SECRET-admin",
+    )
+    for rendered in (repr(s), str(s)):
+        assert "SECRET" not in rendered
+    # hiding them from the repr must not change what is read or written
+    assert s.encryption_key == "SECRET-enc" and s.admin_api_key == "SECRET-admin"
+    assert s.model_dump()["admin_api_key"] == "SECRET-admin"
+    config = TranslationConfig(apiKey="SECRET-user", model="x/y")
+    assert "SECRET" not in repr(config) and "SECRET" not in str(config)
+    assert config.api_key == "SECRET-user" and config.model_dump(by_alias=True)["apiKey"] == "SECRET-user"
+
+
+def test_an_opened_back_end_does_not_show_a_request_key_in_its_repr():
+    from subtitle_translator.core.backends import Connection
+
+    run = single_provider_runtime(ScriptedProvider(), settings(openrouter_api_key="server"))
+    connections, _ = run.plan(TranslationConfig(apiKey="SECRET-user", model="x/y"))
+    entry = run.engine._open(connections[0])
+    assert "SECRET" not in repr(entry) and "SECRET" not in repr(entry.opened) and "SECRET" not in repr(run.engine._opened)
+    assert isinstance(connections[0], Connection)

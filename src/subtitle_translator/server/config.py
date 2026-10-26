@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     # Encryption
     encryption_enabled: bool = True
     encryption_strict: bool = False  # When True, reject plaintext API keys
-    encryption_key: str = ""  # 64-char hex AES-256 key, overrides key file
+    encryption_key: str = Field("", repr=False)  # 64-char hex AES-256 key, overrides key file
     encryption_key_file: str = "/app/data/encryption.key"
 
     # Persistence
@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     job_retention_hours: int = 24
 
     # Admin API key for protecting config endpoints (optional)
-    admin_api_key: str = ""
+    admin_api_key: str = Field("", repr=False)
 
     # App identification for OpenRouter analytics
     app_name: str = "ai-subtitle-translator"

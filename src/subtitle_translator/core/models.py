@@ -152,6 +152,7 @@ class TranslationConfig(BaseModel):
         default=None,
         alias="apiKey",
         max_length=500,
+        repr=False,
         description="OpenRouter API key (overrides environment variable)",
     )
     model: str | None = Field(default=None, description="Model to use for translation")
