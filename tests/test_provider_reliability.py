@@ -9,6 +9,7 @@ import pytest
 from subtitle_translator import config
 from subtitle_translator.api import routes
 from subtitle_translator.api.models import ReasoningConfig, TranslationConfig
+from subtitle_translator.core import batch_sizing
 from subtitle_translator.core import translator as translator_module
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.main import app
@@ -17,6 +18,17 @@ from subtitle_translator.providers.openrouter import OpenRouterProvider
 from subtitle_translator.queue.job_manager import JobManager, JobStatus
 from subtitle_translator.queue.worker import job_worker_handler
 from tests.test_batch_reliability import response, settings
+
+
+@pytest.fixture(autouse=True)
+def reset_sizing(monkeypatch):
+    monkeypatch.setattr(config, "_settings", None)
+    monkeypatch.setattr(config, "_runtime_overrides", {})
+    monkeypatch.setattr(config, "_overridden_settings", None)
+    monkeypatch.setattr(batch_sizing, "TOKENS_PER_LINE_ESTIMATE", 800)
+    monkeypatch.setattr(batch_sizing, "MIN_BATCH_SIZE", 5)
+    monkeypatch.setattr(batch_sizing, "OUTPUT_TOKENS_PER_LINE_ESTIMATE", 100)
+    monkeypatch.setattr(batch_sizing, "_resolver_instance", None)
 
 
 @pytest.mark.asyncio
@@ -215,6 +227,9 @@ async def test_http_runtime_defaults_snapshot_running_and_queued_jobs(monkeypatc
     config.reset_settings()
     initial = settings(openrouter_default_model="old/model", openrouter_temperature=0.2)
     monkeypatch.setattr(config, "_settings", initial)
+    monkeypatch.setattr(
+        batch_sizing.get_batch_size_resolver(), "_settings", settings(openrouter_max_tokens=10000)
+    )
     monkeypatch.setattr(translator_module, "_translator_instance", None)
     monkeypatch.setattr(translator_module, "_translator_lock", asyncio.Lock())
     manager = JobManager(max_concurrent=1)

@@ -24,7 +24,7 @@ class TestBatchActivityReporting:
     """The reported attempt number and batch number must stay truthful."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self, monkeypatch):
         from unittest.mock import MagicMock
 
         self.provider = MagicMock()
@@ -37,7 +37,7 @@ class TestBatchActivityReporting:
         self.settings.openrouter_default_model = "test/model"
         self.processor = BatchProcessor(self.provider, self.settings)
         get_batch_size_resolver().reset()
-        get_batch_size_resolver()._settings = self.settings
+        monkeypatch.setattr(get_batch_size_resolver(), "_settings", self.settings)
 
     def _timeout_over(self, limit):
         """Time out above `limit` lines, translate at or below it."""
@@ -184,7 +184,7 @@ class TestTimeoutRecoveryPolicy:
     """
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self, monkeypatch):
         from unittest.mock import MagicMock
 
         self.provider = MagicMock()
@@ -197,7 +197,7 @@ class TestTimeoutRecoveryPolicy:
         self.settings.openrouter_default_model = "test/model"
         self.processor = BatchProcessor(self.provider, self.settings)
         get_batch_size_resolver().reset()
-        get_batch_size_resolver()._settings = self.settings
+        monkeypatch.setattr(get_batch_size_resolver(), "_settings", self.settings)
 
     @pytest.mark.asyncio
     async def test_transient_timeout_retries_at_the_same_size(self):

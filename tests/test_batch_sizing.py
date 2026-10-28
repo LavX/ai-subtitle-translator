@@ -309,7 +309,7 @@ class TestBatchProcessorAdaptiveSizing:
     """Tests for adaptive batch sizing in BatchProcessor."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self, monkeypatch):
         self.provider = MagicMock()
         self.provider.get_model_metadata.return_value = {"context_length": 32768}
         self.settings = MagicMock()
@@ -319,7 +319,7 @@ class TestBatchProcessorAdaptiveSizing:
         self.settings.openrouter_default_model = "default/model"
         self.processor = BatchProcessor(self.provider, self.settings)
         get_batch_size_resolver().reset()
-        get_batch_size_resolver()._settings = self.settings
+        monkeypatch.setattr(get_batch_size_resolver(), "_settings", self.settings)
 
     def test_create_batches_with_model_uses_resolver(self):
         """When model is provided, batch size comes from resolver."""
@@ -354,7 +354,7 @@ class TestAdaptiveRetry:
     """Tests for adaptive retry when batches fail."""
 
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self, monkeypatch):
         self.provider = MagicMock()
         self.provider.get_model_metadata.return_value = None
         self.settings = MagicMock()
@@ -365,7 +365,7 @@ class TestAdaptiveRetry:
         self.settings.openrouter_default_model = "test/model"
         self.processor = BatchProcessor(self.provider, self.settings)
         get_batch_size_resolver().reset()
-        get_batch_size_resolver()._settings = self.settings
+        monkeypatch.setattr(get_batch_size_resolver(), "_settings", self.settings)
 
     @pytest.mark.asyncio
     async def test_invalid_response_triggers_adaptive_retry(self):
