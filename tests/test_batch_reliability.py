@@ -6,7 +6,9 @@ import json
 import httpx
 import pytest
 
+from subtitle_translator import config
 from subtitle_translator.config import Settings
+from subtitle_translator.core import batch_sizing
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.batch_sizing import get_batch_size_resolver
 from subtitle_translator.core.translator import SubtitleTranslator
@@ -40,11 +42,22 @@ def settings(**kwargs):
     )
 
 
+def budget_settings(monkeypatch, **kwargs):
+    """Plan 100-cue batches: 10000 output tokens at 100 tokens per cue."""
+    pinned = settings(openrouter_max_tokens=10000, **kwargs)
+    monkeypatch.setattr(get_batch_size_resolver(), "_settings", pinned)
+    return pinned
+
+
 @pytest.fixture(autouse=True)
-def reset_sizing():
-    get_batch_size_resolver().reset()
-    yield
-    get_batch_size_resolver().reset()
+def reset_sizing(monkeypatch):
+    monkeypatch.setattr(config, "_settings", None)
+    monkeypatch.setattr(config, "_runtime_overrides", {})
+    monkeypatch.setattr(config, "_overridden_settings", None)
+    monkeypatch.setattr(batch_sizing, "TOKENS_PER_LINE_ESTIMATE", 800)
+    monkeypatch.setattr(batch_sizing, "MIN_BATCH_SIZE", 5)
+    monkeypatch.setattr(batch_sizing, "OUTPUT_TOKENS_PER_LINE_ESTIMATE", 100)
+    monkeypatch.setattr(batch_sizing, "_resolver_instance", None)
 
 
 @pytest.mark.asyncio
@@ -475,7 +488,7 @@ async def test_terminal_timeout_summary_preserves_unattempted_work_and_stop_reas
             return response([{**x, "content": "translated"} for x in lines])
         raise httpx.ReadTimeout("synthetic timeout", request=request)
 
-    provider = OpenRouterProvider(settings())
+    provider = OpenRouterProvider(budget_settings(monkeypatch))
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
@@ -556,7 +569,7 @@ async def test_synchronous_timeout_error_preserves_stop_summary(
             return response([{**x, "content": "translated"} for x in lines])
         raise httpx.ReadTimeout("synthetic timeout", request=request)
 
-    provider = OpenRouterProvider(settings())
+    provider = OpenRouterProvider(budget_settings(monkeypatch))
     provider._client = httpx.AsyncClient(
         transport=httpx.MockTransport(send), base_url="https://fake"
     )
