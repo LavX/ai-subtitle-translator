@@ -644,7 +644,7 @@ class OpenRouterProvider(ChatCompletionsProvider):
             if self._model_params_fetched or loop.time() < self._model_params_retry_at:
                 return
             try:
-                # Use a plain client without auth — /models is a public endpoint
+                # Use a plain client without auth: /models is a public endpoint
                 async with httpx.AsyncClient(
                     base_url=self.settings.openrouter_api_base,
                     timeout=httpx.Timeout(15.0),
@@ -861,7 +861,7 @@ class OpenRouterProvider(ChatCompletionsProvider):
                     else:
                         logger.warning(f"Invalid reasoning effort: {reasoning_config.effort}")
                 elif reasoning_config.max_tokens:
-                    # User sent max_tokens but model expects effort — map it
+                    # User sent max_tokens but model expects effort, map it
                     if reasoning_config.max_tokens >= 4000:
                         effort = "high"
                     elif reasoning_config.max_tokens >= 2000:
