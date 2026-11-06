@@ -375,3 +375,25 @@ def test_no_dotenv_file_is_fine(tmp_path, monkeypatch):
     registry = BackendRegistry.discover(BackendScope.builtin())
     connection = build_connections(settings(backend_order="openai_compatible"), registry)[0]
     assert not connection.enabled
+
+
+@pytest.mark.asyncio
+async def test_the_standalone_lists_models_from_its_configured_api_base(monkeypatch):
+    import httpx
+
+    from subtitle_translator.core.backends import BackendContext
+
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, json={"data": []})
+
+    monkeypatch.setattr(
+        runtime_module, "get_settings", lambda: settings(openrouter_api_base="https://gateway.example/v1")
+    )
+    registry = runtime_module._registry(lambda _core: None)
+    backend = registry.get("openrouter")
+    backend._transport = httpx.MockTransport(handler)
+    await backend.options("model", {}, {}, BackendContext())
+    assert seen == ["https://gateway.example/v1/models"]

@@ -108,7 +108,12 @@ class Runtime:
 
 def _registry(openrouter_factory) -> BackendRegistry:
     registry = BackendRegistry.discover(BackendScope.everything())
-    registry.override(OpenRouterBackendType(provider_factory=openrouter_factory))
+    registry.override(
+        OpenRouterBackendType(
+            provider_factory=openrouter_factory,
+            api_base=lambda: get_settings().openrouter_api_base,
+        )
+    )
     return registry
 
 

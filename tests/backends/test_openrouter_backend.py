@@ -142,6 +142,58 @@ async def test_options_list_models_with_prices_and_context():
     assert choices[0].completion_price == pytest.approx(0.4) and choices[0].context_length == 131072
 
 
+@pytest.mark.asyncio
+async def test_options_return_nothing_when_the_model_list_cannot_be_fetched(caplog):
+    def handler(request):
+        raise httpx.ConnectError("no route", request=request)
+
+    backend = OpenRouterBackendType(transport=httpx.MockTransport(handler))
+    secrets = {"api_key": "sk-or-synthetic-key"}
+    with caplog.at_level("WARNING"):
+        assert await backend.options("model", {}, secrets, BackendContext()) == []
+    assert "ConnectError" in caplog.text
+    assert "sk-or-synthetic-key" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body", [b"<html>maintenance</html>", b"[1, 2]", b"null"])
+async def test_options_return_nothing_for_a_body_that_is_not_a_model_list(body):
+    def handler(request):
+        return httpx.Response(200, content=body)
+
+    backend = OpenRouterBackendType(transport=httpx.MockTransport(handler))
+    assert await backend.options("model", {}, {}, BackendContext()) == []
+
+
+@pytest.mark.asyncio
+async def test_options_read_the_configured_api_base():
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, json={"data": [{"id": "x/y"}]})
+
+    backend = OpenRouterBackendType(
+        transport=httpx.MockTransport(handler), api_base=lambda: "https://gateway.example/api/v1"
+    )
+    choices = await backend.options("model", {}, {}, BackendContext())
+    assert seen == ["https://gateway.example/api/v1/models"]
+    assert [choice.value for choice in choices] == ["x/y"]
+
+
+@pytest.mark.asyncio
+async def test_options_use_the_public_base_when_the_host_sets_none():
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, json={"data": []})
+
+    backend = OpenRouterBackendType(transport=httpx.MockTransport(handler))
+    await backend.options("model", {}, {}, BackendContext())
+    assert seen == ["https://openrouter.ai/api/v1/models"]
+
+
 def test_open_uses_the_connection_budget_and_adaptive_batches():
     opened = OpenRouterBackendType().open(
         Connection("or", "openrouter", settings={"model": "x/y", "max_tokens": 0}, secrets={"api_key": "k"}),

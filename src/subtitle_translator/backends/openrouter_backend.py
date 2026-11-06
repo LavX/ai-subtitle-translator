@@ -1,5 +1,6 @@
 """OpenRouter as a back-end type: connection settings, validation, live model choices, tests."""
 
+import logging
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -29,6 +30,8 @@ from subtitle_translator.core.models import (
     TranslationConfig,
 )
 from subtitle_translator.core.settings import CoreSettings
+
+logger = logging.getLogger(__name__)
 
 OPENROUTER_DEFAULT_MODEL = "google/gemini-2.5-flash-lite"
 # Carried over from Bazarr+ (bazarr/app/config.py RETIRED_OPENROUTER_MODELS), plus the retired
@@ -134,9 +137,13 @@ class OpenRouterBackendType(BackendType):
         self,
         provider_factory: Callable[[CoreSettings], OpenRouterProvider] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        api_base: Callable[[], str] | None = None,
     ) -> None:
         self._factory = provider_factory or OpenRouterProvider
         self._transport = transport
+        # The host's configured OpenRouter base, read when the model list is fetched. A host
+        # that sets none gets the public one.
+        self._api_base = api_base
 
     def fields(self) -> list[SettingField]:
         def choice(values):
@@ -284,15 +291,21 @@ class OpenRouterBackendType(BackendType):
     async def options(self, field, settings, secrets, context) -> list[Choice]:
         if field != "model":
             return []
-        base = CoreSettings()
-        async with httpx.AsyncClient(
-            transport=self._transport,
-            base_url=base.openrouter_api_base,
-            timeout=15.0,
-            follow_redirects=False,
-        ) as client:
-            response = await client.get("/models")
-        records = response.json().get("data") if response.status_code == 200 else None
+        base_url = self._api_base() if self._api_base else CoreSettings().openrouter_api_base
+        try:
+            async with httpx.AsyncClient(
+                transport=self._transport,
+                base_url=base_url,
+                timeout=15.0,
+                follow_redirects=False,
+            ) as client:
+                response = await client.get("/models")
+            records = response.json().get("data") if response.status_code == 200 else None
+        except (httpx.HTTPError, ValueError, AttributeError) as error:
+            # The model field then takes free text. The request carries no key, and the
+            # message names only the kind of failure.
+            logger.warning("Could not list OpenRouter models: %s", type(error).__name__)
+            return []
         choices = []
         for model in records if isinstance(records, list) else []:
             if not isinstance(model, dict) or not isinstance(model.get("id"), str):
