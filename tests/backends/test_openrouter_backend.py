@@ -194,6 +194,27 @@ async def test_options_use_the_public_base_when_the_host_sets_none():
     assert seen == ["https://openrouter.ai/api/v1/models"]
 
 
+@pytest.mark.asyncio
+async def test_options_leave_out_models_that_do_not_produce_text():
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {"id": "a/chat", "architecture": {"output_modalities": ["text"]}},
+                    {"id": "b/both", "architecture": {"output_modalities": ["text", "image"]}},
+                    {"id": "c/image", "architecture": {"output_modalities": ["image"]}},
+                    {"id": "d/silent"},
+                    {"id": "e/odd", "architecture": {"output_modalities": "text"}},
+                ]
+            },
+        )
+
+    backend = OpenRouterBackendType(transport=httpx.MockTransport(handler))
+    choices = await backend.options("model", {}, {}, BackendContext())
+    assert [choice.value for choice in choices] == ["a/chat", "b/both", "d/silent", "e/odd"]
+
+
 def test_open_uses_the_connection_budget_and_adaptive_batches():
     opened = OpenRouterBackendType().open(
         Connection("or", "openrouter", settings={"model": "x/y", "max_tokens": 0}, secrets={"api_key": "k"}),

@@ -128,6 +128,14 @@ def settings_from_config(config: TranslationConfig) -> dict[str, Any]:
     return settings
 
 
+def _produces_text(model: dict) -> bool:
+    """False only for a model that states its outputs and text is not among them (image or
+    audio generators). A record that says nothing is kept."""
+    architecture = model.get("architecture")
+    outputs = architecture.get("output_modalities") if isinstance(architecture, dict) else None
+    return not isinstance(outputs, list) or "text" in outputs
+
+
 class OpenRouterBackendType(BackendType):
     type_id = "openrouter"
     display_name = "OpenRouter"
@@ -309,6 +317,8 @@ class OpenRouterBackendType(BackendType):
         choices = []
         for model in records if isinstance(records, list) else []:
             if not isinstance(model, dict) or not isinstance(model.get("id"), str):
+                continue
+            if not _produces_text(model):
                 continue
             pricing = model.get("pricing") if isinstance(model.get("pricing"), dict) else {}
 
