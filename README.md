@@ -413,7 +413,7 @@ SmartFast accepts `config.provider.sort: "smartfast"` or a trailing `:smartfast`
 
 Per-request `config.serviceTier` accepts `default` (standard capacity), `flex`, or `priority`. It is forwarded as OpenRouter's top-level `service_tier`. Setting `default` prevents route shortcuts from admitting Flex and priority tiers, while retaining their price or throughput sorting. Outside SmartFast, omitting it preserves OpenRouter's routing-based tier selection. SmartFast uses standard endpoints when it is omitted, unless an explicit `only` restriction selects another tier. The GUI explicitly selects standard capacity for new submissions; existing API clients retain their current behavior.
 
-When a library caller gives a job a cost budget, ordinary OpenRouter routing (not only SmartFast) sends the catalog prices the budget reserved as `provider.max_price`, so no endpoint or service tier above them can serve the request and spend what the budget never held. A lower cap the request already carries stays; a model whose prices the catalog does not list is sent no cap and is held by reported cost only.
+When a library caller gives a job a cost budget, ordinary OpenRouter routing (not only SmartFast) sends the catalog prices the budget reserved, and a zero per-request fee, as `provider.max_price`, so no endpoint or service tier above them can serve the request and spend what the budget never held. A lower cap the request already carries stays; a model whose prices the catalog does not list is sent no cap and is held by reported cost only.
 
 ## Configuration
 

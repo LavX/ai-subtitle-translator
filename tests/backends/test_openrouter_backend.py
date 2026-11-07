@@ -413,7 +413,8 @@ async def test_a_budgeted_request_caps_endpoint_prices_at_the_reserved_prices():
     # USD per million tokens, the catalog's 1e-6 and 2e-6 per token.
     # The SDK sends prices as decimal strings, as it does for SmartFast.
     sent = {key: float(value) for key, value in seen[0]["provider"]["max_price"].items()}
-    assert sent == {"prompt": 1.0, "completion": 2.0}
+    # A fixed fee per request is capped at nothing, because the reservation prices tokens only.
+    assert sent == {"prompt": 1.0, "completion": 2.0, "request": 0.0}
 
 
 @pytest.mark.asyncio
@@ -435,6 +436,9 @@ async def test_a_cap_the_request_already_carries_stays_where_it_is_lower():
     config._usage_meter = UsageMeter(budget=1.0)
     provider._cap_prices_to_the_reservation(payload, "x/y", config)
     assert payload["provider"]["max_price"] == {"prompt": 0.5, "completion": 2.0, "request": 0}
+    payload = {"provider": {"max_price": {"request": 0.01}}, "messages": []}
+    provider._cap_prices_to_the_reservation(payload, "x/y", config)
+    assert payload["provider"]["max_price"]["request"] == 0
 
 
 def test_the_reservation_never_assumes_a_price_above_the_cap():

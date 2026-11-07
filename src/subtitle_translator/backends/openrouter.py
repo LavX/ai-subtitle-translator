@@ -1523,8 +1523,16 @@ class OpenRouterProvider(ChatCompletionsProvider):
             return
         provider = dict(payload.get("provider") or {})
         caps = dict(provider.get("max_price") or {})
-        for key, per_token in zip(("prompt", "completion"), catalog, strict=True):
-            wanted = round(per_token * 1_000_000, 9)
+        # The reservation prices tokens only, so an endpoint that adds a fixed fee per request
+        # (as SmartFast already forbids) cannot serve a budgeted request either. Image and audio
+        # prices are left alone: a text request never uses them, and capping them would exclude
+        # endpoints that merely list one.
+        wanted_caps = {
+            "prompt": round(catalog[0] * 1_000_000, 9),
+            "completion": round(catalog[1] * 1_000_000, 9),
+            "request": 0,
+        }
+        for key, wanted in wanted_caps.items():
             current = caps.get(key)
             try:
                 caps[key] = wanted if current is None else min(wanted, float(current))
