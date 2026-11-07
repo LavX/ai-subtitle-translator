@@ -408,12 +408,12 @@ def _runtime_with_every_backend():
     return run
 
 
-def _request_options(**extra):
+def _request_options(collection="deny", **extra):
     return TranslationConfig(
         model="x/y",
         temperature=0.9,
         requestTimeout=77.0,
-        provider=ProviderConfig(only=["safe-host"], ignore=["bad-host"], dataCollection="deny"),
+        provider=ProviderConfig(only=["safe-host"], ignore=["bad-host"], dataCollection=collection),
         **extra,
     )
 
@@ -430,7 +430,7 @@ def test_a_backend_pin_to_openrouter_keeps_every_request_option():
 
 def test_a_backend_pin_to_another_backend_keeps_the_options_it_can_take():
     run = _runtime_with_every_backend()
-    connections, pinned = run.plan(_request_options(backend="gemini"))
+    connections, pinned = run.plan(_request_options("allow", backend="gemini"))
     chosen = next(c for c in connections if c.id == pinned).settings
     assert pinned == "gemini" and chosen["model"] == "x/y" and chosen["temperature"] == 0.9
     # OpenRouter's routing vocabulary never reaches a back end that has no such thing.
@@ -442,7 +442,45 @@ def test_a_backend_pin_to_an_openai_compatible_connection_keeps_its_model_and_pa
 
     run = _runtime_with_every_backend()
     run.connections = [*run.connections, Connection("local", "openai_compatible", settings={"model": "m0"})]
-    connections, pinned = run.plan(_request_options(backend="local", parallelBatches=3))
+    connections, pinned = run.plan(_request_options("allow", backend="local", parallelBatches=3))
     chosen = next(c for c in connections if c.id == pinned).settings
     assert chosen["model"] == "x/y" and chosen["temperature"] == 0.9 and chosen["parallel_batches"] == 3
     assert not {"only", "ignore", "data_collection", "request_timeout"} & set(chosen)
+
+
+@pytest.mark.parametrize("pin,kind", [("gemini", "gemini"), ("local", "openai_compatible")])
+def test_a_pin_to_a_back_end_that_cannot_promise_no_collection_refuses_deny(pin, kind):
+    from subtitle_translator.core.backends import Connection
+    from subtitle_translator.core.errors import InvalidConfigError
+
+    run = _runtime_with_every_backend()
+    run.connections = [*run.connections, Connection("local", "openai_compatible", settings={"model": "m0"})]
+    config = TranslationConfig(backend=pin, provider=ProviderConfig(dataCollection="deny"))
+    with pytest.raises(InvalidConfigError) as caught:
+        run.plan(config)
+    assert kind in str(caught.value) and "dataCollection" in str(caught.value)
+    assert "provider.dataCollection" in caught.value.field_errors
+
+
+@pytest.mark.parametrize("pin", ["gemini", "local"])
+def test_a_pin_to_another_back_end_still_accepts_allow_and_ignores_routing_lists(pin, caplog):
+    from subtitle_translator.core.backends import Connection
+
+    run = _runtime_with_every_backend()
+    run.connections = [*run.connections, Connection("local", "openai_compatible", settings={"model": "m0"})]
+    config = TranslationConfig(
+        backend=pin,
+        provider=ProviderConfig(only=["safe"], ignore=["bad"], dataCollection="allow"),
+    )
+    with caplog.at_level("WARNING"):
+        connections, pinned = run.plan(config)
+    chosen = next(c for c in connections if c.id == pinned).settings
+    assert pinned == pin and "only" not in chosen and "ignore" not in chosen
+    assert "OpenRouter only" in caplog.text
+
+
+def test_a_pin_to_openrouter_still_takes_deny():
+    run = _runtime_with_every_backend()
+    config = TranslationConfig(backend="openrouter", provider=ProviderConfig(dataCollection="deny"))
+    connections, pinned = run.plan(config)
+    assert next(c for c in connections if c.id == pinned).settings["data_collection"] == "deny"

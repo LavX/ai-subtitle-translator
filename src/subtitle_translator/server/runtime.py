@@ -20,6 +20,7 @@ from subtitle_translator.core.backends import (
     RegisteredBackend,
 )
 from subtitle_translator.core.engine import TranslationEngine
+from subtitle_translator.core.errors import InvalidConfigError
 from subtitle_translator.core.models import TranslationConfig
 from subtitle_translator.core.provider import TranslationProvider
 from subtitle_translator.core.settings import CoreSettings
@@ -101,6 +102,16 @@ class Runtime:
         if temperature is not None:
             overlay.setdefault("temperature", temperature)
         pin = config.backend if config is not None and config.backend else None
+        if pin is not None and asked.get("data_collection") == "deny":
+            pinned = next((c for c in self.connections if c.id == pin), None)
+            if pinned is not None and pinned.backend_type != "openrouter":
+                raise InvalidConfigError(
+                    f"The {pinned.backend_type} back end cannot promise that no data is "
+                    'collected, so a request pinned to it cannot ask for dataCollection "deny". '
+                    "Use an OpenRouter connection, or remove the option.",
+                    provider=pinned.backend_type,
+                    field_errors={"provider.dataCollection": "deny is supported by OpenRouter only"},
+                )
         if not overlay:
             return self.connections, pin
         # A backend pin chooses the connection; it never drops the request's own options. The

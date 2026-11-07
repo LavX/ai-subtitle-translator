@@ -96,6 +96,11 @@ pip install ".[server]"      # from a checkout; or: pip install "lavx-ai-subtitl
 The `ai-subtitle-translator` command, the `uvicorn subtitle_translator.main:app` entry point and the
 HTTP API are unchanged, so Docker users only need to pull the new image.
 
+One behaviour is stricter than in 2.1.x: a request whose `config` pins `backend` to Gemini or an
+OpenAI-compatible connection and also sets `provider.dataCollection: "deny"` is now refused with a
+validation error. Those back ends cannot honour the option, and 2.1.x never routed such a request
+to them. `provider.only` and `provider.ignore` on those pins are ignored and logged.
+
 ## Optional web UI
 
 Enable the standalone subtitle studio for single-file or batch SRT translation:
@@ -455,6 +460,14 @@ Requests that carry their own OpenRouter key (the Bazarr+ 2.7 integration and th
 on that key. Other requests use the back ends in `BACKEND_ORDER`; when one is rate limited, out of
 quota, rejects its key or cannot be reached, the next one continues where it stopped. Put `backend`
 in a request's `config` to use one back end only.
+
+A request pinned to a back end keeps its own options. The model and temperature go to the back end
+it names (an OpenAI-compatible connection also takes `parallelBatches`). The routing and privacy
+options are OpenRouter's: `provider.only` and `provider.ignore` on a pin to Gemini or an
+OpenAI-compatible connection are ignored, with a warning in the log. `provider.dataCollection:
+"deny"` is different, because those back ends cannot promise that no data is collected: such a
+request is refused with a validation error instead of being sent anywhere that might collect data.
+Pin to an OpenRouter connection to use it.
 
 `OPENROUTER_MAX_TOKENS` and `BATCH_SIZE` have to fit each other. A batch that cannot
 answer inside the budget comes back cut short, and the adaptive sizer then halves the
