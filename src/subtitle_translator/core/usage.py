@@ -144,15 +144,33 @@ def call_scope() -> Iterator[list[Reservation]]:
 
 async def reserve_request(
     config: Any, worst_case: float | None, provider: str = "unknown", model: str = ""
-) -> None:
+) -> Reservation | None:
     """Called right before a request is sent. worst_case is the most the request can be
     charged: its input tokens plus the output-token limit it carries, at the model's rates;
     None when the back end cannot price it. Raises BudgetExhaustedError when it does not fit.
-    Otherwise the hold joins the open call and is settled with that call's usage."""
+    Otherwise the hold joins the open call and is settled with that call's usage. Returns the
+    hold, or None when the request carries no meter."""
     meter = getattr(config, "_usage_meter", None)
     if meter is None:
-        return
+        return None
     reservation = await meter.reserve(worst_case, model, provider)
     holds = _OPEN_CALL.get()
     if holds is not None:
         holds.append(reservation)
+    return reservation
+
+
+async def release_request(config: Any, reservation: Reservation | None) -> None:
+    """Give back the hold of a request the server rejected before it did any work, so a retry
+    of the same call does not promise the same money twice. Only for a request known to be
+    unbilled: a rejected optional field, a refused key, a rate limit."""
+    meter = getattr(config, "_usage_meter", None)
+    if meter is None or reservation is None:
+        return
+    holds = _OPEN_CALL.get()
+    if holds is not None:
+        for position, held in enumerate(holds):
+            if held is reservation:
+                del holds[position]
+                break
+    await meter.record(0, 0.0, reservation.model, reservations=(reservation,))

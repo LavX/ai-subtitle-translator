@@ -206,3 +206,27 @@ async def test_a_successful_override_key_translates_and_leaves_the_ring_alone(ca
     assert "sk-override-secret" not in caplog.text
     assert "sk-override-secret" not in repr(result)
     assert p.keys.acquire("local-model") == "ring-key"
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_key_gives_its_hold_back_before_the_next_key():
+    from subtitle_translator.core.batch_processor import BatchProcessor
+    from subtitle_translator.core.usage import UsageMeter
+
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers["authorization"])
+        if request.headers["authorization"] == "Bearer k1":
+            return httpx.Response(401, json={"error": {"message": "bad"}})
+        return httpx.Response(200, json=OK)
+
+    p = provider(handler, keys=["k1", "k2"], price_input=1.0, price_output=2.0)
+    p._output_limit = lambda model, payload: 1000
+    one_call = p._worst_case("local-model", p._payload(BATCH, "local-model", None, None), None)
+    meter = UsageMeter(budget=one_call * 1.5)  # room for one request in flight, not two
+    result = await BatchProcessor(p, CoreSettings(), meter=meter).process_all_batches(
+        BATCH.lines, "en", "es", batch_size=10, model="local-model"
+    )
+    assert seen == ["Bearer k1", "Bearer k2"] and result.success
+    assert meter.reserved == pytest.approx(0.0)

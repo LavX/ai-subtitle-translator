@@ -86,3 +86,27 @@ async def test_reserve_request_reads_the_meter_attached_to_the_request():
     with pytest.raises(BudgetExhaustedError) as caught:
         await reserve_request(config, 0.02)
     assert error_kind(caught.value) is ErrorKind.CANCELLED and caught.value.reason == "budget_exhausted"
+
+
+@pytest.mark.asyncio
+async def test_releasing_a_request_frees_its_hold_and_leaves_the_open_call():
+    from subtitle_translator.core.models import TranslationConfig
+    from subtitle_translator.core.usage import call_scope, release_request, reserve_request
+
+    seen = []
+
+    async def sink(usage):
+        seen.append(usage)
+
+    async def reserve_sink(amount, model):
+        return "hold-1"
+
+    config = TranslationConfig().for_operation("job")
+    config._usage_meter = meter = UsageMeter(budget=1.0, sink=sink, reserve_sink=reserve_sink)
+    with call_scope() as holds:
+        hold = await reserve_request(config, 0.3, "p", "m")
+        assert holds == [hold] and meter.reserved == pytest.approx(0.3)
+        await release_request(config, hold)
+        assert holds == [] and meter.reserved == 0.0
+    assert seen[-1].reservations == ("hold-1",) and meter.cost == 0.0
+    await release_request(config, None)  # nothing held: nothing to do

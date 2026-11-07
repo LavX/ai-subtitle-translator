@@ -22,7 +22,7 @@ from subtitle_translator.core.errors import (
 )
 from subtitle_translator.core.provider import TranslationBatch, TranslationResult
 from subtitle_translator.core.settings import CoreSettings
-from subtitle_translator.core.usage import reserve_request
+from subtitle_translator.core.usage import release_request, reserve_request
 
 if TYPE_CHECKING:
     from subtitle_translator.core.models import TranslationConfig
@@ -201,6 +201,12 @@ class OpenAICompatProvider(ChatCompletionsProvider):
             retry_after=max(0.0, wait[1]) if wait is not None else self._cooldown,
         )
 
+    @staticmethod
+    async def _release_unbilled(config, reservation, error: TranslationProviderError) -> None:
+        """A rejection that reports no usage cost nothing, so the next attempt may reuse its hold."""
+        if not (error.tokens_used or error.cost or error.billing_unknown):
+            await release_request(config, reservation)
+
     async def translate_batch(
         self,
         batch: TranslationBatch,
@@ -218,8 +224,9 @@ class OpenAICompatProvider(ChatCompletionsProvider):
             key = pinned_key or (self.keys.acquire(model_id) if len(self.keys) else None)
             if key is None and len(self.keys):
                 raise self._no_key_left(model_id)
+            reservation = None
             if self.prices_requests:
-                await reserve_request(
+                reservation = await reserve_request(
                     config_override,
                     self._worst_case(model_id, payload, config_override),
                     self._name,
@@ -255,6 +262,8 @@ class OpenAICompatProvider(ChatCompletionsProvider):
                     None,
                 )
                 if relaxed is not None:
+                    # The server turned the request down before doing any work.
+                    await release_request(config_override, reservation)
                     payload.pop(relaxed)
                     dropped.add(relaxed)
                     self._note_rejected(model_id, relaxed)
@@ -269,12 +278,14 @@ class OpenAICompatProvider(ChatCompletionsProvider):
                 self._price_error(error)
                 if pinned_key or not key:
                     raise
+                await self._release_unbilled(config_override, reservation, error)
                 self.keys.mark_invalid(key)
                 continue
             except QuotaExhaustedError as error:
                 self._price_error(error)
                 if pinned_key or not key:
                     raise
+                await self._release_unbilled(config_override, reservation, error)
                 self.keys.mark_exhausted(
                     key, self._clock() + (error.retry_after or 3600.0), model_id
                 )
@@ -283,6 +294,7 @@ class OpenAICompatProvider(ChatCompletionsProvider):
                 self._price_error(error)
                 if pinned_key or not key:
                     raise
+                await self._release_unbilled(config_override, reservation, error)
                 self.keys.mark_rate_limited(key, error.retry_after or self._cooldown, model_id)
                 continue
             if key and not pinned_key:

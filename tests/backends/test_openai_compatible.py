@@ -287,3 +287,40 @@ async def test_an_unknown_output_bound_refuses_only_with_a_budget():
     assert "max_tokens" in caught.value.field_errors
     sent = await backend.provider.translate_batch(BATCH, config_override=backend.config)
     assert sent.translations == [{"index": "0", "content": "Szia"}]
+
+
+def _temperature_refusal(request):
+    if "temperature" in json.loads(request.content):
+        return httpx.Response(400, json={"error": {"message": "Unsupported value: 'temperature' does not support 0.3 with this model.", "param": "temperature"}})
+    return httpx.Response(200, json=OK)
+
+
+async def _one_call_budget(handler_kwargs):
+    """A budget that covers exactly one request of the shape the tests send."""
+    held = []
+    probe = UsageMeter(budget=10.0)
+
+    def handler(request):
+        held.append(probe.reserved)
+        return httpx.Response(200, json=OK)
+
+    backend = opened(handler, **handler_kwargs)
+    config = backend.config.for_operation()
+    config._usage_meter = probe
+    await backend.provider.translate_batch(BATCH, config_override=config)
+    return held[0] * 1.5
+
+
+@pytest.mark.asyncio
+async def test_a_refused_field_gives_its_hold_back_before_the_retry():
+    kwargs = {"preset": "openai", "model": "gpt-5.6-mini", "secrets": {"api_key": "k"}, "price_input": 1.0, "price_output": 2.0}
+    meter = UsageMeter(budget=await _one_call_budget(kwargs))
+    seen, handler = recorder(_temperature_refusal)
+    backend = opened(handler, **kwargs)
+    processor = BatchProcessor(backend.provider, backend.settings, meter=meter)
+    result = await processor.process_all_batches(
+        BATCH.lines, "en", "hu", batch_size=10, model="gpt-5.6-mini"
+    )
+    assert result.success and len(seen) == 2
+    assert meter.reserved == pytest.approx(0.0) and meter.cost == pytest.approx(0.000028)
+
