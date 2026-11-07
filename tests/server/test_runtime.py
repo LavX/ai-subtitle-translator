@@ -484,3 +484,57 @@ def test_a_pin_to_openrouter_still_takes_deny():
     config = TranslationConfig(backend="openrouter", provider=ProviderConfig(dataCollection="deny"))
     connections, pinned = run.plan(config)
     assert next(c for c in connections if c.id == pinned).settings["data_collection"] == "deny"
+
+
+@pytest.mark.asyncio
+async def test_an_unpinned_deny_request_never_fails_over_to_a_back_end_that_cannot_honour_it():
+    from subtitle_translator.core.engine import EngineError, Line, TranslationJob
+
+    provider = ScriptedProvider([RateLimitError("slow", retry_after=120)])
+    run = single_provider_runtime(provider, settings(openrouter_api_key="k", gemini_api_keys="g"))
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    run.connections = build_connections(
+        settings(openrouter_api_key="k", gemini_api_keys="g"), registry, environ={}
+    )
+    assert {c.backend_type for c in run.connections} == {"openrouter", "gemini"}
+    config = TranslationConfig(provider=ProviderConfig(dataCollection="deny"))
+    connections, pinned = run.plan(config)
+    assert pinned is None and [c.backend_type for c in connections] == ["openrouter"]
+    job = TranslationJob(Language("en", "en"), Language("hu", "hu"), [Line(0, "Hello")])
+    with pytest.raises(EngineError) as caught:
+        await run.engine.translate(job, connections, pinned=pinned)
+    assert caught.value.kind is ErrorKind.RATE_LIMITED
+    assert [f.connection_id for f in caught.value.failovers] == ["openrouter"]
+    assert not any("gemini" in repr(key) for key in run.engine._opened)
+    # Without the option the same request does have Gemini to fail over to.
+    assert [c.backend_type for c in run.plan(TranslationConfig())[0]] == ["openrouter", "gemini"]
+
+
+def test_an_unpinned_deny_request_with_no_openrouter_connection_is_refused():
+    from subtitle_translator.core.errors import InvalidConfigError
+
+    run = _runtime_with_every_backend()
+    run.connections = [c for c in run.connections if c.backend_type != "openrouter"]
+    with pytest.raises(InvalidConfigError) as caught:
+        run.plan(TranslationConfig(provider=ProviderConfig(dataCollection="deny")))
+    assert "provider.dataCollection" in caught.value.field_errors
+
+
+@pytest.mark.parametrize("pin", ["gemini", "local"])
+def test_top_level_model_and_temperature_reach_a_pinned_back_end(pin):
+    from subtitle_translator.core.backends import Connection
+
+    run = _runtime_with_every_backend()
+    run.connections = [*run.connections, Connection("local", "openai_compatible", settings={"model": "m0"})]
+    connections, pinned = run.plan(TranslationConfig(backend=pin), model="top-model", temperature=0.2)
+    chosen = next(c for c in connections if c.id == pinned).settings
+    assert chosen["model"] == "top-model" and chosen["temperature"] == 0.2
+    # The config's own value wins over the top-level argument.
+    connections, pinned = run.plan(
+        TranslationConfig(backend=pin, model="own-model", temperature=0.7), model="top-model", temperature=0.2
+    )
+    chosen = next(c for c in connections if c.id == pinned).settings
+    assert chosen["model"] == "own-model" and chosen["temperature"] == 0.7
+    # Back ends that are not pinned are left alone.
+    other = next(c for c in connections if c.id != pinned and c.backend_type != "openrouter")
+    assert other.settings.get("model") != "top-model"

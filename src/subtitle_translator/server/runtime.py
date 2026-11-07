@@ -102,29 +102,30 @@ class Runtime:
         if temperature is not None:
             overlay.setdefault("temperature", temperature)
         pin = config.backend if config is not None and config.backend else None
-        if pin is not None and asked.get("data_collection") == "deny":
-            pinned = next((c for c in self.connections if c.id == pin), None)
+        connections = self.connections
+        if asked.get("data_collection") == "deny":
+            # Only OpenRouter can promise that no data is collected. A request that says deny is
+            # never sent to a back end that cannot, whether it pins one or fails over to one.
+            pinned = next((c for c in connections if c.id == pin), None) if pin else None
             if pinned is not None and pinned.backend_type != "openrouter":
-                raise InvalidConfigError(
-                    f"The {pinned.backend_type} back end cannot promise that no data is "
-                    'collected, so a request pinned to it cannot ask for dataCollection "deny". '
-                    "Use an OpenRouter connection, or remove the option.",
-                    provider=pinned.backend_type,
-                    field_errors={"provider.dataCollection": "deny is supported by OpenRouter only"},
-                )
+                raise _deny_refused(f"a request pinned to the {pinned.backend_type} back end", pinned.backend_type)
+            connections = [c for c in connections if c.backend_type == "openrouter"]
+            if not connections:
+                raise _deny_refused("a request with no OpenRouter connection to send it to", "openrouter")
         if not overlay:
-            return self.connections, pin
+            return connections, pin
         # A backend pin chooses the connection; it never drops the request's own options. The
         # routing and privacy options (only, ignore, data collection, order) and the timeout
-        # are OpenRouter's; the model and temperature are what the other back ends take too.
+        # are OpenRouter's; the model and temperature are what the other back ends take too,
+        # from the request's config first and from the top-level arguments after it.
         planned = []
-        for c in self.connections:
+        for c in connections:
             if c.backend_type == "openrouter":
                 planned.append(replace(c, settings={**c.settings, **overlay}))
                 continue
             taken = {
                 k: v
-                for k, v in asked.items()
+                for k, v in overlay.items()
                 if k in _OTHER_BACKENDS_TAKE.get(c.backend_type, ())
             }
             if pin is not None and c.id == pin:
@@ -143,6 +144,15 @@ class Runtime:
         chosen = next((c for c in connections if c.id == pinned), None) if pinned else None
         chosen = chosen or next((c for c in connections if c.enabled), None)
         return str(chosen.settings.get("model", "")) if chosen else ""
+
+
+def _deny_refused(who: str, provider: str) -> InvalidConfigError:
+    return InvalidConfigError(
+        f"Only OpenRouter can promise that no data is collected, so {who} cannot ask for "
+        'dataCollection "deny". Use an OpenRouter connection, or remove the option.',
+        provider=provider,
+        field_errors={"provider.dataCollection": "deny is supported by OpenRouter only"},
+    )
 
 
 def _registry(openrouter_factory) -> BackendRegistry:

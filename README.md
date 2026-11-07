@@ -465,9 +465,11 @@ A request pinned to a back end keeps its own options. The model and temperature 
 it names (an OpenAI-compatible connection also takes `parallelBatches`). The routing and privacy
 options are OpenRouter's: `provider.only` and `provider.ignore` on a pin to Gemini or an
 OpenAI-compatible connection are ignored, with a warning in the log. `provider.dataCollection:
-"deny"` is different, because those back ends cannot promise that no data is collected: such a
-request is refused with a validation error instead of being sent anywhere that might collect data.
-Pin to an OpenRouter connection to use it.
+"deny"` is different, because those back ends cannot promise that no data is collected: a request
+pinned to one is refused with a validation error, and an unpinned request that says deny never
+fails over to one. Only OpenRouter connections are tried for it, and it is refused when there is
+none. A top-level `model` and `temperature` on the request reach a pinned back end too, below the
+same fields in `config`.
 
 `OPENROUTER_MAX_TOKENS` and `BATCH_SIZE` have to fit each other. A batch that cannot
 answer inside the budget comes back cut short, and the adaptive sizer then halves the
