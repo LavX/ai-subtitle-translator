@@ -73,6 +73,7 @@ class OpenRouterWire:
         # Luna over a parameter OpenRouter itself adds.
         self.reject_endpoints = set()
         self.reject_usage = None
+        self.timeout_endpoints = set()
 
     async def __call__(self, request):
         self.requests.append(request)
@@ -89,6 +90,8 @@ class OpenRouterWire:
         self.completions.append(body)
         self.started.set()
         chosen = (body.get("provider") or {}).get("only") or [None]
+        if chosen[0] in self.timeout_endpoints:
+            raise httpx.ReadTimeout("synthetic stall", request=request)
         if chosen[0] in self.reject_endpoints:
             body = {"error": {"code": 400, "message": "Provider returned error"}}
             if self.reject_usage is not None:
@@ -1275,6 +1278,19 @@ class TestARejectedRouteIsRetriedElsewhere:
             )
         assert result.cost == pytest.approx(0.251) and result.total_tokens == 1057
         assert meter.cost == pytest.approx(0.251) and meter.reserved == 0.0
+
+    @pytest.mark.asyncio
+    async def test_a_timeout_after_a_charged_refusal_still_reports_the_refusal(self, environment):
+        wire, provider, _ = environment
+        wire.reject_endpoints = {"a"}
+        wire.reject_usage = {"total_tokens": 7, "cost": 0.25}
+        wire.timeout_endpoints = {"b"}
+
+        with pytest.raises(ProviderTimeoutError) as raised:
+            await provider.translate_batch(batch(), model="fixture/model:smartfast")
+
+        assert raised.value.cost == pytest.approx(0.25) and raised.value.tokens_used == 7
+        assert raised.value.billing_unknown
 
     @pytest.mark.asyncio
     async def test_routing_off_means_no_reroute(self, environment):

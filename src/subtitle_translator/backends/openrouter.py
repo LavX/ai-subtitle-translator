@@ -1082,6 +1082,8 @@ class OpenRouterProvider(ChatCompletionsProvider):
             else self.settings.request_timeout
         )
         deadline = asyncio.timeout(request_timeout)
+        # What a refused first request reported as charged, until the second one answers.
+        refused_tokens, refused_cost = 0, 0.0
         try:
             async with deadline:
                 try:
@@ -1102,6 +1104,7 @@ class OpenRouterProvider(ChatCompletionsProvider):
                         (error.routing_diagnostics or {}).get("selected_endpoint"),
                         error.status_code,
                     )
+                    refused_tokens, refused_cost = error.tokens_used, error.cost
                     try:
                         result = await self._translate_batch(
                             batch, model, temperature, config_override, deadline
@@ -1118,6 +1121,8 @@ class OpenRouterProvider(ChatCompletionsProvider):
             failure = ProviderTimeoutError(
                 f"Request timed out after {request_timeout}s", provider=self.provider_name
             )
+            # The request that timed out is not the only one sent: a refusal before it was billed.
+            failure.tokens_used, failure.cost = refused_tokens, refused_cost
             failure.routing_diagnostics = getattr(error, "routing_diagnostics", None) or getattr(
                 error.__cause__, "routing_diagnostics", None
             )
