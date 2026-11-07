@@ -1,12 +1,11 @@
 name: Publish to PyPI
 
-# Production PyPI is published by publishing a GitHub release, never by pushing a tag. The
-# dispatch builds the current ref and goes to TestPyPI only. Both publish jobs run in a GitHub
-# environment (pypi, testpypi); set a required reviewer on each so a person approves the upload.
+# Production PyPI is published by publishing a GitHub release, never by pushing a tag and never
+# by hand. The publish job runs in the pypi GitHub environment; set a required reviewer on it
+# so a person approves the upload.
 on:
   release:
     types: [published]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,7 +22,6 @@ jobs:
           python-version: "3.14"
       - name: Check the tag against the package version
         id: version
-        if: github.event_name == 'release'
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: python scripts/check_release_version.py "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
@@ -42,7 +40,6 @@ jobs:
           path: dist/
 
   publish-pypi:
-    if: github.event_name == 'release'
     needs: build
     runs-on: ubuntu-latest
     environment: pypi
@@ -54,20 +51,3 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
-
-  publish-testpypi:
-    if: github.event_name == 'workflow_dispatch'
-    needs: build
-    runs-on: ubuntu-latest
-    environment: testpypi
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: dist
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
