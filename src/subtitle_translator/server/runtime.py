@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 
 REQUEST_CONNECTION = "request"
 
+# What a request can set on a pinned back end other than OpenRouter. Everything else it carries is
+# OpenRouter's routing and privacy vocabulary, which those back ends have no way to apply.
+_OPENROUTER_ONLY = ("only", "ignore", "provider_order", "data_collection", "deny_data_collection")
+_OTHER_BACKENDS_TAKE = {
+    "gemini": frozenset({"model", "temperature"}),
+    "openai_compatible": frozenset({"model", "temperature", "parallel_batches"}),
+}
+
 
 class _SharedOpenRouter:
     """One OpenRouter provider per settings snapshot, shared by every key, as in 2.1.1: the
@@ -86,19 +94,39 @@ class Runtime:
             )
             pinned = Connection(REQUEST_CONNECTION, "openrouter", settings=wanted, secrets={"api_key": config.api_key})
             return [pinned], REQUEST_CONNECTION
-        if config is not None and config.backend:
-            return self.connections, config.backend
-        overlay = {k: v for k, v in (settings_from_config(config).items() if config else []) if v is not None}
+        asked = {k: v for k, v in (settings_from_config(config).items() if config else []) if v is not None}
+        overlay = dict(asked)
         if model:
             overlay.setdefault("model", model)
         if temperature is not None:
             overlay.setdefault("temperature", temperature)
+        pin = config.backend if config is not None and config.backend else None
         if not overlay:
-            return self.connections, None
-        return [
-            replace(c, settings={**c.settings, **overlay}) if c.backend_type == "openrouter" else c
-            for c in self.connections
-        ], None
+            return self.connections, pin
+        # A backend pin chooses the connection; it never drops the request's own options. The
+        # routing and privacy options (only, ignore, data collection, order) and the timeout
+        # are OpenRouter's; the model and temperature are what the other back ends take too.
+        planned = []
+        for c in self.connections:
+            if c.backend_type == "openrouter":
+                planned.append(replace(c, settings={**c.settings, **overlay}))
+                continue
+            taken = {
+                k: v
+                for k, v in asked.items()
+                if k in _OTHER_BACKENDS_TAKE.get(c.backend_type, ())
+            }
+            if pin is not None and c.id == pin:
+                if any(asked.get(k) for k in _OPENROUTER_ONLY):
+                    logger.warning(
+                        "The request's provider routing options apply to OpenRouter only and "
+                        "are not sent to the %s back end",
+                        c.backend_type,
+                    )
+                planned.append(replace(c, settings={**c.settings, **taken}) if taken else c)
+            else:
+                planned.append(c)
+        return planned, pin
 
     def planned_model(self, connections: list[Connection], pinned: str | None) -> str:
         chosen = next((c for c in connections if c.id == pinned), None) if pinned else None

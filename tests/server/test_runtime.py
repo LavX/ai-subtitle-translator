@@ -397,3 +397,52 @@ async def test_the_standalone_lists_models_from_its_configured_api_base(monkeypa
     backend._transport = httpx.MockTransport(handler)
     await backend.options("model", {}, {}, BackendContext())
     assert seen == ["https://gateway.example/v1/models"]
+
+
+def _runtime_with_every_backend():
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    run = single_provider_runtime(ScriptedProvider(), settings(openrouter_api_key="k"))
+    run.connections = build_connections(
+        settings(openrouter_api_key="k", gemini_api_keys="g"), registry, environ={}
+    )
+    return run
+
+
+def _request_options(**extra):
+    return TranslationConfig(
+        model="x/y",
+        temperature=0.9,
+        requestTimeout=77.0,
+        provider=ProviderConfig(only=["safe-host"], ignore=["bad-host"], dataCollection="deny"),
+        **extra,
+    )
+
+
+def test_a_backend_pin_to_openrouter_keeps_every_request_option():
+    run = _runtime_with_every_backend()
+    connections, pinned = run.plan(_request_options(backend="openrouter"))
+    chosen = next(c for c in connections if c.id == pinned).settings
+    assert chosen["only"] == ["safe-host"] and chosen["ignore"] == ["bad-host"]
+    assert chosen["data_collection"] == "deny" and chosen["deny_data_collection"] is True
+    assert chosen["model"] == "x/y" and chosen["temperature"] == 0.9
+    assert chosen["request_timeout"] == 77.0
+
+
+def test_a_backend_pin_to_another_backend_keeps_the_options_it_can_take():
+    run = _runtime_with_every_backend()
+    connections, pinned = run.plan(_request_options(backend="gemini"))
+    chosen = next(c for c in connections if c.id == pinned).settings
+    assert pinned == "gemini" and chosen["model"] == "x/y" and chosen["temperature"] == 0.9
+    # OpenRouter's routing vocabulary never reaches a back end that has no such thing.
+    assert not {"only", "ignore", "data_collection", "request_timeout"} & set(chosen)
+
+
+def test_a_backend_pin_to_an_openai_compatible_connection_keeps_its_model_and_parallelism():
+    from subtitle_translator.core.backends import Connection
+
+    run = _runtime_with_every_backend()
+    run.connections = [*run.connections, Connection("local", "openai_compatible", settings={"model": "m0"})]
+    connections, pinned = run.plan(_request_options(backend="local", parallelBatches=3))
+    chosen = next(c for c in connections if c.id == pinned).settings
+    assert chosen["model"] == "x/y" and chosen["temperature"] == 0.9 and chosen["parallel_batches"] == 3
+    assert not {"only", "ignore", "data_collection", "request_timeout"} & set(chosen)
