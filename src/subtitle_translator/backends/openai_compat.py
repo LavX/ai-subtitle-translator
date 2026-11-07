@@ -183,6 +183,8 @@ class OpenAICompatProvider(ChatCompletionsProvider):
     def _price_error(self, error: TranslationProviderError) -> None:
         if self.prices_requests and error.tokens_used:
             error.cost = float(error.tokens_used) * max(self.price_input, self.price_output) / 1e6
+            # The reported tokens put a charge on the call, so its hold is settled with it.
+            error.billing_unknown = False
 
     def _no_key_left(self, model: str) -> TranslationProviderError:
         if self.keys.all_invalid():

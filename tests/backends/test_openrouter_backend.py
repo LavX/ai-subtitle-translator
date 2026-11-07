@@ -324,3 +324,62 @@ async def test_a_free_model_reply_without_a_charge_costs_nothing():
         BATCH.lines, "en", "hu", batch_size=10, model="x/y:free"
     )
     assert result.success and meter.reserved == 0.0 and meter.cost == 0.0
+
+
+def _reply_with(content=None, *, choices=True, usage=None):
+    message = {"content": content} if content is not None else {}
+    body = {"choices": [{"message": message}] if choices else []}
+    if usage is not None:
+        body["usage"] = usage
+    return body
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "reply",
+    [
+        _reply_with(choices=False, usage={"total_tokens": 30}),
+        _reply_with(content=None, usage={"total_tokens": 30}),
+        _reply_with(content="this is not json", usage={"total_tokens": 30}),
+        _reply_with(content=json.dumps({"translations": "nope"}), usage={"total_tokens": 30}),
+        _reply_with(content="this is not json"),
+    ],
+    ids=["no-choices", "no-content", "not-json", "bad-translations", "no-usage-at-all"],
+)
+async def test_a_reply_that_fails_processing_without_a_stated_charge_keeps_its_hold(reply):
+    from subtitle_translator.core.batch_processor import BatchProcessor
+
+    provider = _priced_provider(reply)
+    meter = UsageMeter(budget=1.0)
+    result = await BatchProcessor(
+        provider, CoreSettings(max_retries=1, retry_delay=0.0), meter=meter
+    ).process_all_batches(BATCH.lines, "en", "hu", batch_size=10, model="x/y")
+    assert not result.success
+    # The call may have been billed, so its hold stays and a retry cannot spend it again.
+    assert meter.reserved > 0 and meter.cost == 0.0
+
+
+@pytest.mark.asyncio
+async def test_a_reply_that_fails_processing_after_stating_a_zero_charge_releases_its_hold():
+    from subtitle_translator.core.batch_processor import BatchProcessor
+
+    reply = _reply_with(content="this is not json", usage={"total_tokens": 30, "cost": 0})
+    provider = _priced_provider(reply)
+    meter = UsageMeter(budget=1.0)
+    result = await BatchProcessor(
+        provider, CoreSettings(max_retries=1, retry_delay=0.0), meter=meter
+    ).process_all_batches(BATCH.lines, "en", "hu", batch_size=10, model="x/y")
+    assert not result.success and meter.reserved == 0.0 and meter.cost == 0.0
+
+
+@pytest.mark.asyncio
+async def test_a_reply_that_fails_processing_after_stating_a_charge_settles_that_charge():
+    from subtitle_translator.core.batch_processor import BatchProcessor
+
+    reply = _reply_with(content="this is not json", usage={"total_tokens": 30, "cost": 0.0004})
+    provider = _priced_provider(reply)
+    meter = UsageMeter(budget=1.0)
+    await BatchProcessor(
+        provider, CoreSettings(max_retries=1, retry_delay=0.0), meter=meter
+    ).process_all_batches(BATCH.lines, "en", "hu", batch_size=10, model="x/y")
+    assert meter.reserved == 0.0 and meter.cost > 0.0

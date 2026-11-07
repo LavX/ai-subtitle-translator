@@ -189,6 +189,7 @@ class ChatCompletionsProvider(TranslationProvider):
                 "Invalid JSON response: expected an object",
                 provider=self.provider_name,
                 raw_response=response.text[:1000],
+                billing_unknown=cost is None,
             )
         if data.get("error") is not None:
             fail(data["error"])
@@ -202,6 +203,7 @@ class ChatCompletionsProvider(TranslationProvider):
                 raw_response=str(data)[:1000],
                 tokens_used=total_tokens or 0,
                 cost=cost or 0.0,
+                billing_unknown=cost is None,
             )
 
         if isinstance(choices[0], dict) and choices[0].get("finish_reason") == "error":
@@ -223,6 +225,7 @@ class ChatCompletionsProvider(TranslationProvider):
                 raw_response=str(data)[:1000],
                 tokens_used=total_tokens or 0,
                 cost=cost or 0.0,
+                billing_unknown=cost is None,
             )
 
         # Debug logging: Log the raw response content
@@ -239,6 +242,9 @@ class ChatCompletionsProvider(TranslationProvider):
         except InvalidResponseError as error:
             error.tokens_used = total_tokens or 0
             error.cost = cost or 0.0
+            # A reply that states no charge may still have been billed, whereas an explicit
+            # zero is a stated charge. Only the first keeps its hold.
+            error.billing_unknown = cost is None
             raise
 
         # Debug logging: Log parsed translations

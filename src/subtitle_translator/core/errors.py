@@ -128,8 +128,10 @@ class InvalidResponseError(TranslationProviderError):
         raw_response: str | None = None,
         tokens_used: int = 0,
         cost: float = 0.0,
+        *,
+        billing_unknown: bool = False,
     ):
-        super().__init__(message, provider, retryable=True)
+        super().__init__(message, provider, retryable=True, billing_unknown=billing_unknown)
         self.raw_response = raw_response
         self.tokens_used = tokens_used
         self.cost = cost
