@@ -298,3 +298,23 @@ async def test_a_priced_gemini_model_with_no_known_ceiling_refuses_only_with_a_b
         await provider.translate_batch(BATCH, config_override=config)
     assert "model" in caught.value.field_errors or "max_tokens" in caught.value.field_errors
     assert (await provider.translate_batch(BATCH)).translations == [{"index": "0", "content": "Szia"}]
+
+
+def test_a_connection_with_its_own_request_timeout_applies_it_to_the_call_and_the_batch():
+    def handler(request):
+        return httpx.Response(200, json={})
+
+    connection = Connection(
+        "g", "gemini", settings={"model": "gemini-2.5-flash", "request_timeout": 900.0}, secrets={"api_keys": ["k"]}
+    )
+    opened = GeminiBackendType(transport=httpx.MockTransport(handler)).open(
+        connection, CoreSettings(request_timeout=120.0), BackendContext()
+    )
+    assert opened.config.request_timeout == 900.0 and opened.settings.request_timeout == 900.0
+    assert opened.provider.client.timeout.read == 900.0
+    plain = GeminiBackendType(transport=httpx.MockTransport(handler)).open(
+        Connection("g", "gemini", settings={"model": "gemini-2.5-flash"}, secrets={"api_keys": ["k"]}),
+        CoreSettings(request_timeout=120.0),
+        BackendContext(),
+    )
+    assert plain.config.request_timeout is None and plain.provider.client.timeout.read == 120.0

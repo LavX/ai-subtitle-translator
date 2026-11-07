@@ -25,6 +25,7 @@ from subtitle_translator.core.backends import (
     OpenedBackend,
     SettingField,
     Validation,
+    request_timeout_of,
 )
 from subtitle_translator.core.errors import (
     AuthenticationError,
@@ -371,11 +372,16 @@ class OpenAICompatibleBackendType(BackendType):
                 field_errors=checked.errors,
             )
         settings = checked.patch
+        timeout = request_timeout_of(connection.settings)
+        if timeout is not None:
+            # The request's own timeout bounds the HTTP call and the batch alike.
+            base = base.model_copy(update={"request_timeout": timeout})
         api_key = str(connection.secrets.get("api_key") or "").strip() or None
         config = TranslationConfig(
             model=settings["model"],
             temperature=settings["temperature"],
             parallelBatches=settings["parallel_batches"],
+            requestTimeout=timeout,
         )
         return OpenedBackend(
             self._provider(settings, api_key, base),

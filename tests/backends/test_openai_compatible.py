@@ -324,3 +324,15 @@ async def test_a_refused_field_gives_its_hold_back_before_the_retry():
     assert result.success and len(seen) == 2
     assert meter.reserved == pytest.approx(0.0) and meter.cost == pytest.approx(0.000028)
 
+
+
+def test_a_connection_with_its_own_request_timeout_applies_it_to_the_call_and_the_batch():
+    seen, handler = recorder()
+    backend = OpenAICompatibleBackendType(transport=httpx.MockTransport(handler))
+    connection = Connection(
+        "oc", "openai_compatible", settings={"model": "qwen3-8b", "base_url": "http://llm.local/v1", "request_timeout": 900.0}, secrets={}
+    )
+    result = backend.open(connection, CoreSettings(request_timeout=120.0), BackendContext())
+    assert result.config.request_timeout == 900.0 and result.settings.request_timeout == 900.0
+    assert result.provider.client.timeout.read == 900.0
+    assert opened(handler, base_url="http://llm.local/v1").config.request_timeout is None

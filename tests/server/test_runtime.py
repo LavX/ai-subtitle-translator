@@ -433,8 +433,10 @@ def test_a_backend_pin_to_another_backend_keeps_the_options_it_can_take():
     connections, pinned = run.plan(_request_options("allow", backend="gemini"))
     chosen = next(c for c in connections if c.id == pinned).settings
     assert pinned == "gemini" and chosen["model"] == "x/y" and chosen["temperature"] == 0.9
-    # OpenRouter's routing vocabulary never reaches a back end that has no such thing.
-    assert not {"only", "ignore", "data_collection", "request_timeout"} & set(chosen)
+    # OpenRouter's routing vocabulary never reaches a back end that has no such thing, but the
+    # request's own timeout does: it bounds the call on any back end.
+    assert chosen["request_timeout"] == 77.0
+    assert not {"only", "ignore", "data_collection"} & set(chosen)
 
 
 def test_a_backend_pin_to_an_openai_compatible_connection_keeps_its_model_and_parallelism():
@@ -445,7 +447,8 @@ def test_a_backend_pin_to_an_openai_compatible_connection_keeps_its_model_and_pa
     connections, pinned = run.plan(_request_options("allow", backend="local", parallelBatches=3))
     chosen = next(c for c in connections if c.id == pinned).settings
     assert chosen["model"] == "x/y" and chosen["temperature"] == 0.9 and chosen["parallel_batches"] == 3
-    assert not {"only", "ignore", "data_collection", "request_timeout"} & set(chosen)
+    assert chosen["request_timeout"] == 77.0
+    assert not {"only", "ignore", "data_collection"} & set(chosen)
 
 
 @pytest.mark.parametrize("pin,kind", [("gemini", "gemini"), ("local", "openai_compatible")])

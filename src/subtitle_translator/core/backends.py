@@ -176,6 +176,15 @@ _PROBE = TranslationBatch(
 )
 
 
+def request_timeout_of(settings: Mapping[str, Any]) -> float | None:
+    """The per-request timeout a connection was given, or None when it has none or it is not a
+    positive number."""
+    value = settings.get("request_timeout")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if value > 0 and value == value and value != float("inf") else None
+
+
 class BackendType(ABC):
     type_id: ClassVar[str]
     display_name: ClassVar[str]

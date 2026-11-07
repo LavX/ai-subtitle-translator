@@ -29,6 +29,7 @@ from subtitle_translator.core.backends import (
     SettingField,
     TestOutcome,
     Validation,
+    request_timeout_of,
 )
 from subtitle_translator.core.errors import (
     AuthenticationError,
@@ -359,6 +360,10 @@ class GeminiBackendType(BackendType):
         self, connection: Connection, base: CoreSettings, context: BackendContext
     ) -> OpenedBackend:
         settings = connection.settings
+        timeout = request_timeout_of(settings)
+        if timeout is not None:
+            # The request's own timeout bounds the HTTP call and the batch alike.
+            base = base.model_copy(update={"request_timeout": timeout})
         prices: dict[str, float] = {}
         for key, label in (("price_input", "Input price"), ("price_output", "Output price")):
             value = settings.get(key, 0.0)
@@ -389,6 +394,7 @@ class GeminiBackendType(BackendType):
             model=model,
             temperature=float(settings.get("temperature", 0.3)),
             parallelBatches=1,
+            requestTimeout=timeout,
         )
         size = settings.get("batch_size", GEMINI_DEFAULT_BATCH_SIZE)
         return OpenedBackend(
