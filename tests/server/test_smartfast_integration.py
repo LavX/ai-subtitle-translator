@@ -1280,6 +1280,68 @@ class TestARejectedRouteIsRetriedElsewhere:
         assert meter.cost == pytest.approx(0.251) and meter.reserved == 0.0
 
     @pytest.mark.asyncio
+    async def test_the_retry_cannot_spend_what_a_billed_refusal_already_consumed(self, environment):
+        from subtitle_translator.core.usage import (
+            BudgetExhaustedError,
+            UsageMeter,
+            call_scope,
+        )
+
+        wire, provider, settings = environment
+        for entry in (wire.models[0], *wire.endpoints):
+            entry["supported_parameters"].append("max_tokens")
+        wire.reject_endpoints = {"a"}
+        held = []
+
+        async def note(amount, model):
+            held.append(amount)
+
+        probe = TranslationConfig()
+        probe._usage_meter = UsageMeter(budget=10.0, reserve_sink=note)
+        with call_scope():
+            await provider.translate_batch(
+                batch(), model="fixture/model:smartfast", config_override=probe
+            )
+        one_request = held[0]
+        charge = 0.01
+        wire.reject_usage = {"total_tokens": 7, "cost": charge}
+
+        async def attempt(budget):
+            wire.completions.clear()
+            fresh = OpenRouterProvider(settings)  # the first one has quarantined "a"
+            meter = UsageMeter(budget=budget)
+            config = TranslationConfig()
+            config._usage_meter = meter
+            try:
+                with call_scope() as holds:
+                    try:
+                        result = await fresh.translate_batch(
+                            batch(), model="fixture/model:smartfast", config_override=config
+                        )
+                        tokens, cost = result.total_tokens, result.cost
+                    except BudgetExhaustedError as error:
+                        tokens, cost = error.tokens_used, error.cost
+                        outcome = error
+                    else:
+                        outcome = result
+                    await meter.record(tokens or 0, cost or 0.0, "m", reservations=holds)
+            finally:
+                await fresh.close()
+            return outcome, meter
+
+        # Room for one request and a little more, less than it and the refusal's charge together:
+        # the first goes out, and what it consumed leaves too little for the retry.
+        outcome, meter = await attempt(one_request + charge * 0.5)
+        assert isinstance(outcome, BudgetExhaustedError)
+        assert chosen_endpoints(wire) == ["a"]
+        assert meter.cost == pytest.approx(charge) and meter.reserved == 0.0
+
+        # Room for the charge plus one request: the retry goes out, and the charge counts once.
+        outcome, meter = await attempt(charge + one_request * 1.01)
+        assert chosen_endpoints(wire) == ["a", "b"]
+        assert meter.cost == pytest.approx(0.001 + charge) and meter.reserved == 0.0
+
+    @pytest.mark.asyncio
     async def test_a_timeout_after_a_charged_refusal_still_reports_the_refusal(self, environment):
         wire, provider, _ = environment
         wire.reject_endpoints = {"a"}

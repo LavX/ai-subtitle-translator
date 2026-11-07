@@ -107,6 +107,14 @@ class UsageMeter:
                 raise
         return Reservation(amount, model, reservation_id)
 
+    def narrow(self, reservation: Reservation, amount: float) -> Reservation:
+        """Shrink a hold to what its request is known to have cost so far, keeping its id. The
+        hold still stands for that charge, which the call's own settlement then turns into spend,
+        so the money is neither free to spend again nor counted twice."""
+        amount = max(0.0, float(amount))
+        self.reserved = max(0.0, self.reserved - reservation.amount + amount)
+        return Reservation(amount, reservation.model, reservation.id)
+
     async def record(
         self, tokens: int, cost: float, model: str, *, reservations: Iterable[Reservation] = ()
     ) -> None:
@@ -184,3 +192,24 @@ async def settle_request(
 async def release_request(config: Any, reservation: Reservation | None) -> None:
     """Give back the hold of a request the server rejected before it did any work."""
     await settle_request(config, reservation)
+
+
+async def narrow_request(config: Any, reservation: Reservation | None, charged: float) -> None:
+    """Replace the hold of a request that is not the call's answer with a hold of what it
+    reported as charged, so that a retry of the same call neither holds the whole worst case
+    twice nor spends money the first request has already consumed. The charge itself is settled
+    with the call's usage, where the caller carries it forward. With no charge the hold is
+    released."""
+    meter = getattr(config, "_usage_meter", None)
+    if meter is None or reservation is None:
+        return
+    if not charged > 0:
+        await release_request(config, reservation)
+        return
+    narrowed = meter.narrow(reservation, charged)
+    holds = _OPEN_CALL.get()
+    if holds is not None:
+        for position, held in enumerate(holds):
+            if held is reservation:
+                holds[position] = narrowed
+                break
