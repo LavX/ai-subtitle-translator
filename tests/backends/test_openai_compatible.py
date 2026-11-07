@@ -360,3 +360,24 @@ async def test_a_classified_failure_charges_the_usage_it_reported(status, body):
     assert not result.success
     assert meter.cost == pytest.approx(100 * 2.0 / 1e6)  # the higher of the two prices
     assert meter.reserved == pytest.approx(0.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body", [None, [], ["a", "b"], "text", {"data": None}, {"data": {"id": "x"}}])
+async def test_a_model_list_that_is_not_a_list_of_models_lists_nothing(body):
+    def listing(request):
+        return httpx.Response(200, json=body)
+
+    settings = {"preset": "ollama", "base_url": "http://localhost:11434/v1"}
+    backend = OpenAICompatibleBackendType(transport=httpx.MockTransport(listing))
+    assert await backend.options("model", settings, {}, BackendContext()) == []
+
+
+@pytest.mark.asyncio
+async def test_a_model_list_that_is_not_json_lists_nothing():
+    def listing(request):
+        return httpx.Response(200, text="<html>not json</html>")
+
+    settings = {"preset": "ollama", "base_url": "http://localhost:11434/v1"}
+    backend = OpenAICompatibleBackendType(transport=httpx.MockTransport(listing))
+    assert await backend.options("model", settings, {}, BackendContext()) == []

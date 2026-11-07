@@ -355,3 +355,15 @@ async def test_a_classified_gemini_failure_settles_the_usage_it_reported_before_
     # The refused request's reported tokens are charged at the higher price, then the reply's.
     assert meter.cost == pytest.approx((100 + 9) * 2.0 / 1e6)
     assert meter.reserved == pytest.approx(0.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body", [None, [], "text"])
+async def test_a_gemini_model_list_that_is_not_an_object_lists_nothing(body):
+    def handler(request):
+        return httpx.Response(200, json=body)
+
+    choices = await GeminiBackendType(transport=httpx.MockTransport(handler)).options(
+        "model", {}, {"api_keys": ["k"]}, BackendContext()
+    )
+    assert choices == []

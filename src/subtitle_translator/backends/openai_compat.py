@@ -363,7 +363,15 @@ class OpenAICompatProvider(ChatCompletionsProvider):
         special = self.classify(response, "")
         if special is not None:
             raise special
-        data = response.json().get("data") if response.status_code == 200 else None
+        data = None
+        if response.status_code == 200:
+            try:
+                body = response.json()
+            except ValueError:
+                body = None
+            # A body that is not an object (null, an array, text) lists nothing: the caller then
+            # falls back to a free-text model field.
+            data = body.get("data") if isinstance(body, dict) else None
         models = []
         for item in data if isinstance(data, list) else []:
             if isinstance(item, dict) and isinstance(item.get("id"), str):
