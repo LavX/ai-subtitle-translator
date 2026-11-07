@@ -342,3 +342,35 @@ async def test_usage_and_checkpoint_totals_after_a_failover_run_on_from_earlier_
     assert usage[-1].total_cost == pytest.approx(0.03)
     assert checkpoints[-1].total_tokens == 30 == outcome.tokens
     assert checkpoints[-1].total_cost == pytest.approx(outcome.cost)
+
+
+@pytest.mark.asyncio
+async def test_a_job_that_finishes_late_does_not_clear_a_newer_cooldown():
+    clock = Clock()
+    release = asyncio.Event()
+    started = asyncio.Event()
+
+    class Slow(ScriptedProvider):
+        async def translate_batch(self, batch, **kwargs):
+            started.set()
+            await release.wait()
+            return await super().translate_batch(batch, **kwargs)
+
+    a = Slow()
+    eng = engine({"a": a, "b": ScriptedProvider()}, clock)
+    running = asyncio.ensure_future(eng.translate(job(5), [A]))
+    await started.wait()
+    # Meanwhile another job's request on the same connection is told to wait.
+    eng._start_cooling(A, clock.now + 600, True)
+    release.set()
+    assert (await running).connection_id == "a"
+    assert eng._cooling_until(A) == clock.now + 600
+
+
+@pytest.mark.asyncio
+async def test_a_short_failover_wait_does_not_shorten_a_longer_running_one():
+    clock = Clock()
+    eng = engine({"a": ScriptedProvider(), "b": ScriptedProvider()}, clock)
+    eng._start_cooling(A, clock.now + 600, True)
+    eng._start_cooling(A, clock.now + 30, False)
+    assert eng._cooling_until(A) == clock.now + 600 and eng._cooling_on_provider_wait(A)

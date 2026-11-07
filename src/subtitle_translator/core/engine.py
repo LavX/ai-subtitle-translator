@@ -237,8 +237,11 @@ class TranslationEngine:
         self._opened: OrderedDict[str, _Opened] = OrderedDict()
         self._retired: list[_Opened] = []
         # connection id -> (fingerprint, when it may be tried again, whether the provider named
-        # that wait). A wait the provider named is honoured; one of the defaults is a guess.
-        self._cooling: dict[str, tuple[str, float, bool]] = {}
+        # that wait, the tick it was set at). A wait the provider named is honoured; one of the
+        # defaults is a guess. The tick lets an attempt that finishes late clear only a cooldown
+        # that was set before it began.
+        self._cooling: dict[str, tuple[str, float, bool, int]] = {}
+        self._cooling_tick = 0
         self._clock = clock
 
     @property
@@ -333,6 +336,21 @@ class TranslationEngine:
             entry.users -= 1
             await self._release(entry)
 
+    def _start_cooling(self, connection: Connection, until: float, named: bool) -> None:
+        """Record a cooldown. A longer one still running for the same settings is kept, so a
+        failure that reports a short wait never shortens a long one set by another job."""
+        fingerprint = connection.fingerprint()
+        self._cooling_tick += 1
+        current = self._cooling.get(connection.id)
+        if (
+            current is not None
+            and current[0] == fingerprint
+            and current[1] > self._clock()
+            and current[1] >= until
+        ):
+            until, named = current[1], current[2]
+        self._cooling[connection.id] = (fingerprint, until, named, self._cooling_tick)
+
     def _cooling_until(self, connection: Connection) -> float:
         """When a connection that failed over may be tried again. The wait belongs to the
         settings and secrets that earned it: a connection saved with a new key or model under
@@ -397,6 +415,7 @@ class TranslationEngine:
             # A call an earlier connection left unsettled may have been billed, so its worst
             # case stays held, as it would within one attempt.
             budget = None if job.budget is None else max(0.0, job.budget - cost - held)
+            began = self._cooling_tick
             try:
                 outcome = await self.attempt(
                     replace(job, checkpoints=checkpoints, budget=budget),
@@ -414,11 +433,7 @@ class TranslationEngine:
                     raise
                 named = bool(error.retry_after)
                 wait = error.retry_after if named else DEFAULT_COOLDOWN[error.kind]
-                self._cooling[connection.id] = (
-                    connection.fingerprint(),
-                    self._clock() + wait,
-                    named,
-                )
+                self._start_cooling(connection, self._clock() + wait, named)
                 record = FailoverRecord(connection.id, error.kind, error.message, error.retry_after)
                 failovers.append(record)
                 # Ids and kinds only: an error message can carry a URL, and keys never belong here.
@@ -433,7 +448,9 @@ class TranslationEngine:
                     events.on_failover(record)
                 last = error
                 continue
-            self._cooling.pop(connection.id, None)
+            entry = self._cooling.get(connection.id)
+            if entry is not None and entry[3] <= began:
+                del self._cooling[connection.id]
             outcome.tokens += tokens
             outcome.cost += cost
             outcome.failovers = failovers
