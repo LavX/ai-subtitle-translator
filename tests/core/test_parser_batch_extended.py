@@ -748,3 +748,25 @@ class TestProcessBatchesStream:
         assert results[0][0].success is False
         assert results[0][1].failed_batches == 1
         assert results[1][0].success is True
+
+
+class TestWithPositions:
+    TIMES = "00:00:01,000 --> 00:00:02,000"
+
+    def test_distinct_integer_indexes_are_kept(self):
+        parser = SRTParser()
+        entries = parser.parse(f"5\n{self.TIMES}\nA\n\n9\n{self.TIMES}\nB\n\n")
+        assert parser.with_positions(entries) is entries
+
+    def test_unnumbered_cues_get_their_place_in_the_file(self):
+        parser = SRTParser()
+        entries = parser.parse(f"{self.TIMES}\nA\n\n{self.TIMES}\nB\n\n")
+        assert [e.index for e in entries] == [None, None]
+        numbered = parser.with_positions(entries)
+        assert [e.index for e in numbered] == [1, 2]
+        assert [line["index"] for line in parser.extract_lines_for_translation(numbered)] == ["1", "2"]
+
+    def test_repeated_indexes_are_renumbered(self):
+        parser = SRTParser()
+        entries = parser.parse(f"1\n{self.TIMES}\nA\n\n1\n{self.TIMES}\nB\n\n")
+        assert [e.index for e in parser.with_positions(entries)] == [1, 2]

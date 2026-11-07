@@ -1,7 +1,7 @@
 """SRT file parsing and generation utilities."""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 
 from subtitle_translator._vendor import srt
@@ -91,6 +91,21 @@ class SRTParser:
         """
         subtitles = [entry.to_srt_subtitle() for entry in entries]
         return srt.compose(subtitles)
+
+    def with_positions(self, entries: list[SubtitleEntry]) -> list[SubtitleEntry]:
+        """Entries whose indexes can serve as unique integer positions.
+
+        A cue may carry no index (the timing line comes first), and a file may repeat or
+        mis-type its numbers. When every index is a distinct integer the entries are returned
+        as they are; otherwise each cue gets its place in the file, counted from one. Composing
+        renumbers the cues anyway, so the output does not depend on the old numbers.
+        """
+        indexes = [entry.index for entry in entries]
+        if all(isinstance(i, int) and not isinstance(i, bool) for i in indexes) and len(
+            set(indexes)
+        ) == len(indexes):
+            return entries
+        return [replace(entry, index=place) for place, entry in enumerate(entries, start=1)]
 
     def extract_lines_for_translation(self, entries: list[SubtitleEntry]) -> list[dict[str, str]]:
         """

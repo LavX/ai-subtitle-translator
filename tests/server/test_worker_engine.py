@@ -311,3 +311,36 @@ async def test_reasoning_and_provider_settings_are_logged_without_keys(manager, 
     assert sum("Reasoning config" in m for m in messages) == 1
     assert sum("Provider config configured" in m for m in messages) == 1
     assert "SECRET" not in " ".join(messages)
+
+
+UNNUMBERED_SRT = (
+    "00:00:01,000 --> 00:00:02,000\nHello\n\n"
+    "00:00:03,000 --> 00:00:04,000\nBye\n\n"
+    "00:00:05,000 --> 00:00:06,000\nAgain\n\n"
+)
+
+
+@pytest.mark.asyncio
+async def test_a_file_job_translates_cues_that_carry_no_number(manager):
+    provider = ScriptedProvider()
+    job_id = await submit(manager, job_type=JobType.TRANSLATE_FILE, content=UNNUMBERED_SRT)
+    await process_file_translation_job(manager, job_id, translator(provider))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.COMPLETED, job.error
+    content = job.result["content"]
+    assert all(text in content for text in ("THello", "TBye", "TAgain"))
+    assert job.result["subtitle_count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_the_sync_translator_translates_cues_that_carry_no_number():
+    result = await translator(ScriptedProvider()).translate_file(UNNUMBERED_SRT, "en", "hu")
+    assert result.success and result.subtitle_count == 3
+    assert all(text in result.content for text in ("THello", "TBye", "TAgain"))
+
+
+@pytest.mark.asyncio
+async def test_repeated_cue_numbers_do_not_merge_translations(manager):
+    repeated = SRT.replace("2\n00:00:03", "1\n00:00:03")
+    result = await translator(ScriptedProvider()).translate_file(repeated, "en", "hu")
+    assert result.success and "THello" in result.content and "TBye" in result.content

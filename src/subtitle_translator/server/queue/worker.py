@@ -228,6 +228,7 @@ async def process_file_translation_job(
             )
             return
 
+        entries = parser.with_positions(entries)
         extracted = parser.extract_lines_for_translation(entries)
         lines = [Line(int(item["index"]), item["content"]) for item in extracted]
 

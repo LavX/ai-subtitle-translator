@@ -303,6 +303,7 @@ class EngineTranslator:
             entries = parser.parse(content)
             if not entries:
                 return FileTranslationResult(content=content, model_used=model_used, subtitle_count=0)
+            entries = parser.with_positions(entries)
             lines = [
                 Line(int(item["index"]), item["content"])
                 for item in parser.extract_lines_for_translation(entries)
