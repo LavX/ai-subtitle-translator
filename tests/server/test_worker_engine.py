@@ -52,7 +52,7 @@ async def test_a_content_failure_is_partial_with_the_2_1_1_message(manager):
     await process_content_translation_job(manager, job_id, translator(ScriptedProvider(["ok", bad, bad])))
     job = manager.get_job(job_id)
     assert job.status == JobStatus.PARTIAL
-    assert job.error.startswith("2/4 lines translated. ")
+    assert job.error == "2/4 lines translated. 1 of 2 batches failed: garbled"
     assert [item["line"] for item in job.result["lines"]] == ["Tl0", "Tl1", "l2", "l3"]
 
 
