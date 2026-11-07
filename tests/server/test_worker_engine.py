@@ -443,3 +443,25 @@ async def test_a_failover_counts_repeated_positions_as_lines_in_the_final_progre
     # Position 0 was translated before the failover and stands for two lines.
     assert job.completed_lines == 4 and updates[-1][2] == 4
     assert all(u[2] is None or u[2] <= 4 for u in updates)
+
+
+@pytest.mark.asyncio
+async def test_preserved_blank_cues_count_as_completed_lines(manager):
+    lines = [{"position": 0, "line": ""}, {"position": 1, "line": "a"}, {"position": 2, "line": "  "}, {"position": 3, "line": "b"}]
+    job_id = await submit(manager, lines)
+    await process_content_translation_job(manager, job_id, translator(ScriptedProvider()))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.COMPLETED
+    assert job.completed_lines == 4
+    assert [item["line"] for item in job.result["lines"]] == ["", "Ta", "  ", "Tb"]
+
+
+@pytest.mark.asyncio
+async def test_a_job_of_only_blank_cues_finishes_with_every_line_completed(manager):
+    lines = [{"position": 0, "line": ""}, {"position": 1, "line": " "}]
+    updates = record_progress(manager)
+    job_id = await submit(manager, lines)
+    await process_content_translation_job(manager, job_id, translator(ScriptedProvider()))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.COMPLETED
+    assert job.completed_lines == 2 and updates[-1][2] == 2

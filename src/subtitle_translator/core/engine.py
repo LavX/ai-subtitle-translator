@@ -490,6 +490,12 @@ class TranslationEngine:
             if acceptable(text)
         }
         remaining = [line for line in job.lines if line.position not in prior]
+        # A cue with no text is sent nowhere and comes back as it went in: it is done from the
+        # start, and the batch processor, which counts only the cues it translates, does not
+        # count it.
+        preserved = len(job.lines) - len(remaining) + sum(
+            1 for line in remaining if not str(line.text).strip()
+        )
         meter = UsageMeter(job.budget, events.on_usage, events.on_reserve)
         produced: list[Checkpoint] = []
         texts = {str(line.position): line.text for line in job.lines}
@@ -525,7 +531,7 @@ class TranslationEngine:
                 events.on_progress(
                     Progress(
                         total_lines=len(job.lines),
-                        done_lines=len(job.lines) - len(remaining) + progress.completed_lines,
+                        done_lines=preserved + progress.completed_lines,
                         total_batches=progress.total_batches,
                         done_batches=progress.completed_batches,
                         failed_batches=progress.failed_batches,
