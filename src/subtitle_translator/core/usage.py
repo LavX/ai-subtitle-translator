@@ -12,7 +12,8 @@ from subtitle_translator.core.errors import ErrorKind, TranslationProviderError
 
 @dataclass(frozen=True)
 class Usage:
-    """One provider call, and the attempt's running totals after it. reservations names the
+    """One provider call, and the running totals after it (an engine failover adds the earlier
+    connections' spend to them). reservations names the
     stored holds this call settles (ids from the reserve sink; empty when nothing was held)."""
 
     tokens: int

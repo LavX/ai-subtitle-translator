@@ -114,17 +114,41 @@ class EngineEvents:
 
 
 def _carrying_spend(events: EngineEvents, tokens: int, cost: float) -> EngineEvents:
-    """Events whose progress adds what earlier attempts of the same job already spent. Each
-    attempt meters only its own calls, so without this a job's totals would fall back to the
-    last attempt's alone after a failover."""
-    report = events.on_progress
-    if report is None or not (tokens or cost):
+    """Events whose totals add what earlier attempts of the same job already spent. Each
+    attempt meters only its own calls, so without this the totals a job reports (progress, the
+    running totals of a usage record and of a checkpoint) would fall back to the last
+    attempt's alone after a failover."""
+    if not (tokens or cost):
         return events
+    report, on_usage, on_checkpoint = events.on_progress, events.on_usage, events.on_checkpoint
 
     def carry(progress: Progress) -> None:
         report(replace(progress, tokens=progress.tokens + tokens, cost=progress.cost + cost))
 
-    return replace(events, on_progress=carry)
+    async def carry_usage(usage: Usage) -> None:
+        await on_usage(
+            replace(
+                usage,
+                total_tokens=usage.total_tokens + tokens,
+                total_cost=usage.total_cost + cost,
+            )
+        )
+
+    async def carry_checkpoint(checkpoint: Checkpoint) -> None:
+        await on_checkpoint(
+            replace(
+                checkpoint,
+                total_tokens=checkpoint.total_tokens + tokens,
+                total_cost=checkpoint.total_cost + cost,
+            )
+        )
+
+    return replace(
+        events,
+        on_progress=carry if report is not None else None,
+        on_usage=carry_usage if on_usage is not None else None,
+        on_checkpoint=carry_checkpoint if on_checkpoint is not None else None,
+    )
 
 
 @dataclass(frozen=True)

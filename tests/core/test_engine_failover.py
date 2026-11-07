@@ -321,3 +321,24 @@ async def test_progress_after_a_failover_carries_what_earlier_attempts_spent():
     assert all(p.cost >= 0.01 and p.tokens >= 10 for p in from_b)
     costs = [p.cost for p in seen]
     assert costs == sorted(costs)
+
+
+@pytest.mark.asyncio
+async def test_usage_and_checkpoint_totals_after_a_failover_run_on_from_earlier_attempts():
+    a = ScriptedProvider(["ok", QuotaExhaustedError("daily", retry_after=600)], tokens=10, cost=0.01)
+    b = ScriptedProvider(tokens=20, cost=0.02)
+    usage, checkpoints = [], []
+
+    async def on_usage(record):
+        usage.append(record)
+
+    async def on_checkpoint(checkpoint):
+        checkpoints.append(checkpoint)
+
+    outcome = await engine({"a": a, "b": b}).translate(
+        job(10), [A, B], events=EngineEvents(on_usage=on_usage, on_checkpoint=on_checkpoint)
+    )
+    assert [(u.tokens, u.total_tokens) for u in usage] == [(10, 10), (20, 30)]
+    assert usage[-1].total_cost == pytest.approx(0.03)
+    assert checkpoints[-1].total_tokens == 30 == outcome.tokens
+    assert checkpoints[-1].total_cost == pytest.approx(outcome.cost)
