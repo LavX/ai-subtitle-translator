@@ -397,6 +397,13 @@ def _extract_config_override_from_dict(
             )
         ):
             raise ValueError("Invalid SmartFast routing configuration") from None
+        if isinstance(provider_config, dict) and any(
+            provider_config.get(key)
+            for key in ("only", "ignore", "dataCollection", "data_collection")
+        ):
+            # A configuration that cannot be read must not run without the restrictions the
+            # caller asked for: the job fails instead of reaching providers they excluded.
+            raise ValueError("Invalid provider restriction configuration") from None
         logger.warning("Failed to validate stored translation configuration")
         return None
 

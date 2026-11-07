@@ -416,3 +416,15 @@ async def test_job_totals_after_a_failover_include_every_attempt(manager):
     assert job.status == JobStatus.COMPLETED
     assert job.tokens_used == 10 + 20 == job.result["tokens_used"]
     assert job.total_cost == pytest.approx(0.03)
+
+
+@pytest.mark.parametrize("restriction", [{"only": ["safe"]}, {"ignore": ["bad"]}, {"dataCollection": "deny"}])
+def test_an_unreadable_config_with_provider_restrictions_is_refused_not_dropped(restriction):
+    from subtitle_translator.server.queue.worker import _extract_config_override_from_dict
+
+    with pytest.raises(ValueError):
+        _extract_config_override_from_dict(
+            {"model": "x/y", "temperature": "hot", "provider": restriction}
+        )
+    # Without a restriction the unreadable config is still ignored, as before.
+    assert _extract_config_override_from_dict({"model": "x/y", "temperature": "hot"}) is None
