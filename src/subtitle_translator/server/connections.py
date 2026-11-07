@@ -43,15 +43,26 @@ def _parse(spec: SettingField, raw: str):
 
 def environment() -> dict[str, str]:
     """The process environment over the .env file the other settings are read from."""
+    # The server settings are read without regard to case, so these are too: every name is
+    # upper-cased before the two sources are merged, and the process environment still wins.
+    # Where one source spells a name two ways, the exact upper-case spelling wins.
     values: dict[str, str] = {}
     env_file = Settings.model_config.get("env_file")
     for name in (env_file,) if isinstance(env_file, (str, os.PathLike)) else tuple(env_file or ()):
         try:
-            values.update({k: v for k, v in dotenv_values(name).items() if v is not None})
+            file_values = {k: v for k, v in dotenv_values(name).items() if v is not None}
         except OSError:
             continue
-    values.update(os.environ)
+        values.update(_upper(file_values))
+    values.update(_upper(os.environ))
     return values
+
+
+def _upper(source: Mapping[str, str]) -> dict[str, str]:
+    folded: dict[str, str] = {}
+    for name in sorted(source, key=lambda n: n == n.upper()):
+        folded[name.upper()] = source[name]
+    return folded
 
 
 def _configured(name: str, backend, environ: Mapping[str, str]) -> Connection:

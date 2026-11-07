@@ -602,3 +602,28 @@ def test_with_the_toggle_off_nothing_changes():
     assert run.plan(TranslationConfig(backend="gemini"))[1] == "gemini"
     (own,), _ = run.plan(TranslationConfig(apiKey="user-key", model="x/y"))
     assert "deny_data_collection" not in own.settings
+
+
+def test_a_lowercase_dotenv_file_configures_a_back_end_like_an_uppercase_one(tmp_path, monkeypatch):
+    for name in ("PRESET", "BASE_URL", "MODEL", "API_KEY"):
+        monkeypatch.delenv(f"OPENAI_COMPATIBLE_{name}", raising=False)
+    (tmp_path / ".env").write_text(LM_STUDIO_ENV.lower())
+    monkeypatch.chdir(tmp_path)
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    connection = build_connections(settings(backend_order="openai_compatible"), registry)[0]
+    assert connection.enabled
+    assert connection.settings["model"] == "from-dotenv"
+    assert connection.settings["base_url"] == "http://192.168.1.10:1234/v1"
+
+
+def test_the_process_environment_still_wins_over_a_lowercase_dotenv_file(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text(LM_STUDIO_ENV.lower())
+    monkeypatch.setenv("OPENAI_COMPATIBLE_MODEL", "from-environment")
+    monkeypatch.chdir(tmp_path)
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    connection = build_connections(settings(backend_order="openai_compatible"), registry)[0]
+    assert connection.settings["model"] == "from-environment"
+    # A lowercase process variable counts the same, and the exact spelling beats it.
+    monkeypatch.setenv("openai_compatible_model", "lower-process")
+    monkeypatch.delenv("OPENAI_COMPATIBLE_MODEL")
+    assert build_connections(settings(backend_order="openai_compatible"), registry)[0].settings["model"] == "lower-process"
