@@ -23,7 +23,7 @@ from subtitle_translator.core.errors import (
 )
 from subtitle_translator.core.provider import TranslationBatch, TranslationResult
 from subtitle_translator.core.settings import CoreSettings
-from subtitle_translator.core.usage import release_request, reserve_request, settle_request
+from subtitle_translator.core.usage import reserve_request, settle_request
 
 if TYPE_CHECKING:
     from subtitle_translator.core.models import TranslationConfig
