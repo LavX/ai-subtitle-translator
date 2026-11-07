@@ -1424,6 +1424,12 @@ class OpenRouterProvider(ChatCompletionsProvider):
                 timeout_seconds=request_timeout,
             )
             result = await self._process_response(response, model_to_use, payload.get("max_tokens"))
+            if result.cost is None:
+                if bare_model.endswith(":free"):
+                    result.cost = 0.0
+                else:
+                    # The reply states no charge, so its hold stays: it may have been billed.
+                    result.billing_unknown = True
             self._validate_and_warn_unchanged(batch.lines, result.translations)
             if decision is not None:
                 requested = {str(line["index"]) for line in batch.lines}

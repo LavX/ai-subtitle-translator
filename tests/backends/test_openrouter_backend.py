@@ -275,3 +275,52 @@ def test_an_empty_only_list_restricts_nothing_through_a_connection_and_in_the_pa
     assert rebuilt.provider.only is None and rebuilt.provider.ignore is None
     _, params = OpenRouterProvider(CoreSettings())._build_provider_payload(rebuilt, "x/y")
     assert "only" not in params["provider"] and "ignore" not in params["provider"]
+
+
+def _priced_provider(reply):
+    provider = OpenRouterProvider(CoreSettings(openrouter_api_key="k", openrouter_max_tokens=1000))
+    provider._model_params_fetched = True
+    provider._model_price_cache["x/y"] = (0.000001, 0.000002)
+    provider._client = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=reply)),
+        base_url="https://openrouter.ai/api/v1",
+    )
+    return provider
+
+
+def _translated(usage):
+    content = json.dumps({"translations": [{"index": "0", "content": "Szia"}]})
+    return {"choices": [{"message": {"content": content}}], "usage": usage}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "usage,charged",
+    [({"total_tokens": 30}, False), ({"total_tokens": 30, "cost": 0.0004}, True)],
+)
+async def test_a_reply_that_states_no_charge_keeps_its_hold(usage, charged):
+    from subtitle_translator.core.batch_processor import BatchProcessor
+
+    provider = _priced_provider(_translated(usage))
+    meter = UsageMeter(budget=1.0)
+    result = await BatchProcessor(provider, CoreSettings(), meter=meter).process_all_batches(
+        BATCH.lines, "en", "hu", batch_size=10, model="x/y"
+    )
+    assert result.success
+    if charged:
+        assert meter.reserved == pytest.approx(0.0) and meter.cost == pytest.approx(0.0004)
+    else:
+        # Nothing says what the call cost, so the hold stays and later requests plan around it.
+        assert meter.reserved > 0 and meter.cost == 0.0
+
+
+@pytest.mark.asyncio
+async def test_a_free_model_reply_without_a_charge_costs_nothing():
+    from subtitle_translator.core.batch_processor import BatchProcessor
+
+    provider = _priced_provider(_translated({"total_tokens": 30}))
+    meter = UsageMeter(budget=1.0)
+    result = await BatchProcessor(provider, CoreSettings(), meter=meter).process_all_batches(
+        BATCH.lines, "en", "hu", batch_size=10, model="x/y:free"
+    )
+    assert result.success and meter.reserved == 0.0 and meter.cost == 0.0
