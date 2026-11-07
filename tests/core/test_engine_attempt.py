@@ -439,9 +439,14 @@ async def test_the_fields_at_fault_survive_the_adaptive_split():
     from subtitle_translator.core.batch_processor import BatchProcessor
 
     fault = InvalidConfigError("no output limit", provider="scripted", field_errors={"model": "required"})
-    processor = BatchProcessor(ScriptedProvider([fault]), CoreSettings(max_retries=0, retry_delay=0.0))
+    # The first request for the ten cues answers badly, so the batch is split; the config error
+    # is raised by a request for one of the smaller batches.
+    provider = ScriptedProvider([InvalidResponseError("garbled"), fault])
+    processor = BatchProcessor(provider, CoreSettings(max_retries=0, retry_delay=0.0))
     result = await processor.process_all_batches(
-        [{"index": str(i), "content": f"l{i}"} for i in range(4)], "en", "hu", batch_size=4
+        [{"index": str(i), "content": f"l{i}"} for i in range(10)], "en", "hu", batch_size=10
     )
+    assert [len(batch.lines) for batch in provider.batches][0] == 10
+    assert all(len(batch.lines) < 10 for batch in provider.batches[1:]) and len(provider.batches) >= 2
     failed = [r for r in result.batch_results if not r.success]
     assert failed and failed[0].field_errors == {"model": "required"}
