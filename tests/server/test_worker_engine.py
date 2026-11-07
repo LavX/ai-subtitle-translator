@@ -392,3 +392,27 @@ async def test_repeated_cue_numbers_do_not_merge_translations(manager):
     repeated = SRT.replace("2\n00:00:03", "1\n00:00:03")
     result = await translator(ScriptedProvider()).translate_file(repeated, "en", "hu")
     assert result.success and "THello" in result.content and "TBye" in result.content
+
+
+def _failover_translator(a, b):
+    from subtitle_translator.core.backends import Connection
+    from subtitle_translator.core.engine import TranslationEngine
+    from subtitle_translator.server.runtime import Runtime
+    from tests.core.engine_fakes import ScriptedBackend, registry_with
+
+    registry = registry_with(ScriptedBackend({"a": a, "b": b}, batch_size=2))
+    connections = [Connection("a", "scripted"), Connection("b", "scripted")]
+    engine = TranslationEngine(registry, SETTINGS)
+    return EngineTranslator(Runtime(SETTINGS, SETTINGS, registry, engine, connections, b))
+
+
+@pytest.mark.asyncio
+async def test_job_totals_after_a_failover_include_every_attempt(manager):
+    a = ScriptedProvider(["ok", QuotaExhaustedError("spent", retry_after=600)], tokens=10, cost=0.01)
+    b = ScriptedProvider(tokens=20, cost=0.02)
+    job_id = await submit(manager)
+    await process_content_translation_job(manager, job_id, _failover_translator(a, b))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.COMPLETED
+    assert job.tokens_used == 10 + 20 == job.result["tokens_used"]
+    assert job.total_cost == pytest.approx(0.03)

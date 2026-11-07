@@ -113,6 +113,20 @@ class EngineEvents:
     on_reserve: ReserveSink | None = None
 
 
+def _carrying_spend(events: EngineEvents, tokens: int, cost: float) -> EngineEvents:
+    """Events whose progress adds what earlier attempts of the same job already spent. Each
+    attempt meters only its own calls, so without this a job's totals would fall back to the
+    last attempt's alone after a failover."""
+    report = events.on_progress
+    if report is None or not (tokens or cost):
+        return events
+
+    def carry(progress: Progress) -> None:
+        report(replace(progress, tokens=progress.tokens + tokens, cost=progress.cost + cost))
+
+    return replace(events, on_progress=carry)
+
+
 @dataclass(frozen=True)
 class BatchModel:
     """The lines one batch of this attempt translated, and the model that served it."""
@@ -361,7 +375,9 @@ class TranslationEngine:
             budget = None if job.budget is None else max(0.0, job.budget - cost - held)
             try:
                 outcome = await self.attempt(
-                    replace(job, checkpoints=checkpoints, budget=budget), connection, events
+                    replace(job, checkpoints=checkpoints, budget=budget),
+                    connection,
+                    _carrying_spend(events, tokens, cost),
                 )
             except EngineError as error:
                 checkpoints.extend(error.checkpoints)

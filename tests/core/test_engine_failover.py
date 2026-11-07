@@ -304,3 +304,20 @@ async def test_each_failover_logs_one_info_line_with_ids_and_kind_only(caplog):
     assert lines[0] == "Failover: connection a ended with rate_limited, next is b"
     assert lines[1].startswith("Failover: connection b ended with auth_required") and "no connection left" in lines[1]
     assert "SECRET" not in " ".join(lines) and "secret.example" not in " ".join(lines)
+
+
+@pytest.mark.asyncio
+async def test_progress_after_a_failover_carries_what_earlier_attempts_spent():
+    a = ScriptedProvider(["ok", QuotaExhaustedError("daily", retry_after=600)], tokens=10, cost=0.01)
+    b = ScriptedProvider(tokens=20, cost=0.02)
+    seen = []
+    outcome = await engine({"a": a, "b": b}).translate(
+        job(10), [A, B], events=EngineEvents(on_progress=seen.append)
+    )
+    assert outcome.status == "complete" and outcome.cost == pytest.approx(0.03)
+    from_b = [p for p in seen if p.connection_id == "b"]
+    assert from_b, "the second connection reported no progress"
+    assert from_b[-1].cost == pytest.approx(0.03) and from_b[-1].tokens == 30
+    assert all(p.cost >= 0.01 and p.tokens >= 10 for p in from_b)
+    costs = [p.cost for p in seen]
+    assert costs == sorted(costs)
