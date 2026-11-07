@@ -5,7 +5,7 @@ import sys
 
 
 def test_main_shim_exposes_the_server_app():
-    import subtitle_translator.server.main as shim
+    import subtitle_translator.main as shim
     from subtitle_translator.server import main as server_main
 
     assert shim.app is server_main.app
@@ -15,7 +15,7 @@ def test_main_shim_exposes_the_server_app():
 
 def test_cli_module_still_runs_as_a_script():
     result = subprocess.run(
-        [sys.executable, "-m", "subtitle_translator.server.cli", "--help"],
+        [sys.executable, "-m", "subtitle_translator.cli", "--help"],
         capture_output=True,
         text=True,
         timeout=60,
