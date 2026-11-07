@@ -26,9 +26,11 @@ def test_a_mismatched_tag_is_refused():
 
 def test_the_publish_workflow_uses_trusted_publishing_and_stores_no_token():
     text = (SCRIPT.parents[1] / ".github" / "workflows" / "publish.yml").read_text()
-    assert text.count("id-token: write") == 2
+    assert text.count("id-token: write") == 1
     assert "secrets." not in text and "password:" not in text
-    assert "environment: pypi" in text and "environment: testpypi" in text
+    assert text.count("environment:") == 1 and "environment: pypi" in text
+    assert "testpypi" not in text.lower() and "test.pypi.org" not in text
+    assert text.count("pypa/gh-action-pypi-publish@") == 1
 
 
 def _publish_workflow():
@@ -40,10 +42,9 @@ def test_pypi_is_published_by_a_release_and_never_by_a_tag_push():
     triggers = text.split("\njobs:")[0]
     assert "release:\n    types: [published]" in triggers
     assert "push:" not in triggers and "tags:" not in triggers
-    pypi = text.split("  publish-pypi:")[1].split("  publish-testpypi:")[0]
-    testpypi = text.split("  publish-testpypi:")[1]
-    assert "if: github.event_name == 'release'" in pypi
-    assert "if: github.event_name == 'workflow_dispatch'" in testpypi
+    assert "workflow_dispatch" not in text
+    jobs = [line for line in text.split("\njobs:")[1].splitlines() if line.startswith("  ") and line.rstrip().endswith(":") and not line.startswith("   ")]
+    assert [job.strip() for job in jobs] == ["build:", "publish-pypi:"]
     assert "github.event.release.tag_name" in text and "GITHUB_REF" not in text
 
 
