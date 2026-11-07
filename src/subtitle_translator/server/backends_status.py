@@ -23,6 +23,7 @@ async def backend_status(runtime) -> dict:
     backends = []
     for entry in runtime.registry.entries():
         backend = entry.backend
+        # No sign-in command is advertised: the image ships no wrapper to run one.
         uses_sign_in = bool(backend and backend.uses_sign_in)
         backends.append(
             {
@@ -32,7 +33,6 @@ async def backend_status(runtime) -> dict:
                 "available": backend is not None,
                 "error": entry.error,
                 "usesSignIn": uses_sign_in,
-                "loginCommand": f"docker exec -it ai-subtitle-translator translator-login {entry.type_id}" if uses_sign_in else None,
             }
         )
     connections = []

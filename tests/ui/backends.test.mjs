@@ -6,7 +6,7 @@ test('renders back ends, errors, sign-in commands and connection state', () => {
  const html = renderBackends({
   backends: [
    {type: 'openrouter', name: 'OpenRouter', source: 'built-in', available: true, error: null, usesSignIn: false, loginCommand: null},
-   {type: 'signin', name: 'Harness', source: 'pkg 0.1.0', available: true, error: null, usesSignIn: true, loginCommand: 'docker exec -it ai-subtitle-translator translator-login signin'},
+   {type: 'signin', name: 'Harness', source: 'pkg 0.1.0', available: true, error: null, usesSignIn: true, loginCommand: 'harness-login signin'},
    {type: 'broken', name: 'broken', source: 'other 1.0', available: false, error: 'ImportError: missing', usesSignIn: false, loginCommand: null},
   ],
   connections: [
@@ -14,7 +14,7 @@ test('renders back ends, errors, sign-in commands and connection state', () => {
    {id: 'gemini', type: 'gemini', enabled: true, model: 'gemini-3.6-flash', signedIn: null, keys: [{index: 1, state: 'cooling', until: 1900000000}]},
   ],
  });
- assert.match(html, /translator-login signin/);
+ assert.match(html, /harness-login signin/);
  assert.match(html, /Signed out/);
  assert.match(html, /ImportError: missing/);
  assert.match(html, /Key 1: cooling/);

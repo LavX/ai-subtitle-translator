@@ -24,7 +24,9 @@ async def test_status_lists_installed_back_ends_with_errors_and_sign_in():
     status = await backend_status(run)
     by_type = {b["type"]: b for b in status["backends"]}
     assert by_type["signin"]["usesSignIn"] is True
-    assert by_type["signin"]["loginCommand"] == "docker exec -it ai-subtitle-translator translator-login signin"
+    # The image ships no sign-in wrapper, so no command is advertised for the user to run.
+    assert all("loginCommand" not in b for b in status["backends"])
+    assert "translator-login" not in repr(status)
     assert by_type["signin"]["source"] == "lavx-translator-harness 0.1.0"
     assert by_type["broken"]["available"] is False and "ImportError" in by_type["broken"]["error"]
     assert "sk-or-hidden" not in repr(status)
