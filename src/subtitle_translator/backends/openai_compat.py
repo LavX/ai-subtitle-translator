@@ -15,6 +15,7 @@ from subtitle_translator.core.errors import (
     AuthenticationError,
     DependencyUnavailableError,
     InvalidConfigError,
+    InvalidResponseError,
     ProviderTimeoutError,
     QuotaExhaustedError,
     RateLimitError,
@@ -297,6 +298,18 @@ class OpenAICompatProvider(ChatCompletionsProvider):
                 await self._release_unbilled(config_override, reservation, error)
                 self.keys.mark_rate_limited(key, error.retry_after or self._cooldown, model_id)
                 continue
+            except TranslationProviderError as error:
+                # A reply the server billed but this side could not use, such as content that
+                # is not a translation. Its tokens are charged at the configured prices; when
+                # it reported none, the hold stays because the call may have been billed.
+                self._price_error(error)
+                if (
+                    self.prices_requests
+                    and isinstance(error, InvalidResponseError)
+                    and not error.tokens_used
+                ):
+                    error.billing_unknown = True
+                raise
             if key and not pinned_key:
                 # An override key is not in the ring, and the ring never sees it.
                 self.keys.mark_success(key, model_id)

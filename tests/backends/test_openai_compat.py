@@ -230,3 +230,39 @@ async def test_a_rejected_key_gives_its_hold_back_before_the_next_key():
     )
     assert seen == ["Bearer k1", "Bearer k2"] and result.success
     assert meter.reserved == pytest.approx(0.0)
+
+
+def _priced(handler, **kw):
+    p = provider(handler, price_input=1.0, price_output=2.0, **kw)
+    p._output_limit = lambda model, payload: 1000
+    return p
+
+
+@pytest.mark.asyncio
+async def test_a_paid_reply_that_is_not_a_translation_is_charged_for_its_tokens():
+    from subtitle_translator.core.batch_processor import BatchProcessor
+    from subtitle_translator.core.usage import UsageMeter
+
+    garbled = {"choices": [{"message": {"content": "no json here"}}], "usage": {"total_tokens": 5000}}
+    p = _priced(lambda request: httpx.Response(200, json=garbled))
+    meter = UsageMeter(budget=1.0)
+    result = await BatchProcessor(p, CoreSettings(max_retries=0), meter=meter).process_all_batches(
+        BATCH.lines, "en", "es", batch_size=10, model="local-model"
+    )
+    assert not result.success
+    assert meter.cost == pytest.approx(5000 * 2.0 / 1e6)  # the higher of the two prices
+    assert meter.reserved == pytest.approx(0.0)
+
+
+@pytest.mark.asyncio
+async def test_a_paid_reply_with_no_usage_and_no_content_keeps_its_hold():
+    from subtitle_translator.core.batch_processor import BatchProcessor
+    from subtitle_translator.core.usage import UsageMeter
+
+    p = _priced(lambda request: httpx.Response(200, json=["not", "an", "object"]))
+    meter = UsageMeter(budget=1.0)
+    result = await BatchProcessor(p, CoreSettings(max_retries=0), meter=meter).process_all_batches(
+        BATCH.lines, "en", "es", batch_size=10, model="local-model"
+    )
+    assert not result.success
+    assert meter.reserved > 0  # it may have been billed, so the hold stays
