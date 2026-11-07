@@ -115,7 +115,9 @@ async def test_a_file_job_into_hebrew_gets_rtl_marks_once(manager):
 async def test_invalid_srt_and_empty_content_fail_like_2_1_1(manager):
     job_id = await submit(manager, job_type=JobType.TRANSLATE_FILE, content="not srt at all")
     await process_file_translation_job(manager, job_id, translator(ScriptedProvider()))
-    assert manager.get_job(job_id).status in (JobStatus.FAILED, JobStatus.COMPLETED)
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.FAILED
+    assert job.error.startswith("Invalid SRT content: Failed to parse SRT content")
     job_id = await submit(manager, job_type=JobType.TRANSLATE_FILE, content="   ")
     await process_file_translation_job(manager, job_id, translator(ScriptedProvider()))
     assert manager.get_job(job_id).error == "SRT content is required"
