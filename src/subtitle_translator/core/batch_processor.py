@@ -1282,4 +1282,8 @@ class BatchProcessor:
             progress.completed_batches += 1
 
             yield result, progress
+            if ends_dispatch(result):
+                # Sending the next batch to a connection that just said stop only repeats the
+                # failure (a quota, a rate limit with a long Retry-After, a bad key).
+                return
 

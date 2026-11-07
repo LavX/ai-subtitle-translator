@@ -717,6 +717,28 @@ class TestProcessBatchesStream:
         assert results[1][1] == 2
 
     @pytest.mark.asyncio
+    async def test_stream_stops_after_a_connection_level_failure(self):
+        from subtitle_translator.core.errors import RateLimitError
+
+        calls = []
+
+        async def _side_effect(batch, **kwargs):
+            calls.append(len(batch.lines))
+            raise RateLimitError("slow down", retry_after=3600)
+
+        provider = _mock_provider(side_effect=_side_effect)
+        processor = BatchProcessor(provider, _make_settings(batch_size=1, max_retries=0, retry_delay=0.0))
+        lines = [{"index": str(i), "content": f"l{i}"} for i in range(4)]
+
+        results = []
+        async for batch_result, progress in processor.process_batches_stream(lines, "en", "es"):
+            results.append(batch_result)
+
+        # The first batch reports the stop; the other three are never sent.
+        assert len(results) == 1 and not results[0].success
+        assert len(calls) == 1
+
+    @pytest.mark.asyncio
     async def test_stream_failed_batch_increments_failures(self):
         call_count = 0
 
