@@ -192,3 +192,17 @@ async def test_the_base_payload_is_the_one_gemini_builds_on():
 
     await provider(handler).translate_batch(BATCH)
     assert set(bodies[0]) == {"model", "messages", "temperature", "response_format"}
+
+
+@pytest.mark.asyncio
+async def test_a_successful_override_key_translates_and_leaves_the_ring_alone(caplog):
+    def handler(request):
+        return httpx.Response(200, json=OK)
+
+    p = provider(handler, keys=["ring-key"])
+    with caplog.at_level("DEBUG"):
+        result = await p.translate_batch(BATCH, config_override=TranslationConfig(api_key="sk-override-secret"))
+    assert result.translations == [{"index": "0", "content": "Hola"}]
+    assert "sk-override-secret" not in caplog.text
+    assert "sk-override-secret" not in repr(result)
+    assert p.keys.acquire("local-model") == "ring-key"

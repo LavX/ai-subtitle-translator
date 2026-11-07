@@ -285,7 +285,8 @@ class OpenAICompatProvider(ChatCompletionsProvider):
                     raise
                 self.keys.mark_rate_limited(key, error.retry_after or self._cooldown, model_id)
                 continue
-            if key:
+            if key and not pinned_key:
+                # An override key is not in the ring, and the ring never sees it.
                 self.keys.mark_success(key, model_id)
             if self.prices_requests:
                 cost = self._priced_cost(
