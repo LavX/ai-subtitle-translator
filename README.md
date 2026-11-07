@@ -82,6 +82,20 @@ ai-subtitle-translator serve --host 0.0.0.0 --port 8765
 
 The source-build examples select Luna with local `:smartfast` routing. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
 
+### Upgrading from 2.1.x
+
+The package is now published as `lavx-ai-subtitle-translator`, and `requirements.txt` is gone: the
+dependencies live in `pyproject.toml`, and the HTTP server is the `server` extra. For a manual
+install, remove the old distribution first, because both own the same `subtitle_translator` files:
+
+```bash
+pip uninstall ai-subtitle-translator
+pip install ".[server]"      # from a checkout; or: pip install "lavx-ai-subtitle-translator[server]"
+```
+
+The `ai-subtitle-translator` command, the `uvicorn subtitle_translator.main:app` entry point and the
+HTTP API are unchanged, so Docker users only need to pull the new image.
+
 ## Optional web UI
 
 Enable the standalone subtitle studio for single-file or batch SRT translation:
@@ -390,7 +404,7 @@ Per-request `config.serviceTier` accepts `default` (standard capacity), `flex`, 
 
 ## Configuration
 
-The table lists application defaults. For manual runs, most settings load from environment variables or a `.env` file in the working directory. `LOG_LEVEL` and `CORS_ALLOWED_ORIGINS` read the process environment directly: export them for manual runs. Docker Compose only forwards the variables explicitly listed in `docker-compose.yml`, which covers the ones in `.env.example`; add the `<TYPE>_<FIELD>` variables of an installed extension back end to its `environment` section. Its default model is `google/gemini-2.5-flash-preview-09-2025`, which differs from the application default below. Set a model ID available to your OpenRouter account explicitly.
+The table lists application defaults. For manual runs, most settings load from environment variables or a `.env` file in the working directory. `LOG_LEVEL` and `CORS_ALLOWED_ORIGINS` read the process environment directly: export them for manual runs. Docker Compose only forwards the variables explicitly listed in `docker-compose.yml`. That covers the ones in `.env.example` except `JOB_QUEUE_MAX_CONCURRENT`, `JOB_QUEUE_MAX_JOBS` and `JOB_QUEUE_TTL_HOURS`, which Compose does not pass on: add them to the `environment` section to change the job queue limits. Add the `<TYPE>_<FIELD>` variables of an installed extension back end to that section as well. The Compose default model is `google/gemini-2.5-flash-lite`, which differs from the application default below. Set a model ID available to your OpenRouter account explicitly.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
