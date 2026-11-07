@@ -472,7 +472,23 @@ class TranslationEngine:
         self, job: TranslationJob, connection: Connection, entry: _Opened, events: EngineEvents
     ) -> TranslationOutcome:
         opened = entry.opened
-        prior = usable_translations(job.lines, job.checkpoints)
+
+        def shaped(text: str) -> str:
+            """The text as the caller receives it: the marks the target needs are part of it."""
+            if job.add_rtl_marks and job.target.rtl and text.strip():
+                return add_rtl_markers(text)
+            return text
+
+        def acceptable(text: str) -> bool:
+            """Whether this translation survives every final check. A checkpoint is stored only
+            for such a text, so a resume never skips a position that would be refused later."""
+            return len(text) <= MAX_LINE_CHARS and len(shaped(text)) <= MAX_LINE_CHARS
+
+        prior = {
+            position: text
+            for position, text in usable_translations(job.lines, job.checkpoints).items()
+            if acceptable(text)
+        }
         remaining = [line for line in job.lines if line.position not in prior]
         meter = UsageMeter(job.budget, events.on_usage, events.on_reserve)
         produced: list[Checkpoint] = []
@@ -487,7 +503,7 @@ class TranslationEngine:
                 for t in result.translations
                 if str(t["index"]) in asked
                 and t["content"].strip()
-                and len(t["content"]) <= MAX_LINE_CHARS
+                and acceptable(t["content"])
             }
             if not kept:
                 return
@@ -605,7 +621,7 @@ class TranslationEngine:
                 except (KeyError, TypeError, ValueError):
                     continue
                 content = item.get("content", "")
-                if len(content) <= MAX_LINE_CHARS:
+                if acceptable(content):
                     translations[position] = content
 
         merged = {**prior, **translations}
@@ -613,9 +629,7 @@ class TranslationEngine:
         missing: list[int] = []
         for line in job.lines:
             if line.position in merged:
-                text = merged[line.position]
-                if job.add_rtl_marks and job.target.rtl and text.strip():
-                    text = add_rtl_markers(text)
+                text = shaped(merged[line.position])
                 if len(text) > MAX_LINE_CHARS:
                     # The marks pushed a translation past the longest line a caller can take.
                     # That position keeps its source text, as the cap already does for a

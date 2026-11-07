@@ -155,6 +155,54 @@ async def test_a_translation_pushed_past_the_cap_by_rtl_marks_keeps_its_source_t
 
 
 @pytest.mark.asyncio
+async def test_a_translation_the_rtl_marks_would_push_past_the_cap_is_never_checkpointed():
+    from subtitle_translator.core.provider import TranslationResult
+
+    def long_for_the_first(batch):
+        return TranslationResult(
+            translations=[
+                {"index": line["index"], "content": "x" * (MAX_LINE_CHARS - 1) if line["index"] == "0" else "ok"}
+                for line in batch.lines
+            ],
+            model_used="scripted-model",
+            total_tokens=10,
+            cost=0.01,
+        )
+
+    lines = [Line(0, "first"), Line(1, "second")]
+    checkpoints = []
+
+    async def on_checkpoint(checkpoint):
+        checkpoints.append(checkpoint)
+
+    target_job = TranslationJob(source=ENGLISH, target=HEBREW, lines=lines)
+    outcome = await engine({"c1": ScriptedProvider([long_for_the_first, "ok"])}).attempt(
+        target_job, CONN, EngineEvents(on_checkpoint=on_checkpoint)
+    )
+    assert outcome.missing == [0]
+    # Only the line that survives the final length check is stored.
+    assert [sorted(c.lines) for c in checkpoints] == [[1]]
+    assert 0 not in outcome.batches[0].positions
+
+    # A resume from that checkpoint translates the refused position again instead of skipping it.
+    again = ScriptedProvider()
+    resumed = TranslationJob(source=ENGLISH, target=HEBREW, lines=lines, checkpoints=checkpoints)
+    result = await engine({"c1": again}).attempt(resumed, CONN)
+    assert [line["index"] for batch in again.batches for line in batch.lines] == ["0"]
+    assert result.missing == []
+
+    # A checkpoint an earlier version stored for that position is not trusted either.
+    stale = Checkpoint(
+        {0: CheckpointLine(source_digest("first"), "x" * (MAX_LINE_CHARS - 1))},
+        1, 0.0, 1, 0.0, "c1", "m",
+    )
+    retried = ScriptedProvider()
+    stale_job = TranslationJob(source=ENGLISH, target=HEBREW, lines=lines, checkpoints=[stale])
+    await engine({"c1": retried}).attempt(stale_job, CONN)
+    assert "0" in [line["index"] for batch in retried.batches for line in batch.lines]
+
+
+@pytest.mark.asyncio
 async def test_media_and_languages_reach_the_provider_and_the_connection_is_opened_once():
     provider = ScriptedProvider()
     backend = ScriptedBackend({"c1": provider})
