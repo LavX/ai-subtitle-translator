@@ -383,3 +383,70 @@ async def test_a_reply_that_fails_processing_after_stating_a_charge_settles_that
         provider, CoreSettings(max_retries=1, retry_delay=0.0), meter=meter
     ).process_all_batches(BATCH.lines, "en", "hu", batch_size=10, model="x/y")
     assert meter.reserved == 0.0 and meter.cost > 0.0
+
+
+def _capturing_provider(seen, **settings):
+    reply = _translated({"total_tokens": 30, "cost": 0.0004})
+
+    def handler(request):
+        seen.append(json.loads(request.content))
+        return httpx.Response(200, json=reply)
+
+    provider = OpenRouterProvider(
+        CoreSettings(openrouter_api_key="k", openrouter_max_tokens=1000, **settings)
+    )
+    provider._model_params_fetched = True
+    provider._model_price_cache["x/y"] = (0.000001, 0.000002)
+    provider._client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), base_url="https://openrouter.ai/api/v1"
+    )
+    return provider
+
+
+@pytest.mark.asyncio
+async def test_a_budgeted_request_caps_endpoint_prices_at_the_reserved_prices():
+    seen = []
+    provider = _capturing_provider(seen)
+    config = TranslationConfig()
+    config._usage_meter = UsageMeter(budget=1.0)
+    await provider.translate_batch(BATCH, model="x/y", config_override=config)
+    # USD per million tokens, the catalog's 1e-6 and 2e-6 per token.
+    # The SDK sends prices as decimal strings, as it does for SmartFast.
+    sent = {key: float(value) for key, value in seen[0]["provider"]["max_price"].items()}
+    assert sent == {"prompt": 1.0, "completion": 2.0}
+
+
+@pytest.mark.asyncio
+async def test_a_request_without_a_budget_sends_no_price_cap():
+    seen = []
+    provider = _capturing_provider(seen)
+    config = TranslationConfig()
+    config._usage_meter = UsageMeter()
+    await provider.translate_batch(BATCH, model="x/y", config_override=config)
+    assert "max_price" not in (seen[0].get("provider") or {})
+
+
+@pytest.mark.asyncio
+async def test_a_cap_the_request_already_carries_stays_where_it_is_lower():
+    seen = []
+    provider = _capturing_provider(seen)
+    payload = {"provider": {"max_price": {"prompt": 0.5, "completion": 9, "request": 0}}, "messages": []}
+    config = TranslationConfig()
+    config._usage_meter = UsageMeter(budget=1.0)
+    provider._cap_prices_to_the_reservation(payload, "x/y", config)
+    assert payload["provider"]["max_price"] == {"prompt": 0.5, "completion": 2.0, "request": 0}
+
+
+def test_the_reservation_never_assumes_a_price_above_the_cap():
+    provider = _capturing_provider([])
+    payload = {
+        "messages": [{"role": "user", "content": "x" * 100}],
+        "max_tokens": 1000,
+        "provider": {"max_price": {"completion": 0.5}},  # prompt left open, completion capped
+    }
+    worst = provider._worst_case_charge(payload, "x/y")
+    input_bytes = len(json.dumps(payload["messages"]).encode()) + 16
+    # The open prompt price is the catalog's; the completion price is the cap, below the catalog's.
+    assert worst == pytest.approx(input_bytes * 1e-6 + 1000 * 0.5e-6)
+    free = {"messages": [], "max_tokens": 1000, "provider": {"max_price": {"prompt": 9, "completion": 9}}}
+    assert provider._worst_case_charge(free, "x/y") == pytest.approx(18 * 9e-6 + 1000 * 9e-6)

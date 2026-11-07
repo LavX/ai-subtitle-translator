@@ -1413,6 +1413,7 @@ class OpenRouterProvider(ChatCompletionsProvider):
                 if provider_config and provider_config.data_collection:
                     payload["provider"]["data_collection"] = provider_config.data_collection
                 payload["session_id"] = decision.session_id
+            self._cap_prices_to_the_reservation(payload, bare_model, config_override)
             reservation = await reserve_request(
                 config_override,
                 self._worst_case_charge(payload, bare_model),
@@ -1507,6 +1508,31 @@ class OpenRouterProvider(ChatCompletionsProvider):
     def _output_ceiling(self, model_used: str) -> int | None:
         return _positive_int(self._capability(self._model_max_output_cache, model_used))
 
+    def _cap_prices_to_the_reservation(
+        self, payload: dict, bare_model: str, config_override: Optional["TranslationConfig"]
+    ) -> None:
+        """With a budget, send the prices the reservation assumes as OpenRouter's provider
+        max_price (USD per million tokens), so that no endpoint or tier above them can serve the
+        request and spend what the budget never held. A cap the request already carries stays
+        where it is lower."""
+        meter = getattr(config_override, "_usage_meter", None)
+        if meter is None or meter.budget is None or bare_model.endswith(":free"):
+            return
+        catalog = self._capability(self._model_price_cache, bare_model)
+        if catalog is None:
+            return
+        provider = dict(payload.get("provider") or {})
+        caps = dict(provider.get("max_price") or {})
+        for key, per_token in zip(("prompt", "completion"), catalog, strict=True):
+            wanted = round(per_token * 1_000_000, 9)
+            current = caps.get(key)
+            try:
+                caps[key] = wanted if current is None else min(wanted, float(current))
+            except (TypeError, ValueError):
+                caps[key] = wanted
+        provider["max_price"] = caps
+        payload["provider"] = provider
+
     def _worst_case_charge(self, payload: dict, bare_model: str) -> float | None:
         """The most this request can be charged, in USD.
 
@@ -1518,16 +1544,24 @@ class OpenRouterProvider(ChatCompletionsProvider):
         """
         if bare_model.endswith(":free"):
             return 0.0
-        rates = None
         caps = (payload.get("provider") or {}).get("max_price")
-        if isinstance(caps, dict) and "prompt" in caps and "completion" in caps:
+        caps = caps if isinstance(caps, dict) else {}
+        catalog = self._capability(self._model_price_cache, bare_model)
+
+        def rate(key: str, position: int) -> float | None:
+            # An endpoint above the request's own price cap is not eligible, so the cap bounds
+            # the charge wherever it is set; the catalog covers a component it leaves open.
             try:
-                rates = (float(caps["prompt"]) / 1_000_000, float(caps["completion"]) / 1_000_000)
+                if key in caps:
+                    return float(caps[key]) / 1_000_000
             except (TypeError, ValueError):
-                rates = None
-        rates = rates or self._capability(self._model_price_cache, bare_model)
-        if rates is None:
+                pass
+            return catalog[position] if catalog is not None else None
+
+        prompt_rate, completion_rate = rate("prompt", 0), rate("completion", 1)
+        if prompt_rate is None or completion_rate is None:
             return None
+        rates = (prompt_rate, completion_rate)
         output = (
             payload.get("max_tokens")
             or payload.get("max_completion_tokens")
