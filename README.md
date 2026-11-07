@@ -469,15 +469,23 @@ on that key. Other requests use the back ends in `BACKEND_ORDER`; when one is ra
 quota, rejects its key or cannot be reached, the next one continues where it stopped. Put `backend`
 in a request's `config` to use one back end only.
 
-A request pinned to a back end keeps its own options. The model and temperature go to the back end
-it names (an OpenAI-compatible connection also takes `parallelBatches`). The routing and privacy
-options are OpenRouter's: `provider.only` and `provider.ignore` on a pin to Gemini or an
-OpenAI-compatible connection are ignored, with a warning in the log. `provider.dataCollection:
-"deny"` is different, because those back ends cannot promise that no data is collected: a request
-pinned to one is refused with a validation error, and an unpinned request that says deny never
-fails over to one. Only OpenRouter connections are tried for it, and it is refused when there is
-none. A top-level `model` and `temperature` on the request reach a pinned back end too, below the
-same fields in `config`.
+What a request's options do on each kind of connection:
+
+| Option | OpenRouter | Gemini / OpenAI-compatible, pinned with `backend` | Gemini / OpenAI-compatible, reached by failover |
+|--------|-----------|----------------------------------------------------|-------------------------------------------------|
+| `requestTimeout` | applied | applied to the call and the batch | applied |
+| `model`, `temperature` (config first, then the top-level fields) | applied | applied | ignored: the connection keeps its own, because a model name means nothing to another back end |
+| `parallelBatches` | applied | applied by OpenAI-compatible; Gemini always runs one batch at a time | ignored |
+| `provider` routing (`only`, `ignore`, `order`, `sort`, `smartFast`, `allowFallbacks`), `reasoning`, `useThinkingVariant`, `serviceTier` | applied | ignored, with a warning in the log | ignored |
+| `provider.dataCollection: "deny"` | applied | the request is refused with a validation error | never reached: only OpenRouter connections are tried |
+| `provider.dataCollection: "allow"` | applied | ignored | ignored |
+
+A request that brings its own OpenRouter key runs on that key alone, with every option applied.
+`provider.dataCollection: "deny"` is different from the other routing options because Gemini and
+OpenAI-compatible back ends cannot promise that no data is collected: a request pinned to one is
+refused with a validation error, and an unpinned request that says deny only ever tries OpenRouter
+connections, and is refused when there is none. `OPENROUTER_DENY_DATA_COLLECTION` does the same for
+every request that does not state its own `dataCollection`.
 
 `OPENROUTER_MAX_TOKENS` and `BATCH_SIZE` have to fit each other. A batch that cannot
 answer inside the budget comes back cut short, and the adaptive sizer then halves the

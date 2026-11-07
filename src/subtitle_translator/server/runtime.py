@@ -31,13 +31,30 @@ logger = logging.getLogger(__name__)
 
 REQUEST_CONNECTION = "request"
 
-# What a request can set on a pinned back end other than OpenRouter. Everything else it carries is
-# OpenRouter's routing and privacy vocabulary, which those back ends have no way to apply. The
-# timeout is not part of it: it bounds the HTTP call and the batch on any back end.
-_OPENROUTER_ONLY = ("only", "ignore", "provider_order", "data_collection", "deny_data_collection")
-_OTHER_BACKENDS_TAKE = {
-    "gemini": frozenset({"model", "temperature", "request_timeout"}),
-    "openai_compatible": frozenset({"model", "temperature", "parallel_batches", "request_timeout"}),
+# What a request can set on a back end other than OpenRouter.
+#
+# The timeout bounds the HTTP call and the batch on any back end, so every connection takes it,
+# pinned or reached by failover. The model, temperature and parallel batches belong to the back
+# end the request pins: a failover target keeps its own, because a model name means nothing to
+# another back end. Everything else the request carries is OpenRouter's routing, reasoning and
+# privacy vocabulary, which no other back end can apply; on a pin it is ignored with a warning.
+_EVERY_BACKEND_TAKES = frozenset({"request_timeout"})
+_OPENROUTER_ONLY = (
+    "only",
+    "ignore",
+    "provider_order",
+    "allow_fallbacks",
+    "routing",
+    "smart_fast",
+    "data_collection",
+    "deny_data_collection",
+    "reasoning",
+    "use_thinking_variant",
+    "service_tier",
+)
+_PINNED_BACKEND_TAKES = {
+    "gemini": frozenset({"model", "temperature"}),
+    "openai_compatible": frozenset({"model", "temperature", "parallel_batches"}),
 }
 
 
@@ -129,21 +146,23 @@ class Runtime:
                 raise _deny_refused(origin, "any connection (none is OpenRouter)", "openrouter")
         if not overlay:
             return connections, pin
-        # A backend pin chooses the connection; it never drops the request's own options. The
-        # routing and privacy options (only, ignore, data collection, order)
-        # are OpenRouter's; the model, temperature and timeout are what the other back ends take too,
-        # from the request's config first and from the top-level arguments after it.
+        # A backend pin chooses the connection; it never drops the request's own options. See
+        # the constants above for what each kind of connection takes: config first, then the
+        # top-level arguments.
         planned = []
         for c in connections:
             if c.backend_type == "openrouter":
                 planned.append(replace(c, settings={**c.settings, **overlay}))
                 continue
-            taken = {
-                k: v
-                for k, v in overlay.items()
-                if k in _OTHER_BACKENDS_TAKE.get(c.backend_type, ())
-            }
+            taken = {k: v for k, v in overlay.items() if k in _EVERY_BACKEND_TAKES}
             if pin is not None and c.id == pin:
+                taken.update(
+                    {
+                        k: v
+                        for k, v in overlay.items()
+                        if k in _PINNED_BACKEND_TAKES.get(c.backend_type, ())
+                    }
+                )
                 if any(asked.get(k) for k in _OPENROUTER_ONLY):
                     logger.warning(
                         "The request's provider routing options apply to OpenRouter only and "
@@ -152,7 +171,7 @@ class Runtime:
                     )
                 planned.append(replace(c, settings={**c.settings, **taken}) if taken else c)
             else:
-                planned.append(c)
+                planned.append(replace(c, settings={**c.settings, **taken}) if taken else c)
         return planned, pin
 
     def planned_model(self, connections: list[Connection], pinned: str | None) -> str:

@@ -627,3 +627,52 @@ def test_the_process_environment_still_wins_over_a_lowercase_dotenv_file(tmp_pat
     monkeypatch.setenv("openai_compatible_model", "lower-process")
     monkeypatch.delenv("OPENAI_COMPATIBLE_MODEL")
     assert build_connections(settings(backend_order="openai_compatible"), registry)[0].settings["model"] == "lower-process"
+
+
+def _every_connection_kind():
+    from subtitle_translator.core.backends import Connection
+
+    run = _runtime_with_every_backend()
+    run.connections = [
+        *run.connections,
+        Connection("local", "openai_compatible", settings={"model": "m0", "base_url": "http://llm.local/v1"}),
+    ]
+    return run
+
+
+def test_an_unpinned_request_gives_its_timeout_to_every_connection_it_may_fail_over_to():
+    run = _every_connection_kind()
+    config = TranslationConfig(model="x/y", temperature=0.9, requestTimeout=900.0)
+    connections, pinned = run.plan(config)
+    assert pinned is None
+    by_id = {c.id: c for c in connections}
+    assert {c.settings["request_timeout"] for c in connections} == {900.0}
+    # The model and temperature are OpenRouter's here: a failover target keeps its own.
+    assert by_id["openrouter"].settings["model"] == "x/y"
+    for other in ("gemini", "local"):
+        assert by_id[other].settings.get("model") != "x/y"
+        assert by_id[other].settings.get("temperature") != 0.9
+
+
+@pytest.mark.parametrize("target", ["gemini", "local"])
+def test_a_failover_target_opens_with_the_requests_timeout(target):
+    from subtitle_translator.core.backends import BackendContext
+
+    run = _every_connection_kind()
+    connections, _ = run.plan(TranslationConfig(requestTimeout=900.0))
+    connection = next(c for c in connections if c.id == target)
+    backend = BackendRegistry.discover(BackendScope.builtin()).get(connection.backend_type)
+    opened = backend.open(connection, run.core, BackendContext())
+    assert opened.config.request_timeout == 900.0 and opened.settings.request_timeout == 900.0
+    # Without the option the server's own timeout stands.
+    plain, _ = run.plan(TranslationConfig(model="x/y"))
+    kept = backend.open(next(c for c in plain if c.id == target), run.core, BackendContext())
+    assert kept.config.request_timeout is None and kept.settings.request_timeout == run.core.request_timeout
+
+
+def test_a_pin_warns_about_every_openrouter_only_option_it_cannot_apply(caplog):
+    run = _every_connection_kind()
+    config = TranslationConfig(backend="gemini", reasoning={"effort": "high"}, serviceTier="flex")
+    with caplog.at_level("WARNING"):
+        run.plan(config)
+    assert "OpenRouter only" in caplog.text
