@@ -227,6 +227,7 @@ class OpenAICompatProvider(ChatCompletionsProvider):
         dropped: set[str] = set()
         for _ in range(len(self.keys) + len(self.OPTIONAL_FIELDS) + 1):
             key = pinned_key or (self.keys.acquire(model_id) if len(self.keys) else None)
+            ticket = self.keys.ticket()
             if key is None and len(self.keys):
                 raise self._no_key_left(model_id)
             reservation = None
@@ -316,7 +317,7 @@ class OpenAICompatProvider(ChatCompletionsProvider):
                 raise
             if key and not pinned_key:
                 # An override key is not in the ring, and the ring never sees it.
-                self.keys.mark_success(key, model_id)
+                self.keys.mark_success(key, model_id, since=ticket)
             if self.prices_requests:
                 cost = self._priced_cost(
                     result.prompt_tokens, result.completion_tokens, result.total_tokens

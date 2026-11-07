@@ -67,5 +67,40 @@ def test_success_clears_a_block():
     clock = Clock()
     ring = KeyRing(["a"], clock=clock)
     ring.mark_rate_limited("a", 10, scope="m")
-    ring.mark_success("a", scope="m")
+    ring.mark_success("a", scope="m", since=ring.ticket())
     assert ring.acquire("m") == "a"
+
+
+def test_a_success_that_arrives_after_a_newer_rate_limit_does_not_clear_it():
+    clock = Clock()
+    ring = KeyRing(["a", "b"], ["p1", "p1"], clock=clock)
+    first = ring.acquire("flash")
+    ticket = ring.ticket()  # the first request leaves
+    second = ring.acquire("flash")
+    ring.mark_rate_limited(second, 60, scope="flash")  # the second request is refused meanwhile
+    ring.mark_success(first, "flash", since=ticket)  # the first one's reply arrives late
+    assert ring.acquire("flash") is None
+    assert ring.wait("flash") == (KeyState.COOLING, 60)
+
+
+def test_a_success_clears_a_block_that_was_set_before_its_request_left():
+    clock = Clock()
+    ring = KeyRing(["a"], clock=clock)
+    ring.mark_rate_limited("a", 60, scope="m")
+    clock.now += 61
+    key = ring.acquire("m")
+    ticket = ring.ticket()
+    ring.mark_success(key, "m", since=ticket)
+    assert ring.health("m")[0].state is KeyState.OK
+    assert ring._blocks == {}
+
+
+def test_a_later_short_rate_limit_does_not_shorten_a_quota_block():
+    clock = Clock()
+    ring = KeyRing(["a"], clock=clock)
+    ring.mark_exhausted("a", clock.now + 3600, scope="m")
+    ring.mark_rate_limited("a", 5, scope="m")
+    assert ring.wait("m") == (KeyState.EXHAUSTED, 3600)
+    # ... and a success from before the second mark cannot lift it either.
+    ring.mark_success("a", "m", since=0)
+    assert ring.wait("m") == (KeyState.EXHAUSTED, 3600)
