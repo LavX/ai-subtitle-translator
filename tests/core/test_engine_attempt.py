@@ -17,6 +17,7 @@ from subtitle_translator.core.engine import (
 from subtitle_translator.core.errors import (
     DeclinedError,
     ErrorKind,
+    InvalidConfigError,
     InvalidResponseError,
     QuotaExhaustedError,
 )
@@ -420,3 +421,27 @@ def test_an_opened_back_end_and_the_engine_do_not_show_a_key_in_their_reprs():
     connection = Connection("request", "scripted", secrets={"api_key": "SECRET-key"})
     entry = eng._open(connection)
     assert "SECRET" not in repr(entry) and "SECRET" not in repr(entry.opened) and "SECRET" not in repr(eng._opened)
+
+
+@pytest.mark.asyncio
+async def test_the_fields_at_fault_in_an_invalid_config_reach_the_engine_error():
+    fault = InvalidConfigError(
+        "no output limit", provider="scripted", field_errors={"max_tokens": "Set an output budget"}
+    )
+    with pytest.raises(EngineError) as caught:
+        await engine({"c1": ScriptedProvider([fault])}).attempt(job(10), CONN)
+    assert caught.value.kind is ErrorKind.INVALID_CONFIG
+    assert caught.value.field_errors == {"max_tokens": "Set an output budget"}
+
+
+@pytest.mark.asyncio
+async def test_the_fields_at_fault_survive_the_adaptive_split():
+    from subtitle_translator.core.batch_processor import BatchProcessor
+
+    fault = InvalidConfigError("no output limit", provider="scripted", field_errors={"model": "required"})
+    processor = BatchProcessor(ScriptedProvider([fault]), CoreSettings(max_retries=0, retry_delay=0.0))
+    result = await processor.process_all_batches(
+        [{"index": str(i), "content": f"l{i}"} for i in range(4)], "en", "hu", batch_size=4
+    )
+    failed = [r for r in result.batch_results if not r.success]
+    assert failed and failed[0].field_errors == {"model": "required"}

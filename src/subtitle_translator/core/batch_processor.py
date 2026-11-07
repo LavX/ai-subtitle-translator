@@ -86,6 +86,8 @@ class BatchResult:
     retry_after: float | None = None
     # The failure's own reason, such as budget_exhausted.
     reason: str | None = None
+    # The settings at fault when the failure is an invalid configuration, by field name.
+    field_errors: dict[str, str] = field(default_factory=dict)
     # The model that served the call whose lines the result carries.
     model_used: str | None = None
     # The batch's last failure was a transport error or a 5xx that its retries did not get past.
@@ -691,6 +693,7 @@ class BatchProcessor:
                             error_kind=kind,
                             retry_after=e.retry_after,
                             reason=getattr(e, "reason", None),
+                            field_errors=dict(getattr(e, "field_errors", None) or {}),
                             retries=retries,
                         )
                     )
@@ -846,6 +849,7 @@ class BatchProcessor:
         failure_kinds: list[ErrorKind | None] = []
         retry_afters: list[float] = []
         stop_reason: str | None = None
+        stop_field_errors: dict[str, str] = {}
         model_used: str | None = None
         unreachable = False
         loop = asyncio.get_running_loop()
@@ -903,6 +907,7 @@ class BatchProcessor:
                     retry_afters.append(sub_result.retry_after)
                 if ends_dispatch(sub_result):
                     stop_reason = sub_result.reason
+                    stop_field_errors = sub_result.field_errors
                     unreachable = sub_result.unreachable
                     rest = batch.lines[offset:]
                     if rest:
@@ -926,6 +931,7 @@ class BatchProcessor:
                 error_kind=most_severe(failure_kinds) or ErrorKind.PARTIAL,
                 retry_after=max(retry_afters, default=None),
                 reason=stop_reason,
+                field_errors=stop_field_errors,
                 model_used=model_used,
                 unreachable=unreachable,
             )

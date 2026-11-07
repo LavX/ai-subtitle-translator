@@ -543,6 +543,7 @@ class TranslationEngine:
             retry_after=None,
             summary="",
             reason=None,
+            field_errors=None,
         ) -> EngineError:
             if reason is None and kind is ErrorKind.CANCELLED:
                 # The batch processor produces cancelled only when a request did not fit the budget.
@@ -559,6 +560,7 @@ class TranslationEngine:
                 cost=meter.cost,
                 checkpoints=produced,
                 summary=summary,
+                field_errors=field_errors,
                 reserved=meter.reserved,
             )
 
@@ -594,6 +596,7 @@ class TranslationEngine:
                     error.message,
                     retry_after=error.retry_after,
                     reason=getattr(error, "reason", None),
+                    field_errors=getattr(error, "field_errors", None),
                 ) from error
             except Exception as error:  # noqa: BLE001 - reported as internal, never swallowed
                 raise fail(ErrorKind.INTERNAL, f"{type(error).__name__}: {error}") from error
@@ -614,6 +617,7 @@ class TranslationEngine:
                     retry_after=retry_after,
                     summary=summary,
                     reason=next((r.reason for r in of_kind if r.reason), None),
+                    field_errors=next((r.field_errors for r in of_kind if r.field_errors), None),
                 )
             for item in result.all_translations:
                 try:
