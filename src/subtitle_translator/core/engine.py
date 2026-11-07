@@ -525,7 +525,7 @@ class TranslationEngine:
                 events.on_progress(
                     Progress(
                         total_lines=len(job.lines),
-                        done_lines=len(prior) + progress.completed_lines,
+                        done_lines=len(job.lines) - len(remaining) + progress.completed_lines,
                         total_batches=progress.total_batches,
                         done_batches=progress.completed_batches,
                         failed_batches=progress.failed_batches,

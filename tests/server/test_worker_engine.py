@@ -428,3 +428,18 @@ def test_an_unreadable_config_with_provider_restrictions_is_refused_not_dropped(
         )
     # Without a restriction the unreadable config is still ignored, as before.
     assert _extract_config_override_from_dict({"model": "x/y", "temperature": "hot"}) is None
+
+
+@pytest.mark.asyncio
+async def test_a_failover_counts_repeated_positions_as_lines_in_the_final_progress(manager):
+    lines = [{"position": 0, "line": "a"}, {"position": 0, "line": "a"}, {"position": 1, "line": "b"}, {"position": 2, "line": "c"}]
+    a = ScriptedProvider(["ok", QuotaExhaustedError("spent", retry_after=600)])
+    b = ScriptedProvider()
+    updates = record_progress(manager)
+    job_id = await submit(manager, lines)
+    await process_content_translation_job(manager, job_id, _failover_translator(a, b))
+    job = manager.get_job(job_id)
+    assert job.status == JobStatus.COMPLETED
+    # Position 0 was translated before the failover and stands for two lines.
+    assert job.completed_lines == 4 and updates[-1][2] == 4
+    assert all(u[2] is None or u[2] <= 4 for u in updates)
