@@ -86,12 +86,58 @@ async def test_a_restored_key_pins_the_job_to_it(manager):
     assert provider.batches                                   # served by the pinned request connection
 
 
+def record_progress(manager):
+    """Every progress update the job receives: (percent, message, lines, batches, total batches)."""
+    updates = []
+    original = manager.update_progress
+
+    def update(job_id, progress, message="", **kwargs):
+        updates.append(
+            (
+                progress,
+                message,
+                kwargs.get("completed_lines"),
+                kwargs.get("completed_batches"),
+                kwargs.get("total_batches"),
+            )
+        )
+        original(job_id, progress, message, **kwargs)
+
+    manager.update_progress = update
+    return updates
+
+
 @pytest.mark.asyncio
 async def test_progress_reaches_the_job(manager):
+    updates = record_progress(manager)
     job_id = await submit(manager)
     await process_content_translation_job(manager, job_id, translator(ScriptedProvider()))
     job = manager.get_job(job_id)
     assert job.progress == 100 and job.completed_lines == 4
+    settled = [u for u in updates if u[1].startswith("Translated ")]
+    assert [(u[0], u[1], u[2], u[3], u[4]) for u in settled] == [
+        (0, "Translated 0/4 lines (0/2 batches)", 0, 0, 2),
+        (50, "Translated 2/4 lines (1/2 batches)", 2, 1, 2),
+        (100, "Translated 4/4 lines (2/2 batches)", 4, 2, 2),
+    ]
+    assert any(u[1].startswith("Batch 2: request in progress") and u[0] == 50 for u in updates)
+    percents = [u[0] for u in updates]
+    assert percents == sorted(percents)
+
+
+@pytest.mark.asyncio
+async def test_a_failed_batch_shows_in_the_progress_messages(manager):
+    bad = InvalidResponseError("garbled")
+    updates = record_progress(manager)
+    job_id = await submit(manager)
+    await process_content_translation_job(manager, job_id, translator(ScriptedProvider(["ok", bad, bad])))
+    assert manager.get_job(job_id).status == JobStatus.PARTIAL
+    messages = [u[1] for u in updates]
+    assert "Translated 2/4 lines (1/2 batches)" in messages
+    assert any(m.startswith("Batch 2: retry 1 after invalid response") for m in messages)
+    final = updates[-1]
+    assert final[1] == "Translated 2/4 lines (2/2 batches, 1 failed)"
+    assert final[0] == 100 and final[2] == 2 and final[3] == 2
 
 
 @pytest.mark.asyncio
