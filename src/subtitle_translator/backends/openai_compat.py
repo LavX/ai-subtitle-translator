@@ -23,7 +23,7 @@ from subtitle_translator.core.errors import (
 )
 from subtitle_translator.core.provider import TranslationBatch, TranslationResult
 from subtitle_translator.core.settings import CoreSettings
-from subtitle_translator.core.usage import release_request, reserve_request
+from subtitle_translator.core.usage import release_request, reserve_request, settle_request
 
 if TYPE_CHECKING:
     from subtitle_translator.core.models import TranslationConfig
@@ -206,9 +206,11 @@ class OpenAICompatProvider(ChatCompletionsProvider):
 
     @staticmethod
     async def _release_unbilled(config, reservation, error: TranslationProviderError) -> None:
-        """A rejection that reports no usage cost nothing, so the next attempt may reuse its hold."""
-        if not (error.tokens_used or error.cost or error.billing_unknown):
-            await release_request(config, reservation)
+        """Close the hold of a request the next key replaces, so two are never held at once.
+        What the rejection reported as charged is settled with it; one that may have been
+        billed without saying so keeps its hold."""
+        if not error.billing_unknown:
+            await settle_request(config, reservation, error.tokens_used, error.cost)
 
     async def translate_batch(
         self,

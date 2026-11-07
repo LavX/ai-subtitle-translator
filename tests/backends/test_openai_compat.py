@@ -232,6 +232,33 @@ async def test_a_rejected_key_gives_its_hold_back_before_the_next_key():
     assert meter.reserved == pytest.approx(0.0)
 
 
+@pytest.mark.asyncio
+async def test_a_rotated_key_that_reported_a_charge_settles_it_before_the_next_key():
+    from subtitle_translator.core.batch_processor import BatchProcessor
+    from subtitle_translator.core.usage import UsageMeter
+
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers["authorization"])
+        if request.headers["authorization"] == "Bearer k1":
+            body = {"error": {"message": "slow"}, "usage": {"total_tokens": 100}}
+            return httpx.Response(429, json=body, headers={"retry-after": "30"})
+        return httpx.Response(200, json=OK)
+
+    p = provider(handler, keys=["k1", "k2"], price_input=1.0, price_output=2.0)
+    p._output_limit = lambda model, payload: 1000
+    one_call = p._worst_case("local-model", p._payload(BATCH, "local-model", None, None), None)
+    meter = UsageMeter(budget=one_call * 1.5)  # room for one request in flight, not two
+    result = await BatchProcessor(p, CoreSettings(), meter=meter).process_all_batches(
+        BATCH.lines, "en", "es", batch_size=10, model="local-model"
+    )
+    assert seen == ["Bearer k1", "Bearer k2"] and result.success
+    # The refused request's reported tokens are charged at the higher price, then the reply's.
+    assert meter.cost == pytest.approx((100 + 5) * 2.0 / 1e6)
+    assert meter.reserved == pytest.approx(0.0)
+
+
 def _priced(handler, **kw):
     p = provider(handler, price_input=1.0, price_output=2.0, **kw)
     p._output_limit = lambda model, payload: 1000

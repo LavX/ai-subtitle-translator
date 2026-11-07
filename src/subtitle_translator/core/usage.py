@@ -160,10 +160,14 @@ async def reserve_request(
     return reservation
 
 
-async def release_request(config: Any, reservation: Reservation | None) -> None:
-    """Give back the hold of a request the server rejected before it did any work, so a retry
-    of the same call does not promise the same money twice. Only for a request known to be
-    unbilled: a rejected optional field, a refused key, a rate limit."""
+async def settle_request(
+    config: Any, reservation: Reservation | None, tokens: int = 0, cost: float = 0.0
+) -> None:
+    """Close the hold of a request that is not the call's answer, with whatever it reported as
+    charged, so a retry of the same call does not promise the same money twice and the charge
+    is not lost. Only for a request whose billing is known: a rejected optional field, a
+    refused key, a rate limit, a refused endpoint. A request that may have been billed without
+    saying so keeps its hold instead."""
     meter = getattr(config, "_usage_meter", None)
     if meter is None or reservation is None:
         return
@@ -173,4 +177,9 @@ async def release_request(config: Any, reservation: Reservation | None) -> None:
             if held is reservation:
                 del holds[position]
                 break
-    await meter.record(0, 0.0, reservation.model, reservations=(reservation,))
+    await meter.record(tokens, cost, reservation.model, reservations=(reservation,))
+
+
+async def release_request(config: Any, reservation: Reservation | None) -> None:
+    """Give back the hold of a request the server rejected before it did any work."""
+    await settle_request(config, reservation)
