@@ -225,3 +225,33 @@ def test_override_serves_a_configured_instance():
     registry.override(configured)
     assert registry.get("echo") is configured
     assert [e.distribution for e in registry.entries() if e.type_id == "echo"] == [BUILTIN_DISTRIBUTION]
+
+
+@pytest.mark.asyncio
+async def test_a_paid_test_call_with_unknown_billing_keeps_its_hold():
+    from subtitle_translator.core.backends import BackendContext
+    from subtitle_translator.core.provider import TranslationResult
+    from subtitle_translator.core.settings import CoreSettings
+    from subtitle_translator.core.usage import UsageMeter
+    from tests.core.engine_fakes import ScriptedBackend, ScriptedProvider
+
+    settled = []
+
+    async def reserve(amount, model):
+        return "hold-1"
+
+    async def usage(report):
+        settled.extend(report.reservations)
+
+    def unreported(batch):
+        return TranslationResult(
+            translations=[{"index": "0", "content": "ok"}], model_used="scripted-model", billing_unknown=True
+        )
+
+    meter = UsageMeter(1.0, usage, reserve)
+    provider = ScriptedProvider([unreported], price=0.02)
+    outcome = await ScriptedBackend({"c1": provider}).test(
+        Connection("c1", "scripted"), CoreSettings(), BackendContext(), meter
+    )
+    assert outcome.ok
+    assert meter.reserved == pytest.approx(0.02) and settled == []

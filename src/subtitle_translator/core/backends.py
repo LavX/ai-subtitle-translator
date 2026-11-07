@@ -246,7 +246,7 @@ class BackendType(ABC):
                     result.total_tokens or 0,
                     result.cost or 0.0,
                     result.model_used or opened.model,
-                    reservations=holds,
+                    reservations=() if getattr(result, "billing_unknown", False) else holds,
                 )
         finally:
             await opened.provider.close()
