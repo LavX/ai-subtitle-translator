@@ -1276,7 +1276,8 @@ class TestARejectedRouteIsRetriedElsewhere:
             await meter.record(
                 result.total_tokens or 0, result.cost or 0.0, "m", reservations=holds
             )
-        assert result.cost == pytest.approx(0.251) and result.total_tokens == 1057
+        # The refusal was settled as a call of its own; the answer carries only its own usage.
+        assert result.cost == pytest.approx(0.001) and result.total_tokens == 1050
         assert meter.cost == pytest.approx(0.251) and meter.reserved == 0.0
 
     @pytest.mark.asyncio
@@ -1342,17 +1343,45 @@ class TestARejectedRouteIsRetriedElsewhere:
         assert meter.cost == pytest.approx(0.001 + charge) and meter.reserved == 0.0
 
     @pytest.mark.asyncio
-    async def test_a_timeout_after_a_charged_refusal_still_reports_the_refusal(self, environment):
+    async def test_a_timeout_after_a_charged_refusal_counts_the_refusal_once(self, environment):
+        from subtitle_translator.core.usage import UsageMeter, call_scope
+
         wire, provider, _ = environment
+        for entry in (wire.models[0], *wire.endpoints):
+            entry["supported_parameters"].append("max_tokens")
         wire.reject_endpoints = {"a"}
         wire.reject_usage = {"total_tokens": 7, "cost": 0.25}
         wire.timeout_endpoints = {"b"}
+        stored, settled_ids, spends = [], [], []
 
-        with pytest.raises(ProviderTimeoutError) as raised:
-            await provider.translate_batch(batch(), model="fixture/model:smartfast")
+        async def reserve_sink(amount, model):
+            stored.append(f"hold-{len(stored)}")
+            return stored[-1]
 
-        assert raised.value.cost == pytest.approx(0.25) and raised.value.tokens_used == 7
-        assert raised.value.billing_unknown
+        async def sink(usage):
+            spends.append(usage)
+            settled_ids.extend(usage.reservations)
+
+        meter = UsageMeter(budget=10.0, sink=sink, reserve_sink=reserve_sink)
+        config = TranslationConfig()
+        config._usage_meter = meter
+        with call_scope() as holds:
+            with pytest.raises(ProviderTimeoutError) as raised:
+                await provider.translate_batch(
+                    batch(), model="fixture/model:smartfast", config_override=config
+                )
+            error = raised.value
+            assert error.billing_unknown
+            # What the batch processor does with a call that may have been billed.
+            await meter.record(error.tokens_used, error.cost, "m", reservations=())
+        # The refusal is spent exactly once and its hold is gone; the timed-out request keeps
+        # its own hold, the only one persisted and left unsettled.
+        assert meter.cost == pytest.approx(0.25) and meter.tokens == 7
+        assert len(stored) == 2 and settled_ids == [stored[0]]
+        assert len(holds) == 1 and holds[0].amount > 0
+        assert meter.reserved == pytest.approx(holds[0].amount)
+        assert holds[0].id == stored[1]
+        assert [u.cost for u in spends] == [pytest.approx(0.25)]
 
     @pytest.mark.asyncio
     async def test_routing_off_means_no_reroute(self, environment):

@@ -31,7 +31,7 @@ from subtitle_translator.core.provider import (
     TranslationResult,
 )
 from subtitle_translator.core.settings import CoreSettings
-from subtitle_translator.core.usage import BudgetExhaustedError, narrow_request, reserve_request
+from subtitle_translator.core.usage import BudgetExhaustedError, reserve_request, settle_request
 
 if TYPE_CHECKING:
     from subtitle_translator.core.models import TranslationConfig
@@ -1479,9 +1479,13 @@ class OpenRouterProvider(ChatCompletionsProvider):
                 # translate_batch sends this request again on another endpoint. The refusal
                 # did no work, so its hold goes back first: both would otherwise be held at
                 # once and a budget that covers one request would refuse the alternative.
-                # What the refusal reported as charged stays held, so the alternative cannot
-                # spend it again; the error carries it forward and the call settles it once.
-                await narrow_request(config_override, reservation, error.cost)
+                # What the refusal reported as charged is settled with its own hold now, as a
+                # call of its own, and leaves the error so that it is counted once: the
+                # alternative may time out, which keeps its own unknown hold and nothing else.
+                if await settle_request(
+                    config_override, reservation, error.tokens_used, error.cost
+                ):
+                    error.tokens_used, error.cost = 0, 0.0
             if isinstance(error, httpx.RequestError) and not isinstance(
                 error, httpx.TimeoutException
             ):
