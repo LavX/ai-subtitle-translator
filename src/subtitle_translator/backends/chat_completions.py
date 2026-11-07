@@ -87,6 +87,28 @@ class ChatCompletionsProvider(TranslationProvider):
     def _length_remedy(self, model_used: str, max_tokens: int | None) -> str:
         return "Lower the batch size or raise the output budget."
 
+    @staticmethod
+    def _reported_usage(response: httpx.Response) -> tuple[int | None, float | None]:
+        """What a reply says it used: total tokens and cost, each None when it states none or
+        states something unusable. Read from any reply, an error among them, because a request
+        the server refused after doing some work is still billed for it."""
+        try:
+            data = response.json()
+        except ValueError:
+            return None, None
+        usage = data.get("usage") if isinstance(data, dict) else None
+        usage = usage if isinstance(usage, dict) else {}
+        total_tokens = usage.get("total_tokens")
+        if not isinstance(total_tokens, int) or isinstance(total_tokens, bool) or total_tokens < 0:
+            total_tokens = None
+        try:
+            cost = float(usage["cost"])
+            if not math.isfinite(cost) or cost < 0:
+                cost = None
+        except (KeyError, ValueError, TypeError):
+            cost = None
+        return total_tokens, cost
+
     async def _process_response(
         self, response: httpx.Response, model_used: str, max_tokens: int | None = None
     ) -> TranslationResult:
@@ -113,15 +135,7 @@ class ChatCompletionsProvider(TranslationProvider):
         usage = usage if isinstance(usage, dict) else {}
         prompt_tokens = usage.get("prompt_tokens")
         completion_tokens = usage.get("completion_tokens")
-        total_tokens = usage.get("total_tokens")
-        if not isinstance(total_tokens, int) or isinstance(total_tokens, bool) or total_tokens < 0:
-            total_tokens = None
-        try:
-            cost = float(usage["cost"])
-            if not math.isfinite(cost) or cost < 0:
-                cost = None
-        except (KeyError, ValueError, TypeError):
-            cost = None
+        total_tokens, cost = self._reported_usage(response)
 
         def fail(detail: Any) -> None:
             code = response.status_code if response.status_code >= 400 else None

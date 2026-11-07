@@ -336,3 +336,27 @@ def test_a_connection_with_its_own_request_timeout_applies_it_to_the_call_and_th
     assert result.config.request_timeout == 900.0 and result.settings.request_timeout == 900.0
     assert result.provider.client.timeout.read == 900.0
     assert opened(handler, base_url="http://llm.local/v1").config.request_timeout is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status,body",
+    [
+        (403, {"error": {"message": "no"}}),
+        (429, {"error": {"message": "quota", "type": "insufficient_quota", "code": "insufficient_quota"}}),
+    ],
+    ids=["forbidden", "insufficient-quota"],
+)
+async def test_a_classified_failure_charges_the_usage_it_reported(status, body):
+    def handler(request):
+        return httpx.Response(status, json={**body, "usage": {"total_tokens": 100}})
+
+    backend = opened(handler, preset="openai", model="gpt-5.6-mini", secrets={"api_key": "sk"},
+                     price_input=1.0, price_output=2.0)
+    meter = UsageMeter(budget=1.0)
+    result = await BatchProcessor(backend.provider, CoreSettings(max_retries=0), meter=meter).process_all_batches(
+        BATCH.lines, "en", "hu", batch_size=10, model="gpt-5.6-mini"
+    )
+    assert not result.success
+    assert meter.cost == pytest.approx(100 * 2.0 / 1e6)  # the higher of the two prices
+    assert meter.reserved == pytest.approx(0.0)

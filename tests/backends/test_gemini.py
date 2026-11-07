@@ -318,3 +318,40 @@ def test_a_connection_with_its_own_request_timeout_applies_it_to_the_call_and_th
         BackendContext(),
     )
     assert plain.config.request_timeout is None and plain.provider.client.timeout.read == 120.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status,body",
+    [
+        (429, quota_body("GenerateRequestsPerMinutePerProjectPerModel")),
+        (429, quota_body("GenerateRequestsPerDayPerProjectPerModel")),
+        (403, {"error": {"code": 403, "message": "denied", "status": "PERMISSION_DENIED"}}),
+        (503, {"error": {"code": 503, "message": "overloaded"}}),
+    ],
+    ids=["rate-limit", "daily-quota", "forbidden", "server-error"],
+)
+async def test_a_classified_gemini_failure_settles_the_usage_it_reported_before_the_next_key(status, body):
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers["authorization"])
+        if request.headers["authorization"] == "Bearer k1":
+            return httpx.Response(status, json={**body, "usage": {"total_tokens": 100}})
+        return httpx.Response(200, json=OK)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://g.test/v1beta/openai/")
+    p = GeminiProvider(
+        ["k1", "k2"], model="gemini-2.5-flash", price_input=1.0, price_output=2.0,
+        settings=CoreSettings(), client=client, clock=Clock(datetime(2026, 9, 24, 10, 0, tzinfo=PT)),
+    )
+    p._output_limit = lambda model, payload: 1000
+    one_call = p._worst_case("gemini-2.5-flash", p._payload(BATCH, "gemini-2.5-flash", None, None), None)
+    meter = UsageMeter(budget=one_call * 1.5)  # room for one request in flight, not two
+    result = await BatchProcessor(p, CoreSettings(), meter=meter).process_all_batches(
+        BATCH.lines, "en", "hu", batch_size=10, model="gemini-2.5-flash"
+    )
+    assert seen == ["Bearer k1", "Bearer k2"] and result.success
+    # The refused request's reported tokens are charged at the higher price, then the reply's.
+    assert meter.cost == pytest.approx((100 + 9) * 2.0 / 1e6)
+    assert meter.reserved == pytest.approx(0.0)

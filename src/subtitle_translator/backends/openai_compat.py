@@ -180,6 +180,15 @@ class OpenAICompatProvider(ChatCompletionsProvider):
             return total * max(self.price_input, self.price_output) / 1e6
         return None
 
+    def _attach_usage(self, error: TranslationProviderError, response: httpx.Response) -> None:
+        """Put the usage a reply reports on the error made from it, priced like any other."""
+        tokens, cost = self._reported_usage(response)
+        if tokens and not error.tokens_used:
+            error.tokens_used = tokens
+        if cost and not error.cost:
+            error.cost = cost
+        self._price_error(error)
+
     def _price_error(self, error: TranslationProviderError) -> None:
         if self.prices_requests and error.tokens_used:
             error.cost = float(error.tokens_used) * max(self.price_input, self.price_output) / 1e6
@@ -268,8 +277,13 @@ class OpenAICompatProvider(ChatCompletionsProvider):
                     None,
                 )
                 if relaxed is not None:
-                    # The server turned the request down before doing any work.
-                    await release_request(config_override, reservation)
+                    # The server turned the request down before doing any work, so the hold is
+                    # given back; any usage it nevertheless reported is charged with it.
+                    refusal = TranslationProviderError("optional field refused", provider=self._name)
+                    self._attach_usage(refusal, response)
+                    await settle_request(
+                        config_override, reservation, refusal.tokens_used, refusal.cost
+                    )
                     payload.pop(relaxed)
                     dropped.add(relaxed)
                     self._note_rejected(model_id, relaxed)
@@ -278,6 +292,8 @@ class OpenAICompatProvider(ChatCompletionsProvider):
             try:
                 special = self.classify(response, model_id)
                 if special is not None:
+                    # Whatever the classifier decides, the reply may state what the request cost.
+                    self._attach_usage(special, response)
                     raise special
                 result = await self._process_response(response, model_id)
             except AuthenticationError as error:
