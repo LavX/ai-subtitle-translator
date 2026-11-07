@@ -96,10 +96,16 @@ pip install ".[server]"      # from a checkout; or: pip install "lavx-ai-subtitl
 The `ai-subtitle-translator` command, the `uvicorn subtitle_translator.main:app` entry point and the
 HTTP API are unchanged, so Docker users only need to pull the new image.
 
-One behaviour is stricter than in 2.1.x: a request whose `config` pins `backend` to Gemini or an
-OpenAI-compatible connection and also sets `provider.dataCollection: "deny"` is now refused with a
-validation error. Those back ends cannot honour the option, and 2.1.x never routed such a request
-to them. `provider.only` and `provider.ignore` on those pins are ignored and logged.
+Data-collection handling is stricter than in 2.1.x. A request whose `config` pins `backend` to
+Gemini or an OpenAI-compatible connection and also sets `provider.dataCollection: "deny"` is now
+refused with a validation error, and a request that sets deny without a pin no longer fails over to
+those back ends, because they cannot promise that no data is collected. `provider.only` and
+`provider.ignore` on those pins are ignored and logged.
+
+Admins who set `OPENROUTER_DENY_DATA_COLLECTION=true` and also keep a Gemini or OpenAI-compatible
+back end in `BACKEND_ORDER` lose that fallback: the setting now limits failover to OpenRouter
+connections, the same as a per-request deny. Remove the setting to keep the fallback, or accept
+that those back ends cannot promise that no data is collected.
 
 ## Optional web UI
 
@@ -418,7 +424,7 @@ The table lists application defaults. For manual runs, most settings load from e
 | `OPENROUTER_TEMPERATURE` | `0.3` | Sampling temperature |
 | `OPENROUTER_MAX_TOKENS` | `8000` | Room the reply gets for the translation itself, sent as `max_tokens`. Reasoning is paid for out of the same allowance, so a reasoning request raises what is sent: a declared reasoning budget is added on top, and an effort level (or a model that always reasons) multiplies it, because effort buys a share of the total. The result is held under the output ceiling the catalog publishes for the model's top provider, and a model that accepts no budget parameter is sent none. `0` or any non-positive value sends no budget, which lets OpenRouter reserve the model's full output ceiling against your balance: a free account rarely has the credit for that |
 | `BACKEND_ORDER` | `openrouter,gemini` | Back ends to try, in order. A back end with no key or sign-in is skipped; add `openai_compatible` or the type id of an installed back-end package to use it |
-| `OPENROUTER_DENY_DATA_COLLECTION` | `false` | Send `provider.data_collection: deny`, so OpenRouter uses only providers that do not collect user data |
+| `OPENROUTER_DENY_DATA_COLLECTION` | `false` | Send `provider.data_collection: deny`, so OpenRouter uses only providers that do not collect user data. It also limits failover: only OpenRouter connections are tried, so a Gemini or OpenAI-compatible fallback in `BACKEND_ORDER` is never used. A request that pins one of those back ends is refused with a validation error, and so is every request when the server has no OpenRouter connection. A request can state its own `dataCollection` (`allow`) to override it |
 | `GEMINI_API_KEYS` | *(empty)* | Comma-separated Google Gemini API keys |
 | `GEMINI_KEY_PROJECTS` | *(empty)* | The Google Cloud project of each key, in the same order, so keys from one project share its limits |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model |

@@ -64,6 +64,9 @@ class Runtime:
     connections: list[Connection]
     openrouter: TranslationProvider
 
+    def _server_denies(self) -> bool:
+        return bool(getattr(self.settings, "openrouter_deny_data_collection", False))
+
     def plan(
         self,
         config: TranslationConfig | None,
@@ -93,6 +96,10 @@ class Runtime:
             wanted.setdefault(
                 "max_tokens", getattr(self.settings, "openrouter_max_tokens", self.core.openrouter_max_tokens)
             )
+            if self._server_denies() and not wanted.get("data_collection"):
+                # The server's own setting applies to a request with its own key as well, unless
+                # the request states its choice.
+                wanted["deny_data_collection"] = True
             pinned = Connection(REQUEST_CONNECTION, "openrouter", settings=wanted, secrets={"api_key": config.api_key})
             return [pinned], REQUEST_CONNECTION
         asked = {k: v for k, v in (settings_from_config(config).items() if config else []) if v is not None}
@@ -103,15 +110,22 @@ class Runtime:
             overlay.setdefault("temperature", temperature)
         pin = config.backend if config is not None and config.backend else None
         connections = self.connections
-        if asked.get("data_collection") == "deny":
-            # Only OpenRouter can promise that no data is collected. A request that says deny is
-            # never sent to a back end that cannot, whether it pins one or fails over to one.
+        by_request = asked.get("data_collection") == "deny"
+        if by_request or (self._server_denies() and not asked.get("data_collection")):
+            # Only OpenRouter can promise that no data is collected. A request that says deny, or
+            # a server set to deny that the request does not override, is never sent to a back
+            # end that cannot, whether it pins one or fails over to one.
+            origin = (
+                'a request that asks for dataCollection "deny"'
+                if by_request
+                else "a server with OPENROUTER_DENY_DATA_COLLECTION set"
+            )
             pinned = next((c for c in connections if c.id == pin), None) if pin else None
             if pinned is not None and pinned.backend_type != "openrouter":
-                raise _deny_refused(f"a request pinned to the {pinned.backend_type} back end", pinned.backend_type)
+                raise _deny_refused(origin, f"the {pinned.backend_type} back end it is pinned to", pinned.backend_type)
             connections = [c for c in connections if c.backend_type == "openrouter"]
             if not connections:
-                raise _deny_refused("a request with no OpenRouter connection to send it to", "openrouter")
+                raise _deny_refused(origin, "any connection (none is OpenRouter)", "openrouter")
         if not overlay:
             return connections, pin
         # A backend pin chooses the connection; it never drops the request's own options. The
@@ -146,10 +160,10 @@ class Runtime:
         return str(chosen.settings.get("model", "")) if chosen else ""
 
 
-def _deny_refused(who: str, provider: str) -> InvalidConfigError:
+def _deny_refused(origin: str, target: str, provider: str) -> InvalidConfigError:
     return InvalidConfigError(
-        f"Only OpenRouter can promise that no data is collected, so {who} cannot ask for "
-        'dataCollection "deny". Use an OpenRouter connection, or remove the option.',
+        f"Only OpenRouter can promise that no data is collected, so {origin} cannot use {target}. "
+        "Use an OpenRouter connection, or remove the option.",
         provider=provider,
         field_errors={"provider.dataCollection": "deny is supported by OpenRouter only"},
     )

@@ -538,3 +538,64 @@ def test_top_level_model_and_temperature_reach_a_pinned_back_end(pin):
     # Back ends that are not pinned are left alone.
     other = next(c for c in connections if c.id != pinned and c.backend_type != "openrouter")
     assert other.settings.get("model") != "top-model"
+
+
+def _toggled_runtime(deny):
+    run = single_provider_runtime(
+        ScriptedProvider([RateLimitError("slow", retry_after=120)]),
+        settings(openrouter_api_key="k", gemini_api_keys="g", openrouter_deny_data_collection=deny),
+    )
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    run.connections = build_connections(run.settings, registry, environ={})
+    return run
+
+
+@pytest.mark.asyncio
+async def test_the_server_wide_deny_toggle_never_fails_over_to_a_back_end_that_cannot_honour_it():
+    from subtitle_translator.core.engine import EngineError, Line, TranslationJob
+
+    run = _toggled_runtime(True)
+    connections, pinned = run.plan(None)
+    assert pinned is None and [c.backend_type for c in connections] == ["openrouter"]
+    job = TranslationJob(Language("en", "en"), Language("hu", "hu"), [Line(0, "Hello")])
+    with pytest.raises(EngineError) as caught:
+        await run.engine.translate(job, connections, pinned=pinned)
+    assert [f.connection_id for f in caught.value.failovers] == ["openrouter"]
+    assert not any("gemini" in repr(key) for key in run.engine._opened)
+
+
+def test_the_server_wide_deny_toggle_refuses_a_pin_and_a_server_with_no_openrouter():
+    from subtitle_translator.core.errors import InvalidConfigError
+
+    run = _toggled_runtime(True)
+    with pytest.raises(InvalidConfigError) as caught:
+        run.plan(TranslationConfig(backend="gemini"))
+    assert "OPENROUTER_DENY_DATA_COLLECTION" in str(caught.value)
+    assert "provider.dataCollection" in caught.value.field_errors
+    run.connections = [c for c in run.connections if c.backend_type != "openrouter"]
+    with pytest.raises(InvalidConfigError):
+        run.plan(None)
+    # A pin to OpenRouter, and a request that states its own choice, still plan.
+    run = _toggled_runtime(True)
+    assert run.plan(TranslationConfig(backend="openrouter"))[1] == "openrouter"
+    allowed = TranslationConfig(provider=ProviderConfig(dataCollection="allow"))
+    assert [c.backend_type for c in run.plan(allowed)[0]] == ["openrouter", "gemini"]
+
+
+def test_the_server_wide_deny_toggle_applies_to_a_request_with_its_own_key():
+    run = _toggled_runtime(True)
+    (own,), _ = run.plan(TranslationConfig(apiKey="user-key", model="x/y"))
+    assert own.settings["deny_data_collection"] is True
+    (stated,), _ = run.plan(
+        TranslationConfig(apiKey="user-key", provider=ProviderConfig(dataCollection="allow"))
+    )
+    assert stated.settings["data_collection"] == "allow"
+    assert "deny_data_collection" not in stated.settings
+
+
+def test_with_the_toggle_off_nothing_changes():
+    run = _toggled_runtime(False)
+    assert [c.backend_type for c in run.plan(None)[0]] == ["openrouter", "gemini"]
+    assert run.plan(TranslationConfig(backend="gemini"))[1] == "gemini"
+    (own,), _ = run.plan(TranslationConfig(apiKey="user-key", model="x/y"))
+    assert "deny_data_collection" not in own.settings
