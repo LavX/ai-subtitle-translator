@@ -309,7 +309,7 @@ class OpenRouterBackendType(BackendType):
             ) as client:
                 response = await client.get("/models")
             records = response.json().get("data") if response.status_code == 200 else None
-        except (httpx.HTTPError, ValueError, AttributeError) as error:
+        except (httpx.HTTPError, httpx.InvalidURL, ValueError, AttributeError) as error:
             # The model field then takes free text. The request carries no key, and the
             # message names only the kind of failure.
             logger.warning("Could not list OpenRouter models: %s", type(error).__name__)

@@ -156,6 +156,17 @@ async def test_options_return_nothing_when_the_model_list_cannot_be_fetched(capl
 
 
 @pytest.mark.asyncio
+async def test_options_return_nothing_for_a_malformed_api_base(caplog):
+    def handler(request):
+        return httpx.Response(200, json={"data": [{"id": "x/y"}]})
+
+    backend = OpenRouterBackendType(transport=httpx.MockTransport(handler), api_base=lambda: "http://[::1/v1")
+    with caplog.at_level("WARNING"):
+        assert await backend.options("model", {}, {}, BackendContext()) == []
+    assert "InvalidURL" in caplog.text
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("body", [b"<html>maintenance</html>", b"[1, 2]", b"null"])
 async def test_options_return_nothing_for_a_body_that_is_not_a_model_list(body):
     def handler(request):
