@@ -72,6 +72,7 @@ class OpenRouterWire:
         # Endpoints that reject whatever they are sent, the way Bedrock rejects
         # Luna over a parameter OpenRouter itself adds.
         self.reject_endpoints = set()
+        self.reject_usage = None
 
     async def __call__(self, request):
         self.requests.append(request)
@@ -89,9 +90,10 @@ class OpenRouterWire:
         self.started.set()
         chosen = (body.get("provider") or {}).get("only") or [None]
         if chosen[0] in self.reject_endpoints:
-            return httpx.Response(
-                400, json={"error": {"code": 400, "message": "Provider returned error"}}
-            )
+            body = {"error": {"code": 400, "message": "Provider returned error"}}
+            if self.reject_usage is not None:
+                body["usage"] = self.reject_usage
+            return httpx.Response(400, json=body)
         if self.completion_gate is not None:
             try:
                 await self.completion_gate.wait()
@@ -1214,6 +1216,65 @@ class TestARejectedRouteIsRetriedElsewhere:
             await provider.translate_batch(batch(), model="fixture/model:smartfast")
 
         assert len(wire.completions) == 1
+
+    @pytest.mark.asyncio
+    async def test_the_reroute_does_not_hold_the_refused_request_too(self, environment):
+        """A refusal did no work, so its hold is given back before the alternative is sent.
+        With budget for exactly one request the second one must still go out."""
+        from subtitle_translator.core.usage import UsageMeter, call_scope
+
+        wire, provider, settings = environment
+        wire.reject_endpoints = {"a"}
+        # A request with an output limit is one the back end can price.
+        for entry in (wire.models[0], *wire.endpoints):
+            entry["supported_parameters"].append("max_tokens")
+        held = []
+
+        async def note(amount, model):
+            held.append(amount)
+
+        probe = TranslationConfig()
+        probe._usage_meter = UsageMeter(budget=10.0, reserve_sink=note)
+        with call_scope():
+            await provider.translate_batch(
+                batch(), model="fixture/model:smartfast", config_override=probe
+            )
+        assert len(held) == 2 and held[0] > 0
+        wire.completions.clear()
+        # A fresh provider: the first one has quarantined the refusing endpoint already.
+        provider = OpenRouterProvider(settings)
+
+        meter = UsageMeter(budget=held[0] * 1.5)
+        config = TranslationConfig()
+        config._usage_meter = meter
+        with call_scope() as holds:
+            result = await provider.translate_batch(
+                batch(), model="fixture/model:smartfast", config_override=config
+            )
+            assert len(holds) == 1
+            assert meter.reserved == pytest.approx(holds[0].amount)
+        assert chosen_endpoints(wire) == ["a", "b"] and len(result.translations) == 2
+        await provider.close()
+
+    @pytest.mark.asyncio
+    async def test_the_reroute_keeps_what_the_refusal_reported_as_charged(self, environment):
+        from subtitle_translator.core.usage import UsageMeter, call_scope
+
+        wire, provider, _ = environment
+        wire.reject_endpoints = {"a"}
+        wire.reject_usage = {"total_tokens": 7, "cost": 0.25}
+        meter = UsageMeter(budget=10.0)
+        config = TranslationConfig()
+        config._usage_meter = meter
+        with call_scope() as holds:
+            result = await provider.translate_batch(
+                batch(), model="fixture/model:smartfast", config_override=config
+            )
+            await meter.record(
+                result.total_tokens or 0, result.cost or 0.0, "m", reservations=holds
+            )
+        assert result.cost == pytest.approx(0.251) and result.total_tokens == 1057
+        assert meter.cost == pytest.approx(0.251) and meter.reserved == 0.0
 
     @pytest.mark.asyncio
     async def test_routing_off_means_no_reroute(self, environment):

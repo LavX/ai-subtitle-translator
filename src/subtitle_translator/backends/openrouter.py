@@ -31,7 +31,7 @@ from subtitle_translator.core.provider import (
     TranslationResult,
 )
 from subtitle_translator.core.settings import CoreSettings
-from subtitle_translator.core.usage import BudgetExhaustedError, reserve_request
+from subtitle_translator.core.usage import BudgetExhaustedError, release_request, reserve_request
 
 if TYPE_CHECKING:
     from subtitle_translator.core.models import TranslationConfig
@@ -1320,6 +1320,7 @@ class OpenRouterProvider(ChatCompletionsProvider):
         headers = self.settings.get_openrouter_headers(api_key_override=api_key)
         decision = None
         response = None
+        reservation = None
         started = monotonic()
         try:
             if smartfast:
@@ -1407,7 +1408,7 @@ class OpenRouterProvider(ChatCompletionsProvider):
                 if provider_config and provider_config.data_collection:
                     payload["provider"]["data_collection"] = provider_config.data_collection
                 payload["session_id"] = decision.session_id
-            await reserve_request(
+            reservation = await reserve_request(
                 config_override,
                 self._worst_case_charge(payload, bare_model),
                 self.provider_name,
@@ -1465,6 +1466,16 @@ class OpenRouterProvider(ChatCompletionsProvider):
                 )
                 error.routing_diagnostics = dict(decision.diagnostics)
                 logger.info("SmartFast routing: %s", decision.diagnostics)
+            if (
+                isinstance(error, TranslationProviderError)
+                and not error.billing_unknown
+                and _route_refused_the_request(error)
+            ):
+                # translate_batch sends this request again on another endpoint. The refusal
+                # did no work, so its hold goes back first: both would otherwise be held at
+                # once and a budget that covers one request would refuse the alternative.
+                # Whatever the refusal reported stays on the error and is carried forward.
+                await release_request(config_override, reservation)
             if isinstance(error, httpx.RequestError) and not isinstance(
                 error, httpx.TimeoutException
             ):
