@@ -731,7 +731,7 @@ class TestProcessBatchesStream:
         lines = [{"index": str(i), "content": f"l{i}"} for i in range(4)]
 
         results = []
-        async for batch_result, progress in processor.process_batches_stream(lines, "en", "es"):
+        async for batch_result, _progress in processor.process_batches_stream(lines, "en", "es"):
             results.append(batch_result)
 
         # The first batch reports the stop; the other three are never sent.
