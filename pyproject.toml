@@ -129,4 +129,4 @@ layers = [
 name = "The core and the back ends never load server libraries"
 type = "forbidden"
 source_modules = ["subtitle_translator.core", "subtitle_translator.backends"]
-forbidden_modules = ["fastapi", "starlette", "pydantic_settings", "dotenv", "cryptography", "uvicorn"]
+forbidden_modules = ["fastapi", "starlette", "pydantic_settings", "dotenv", "cryptography", "uvicorn", "multipart", "python_multipart"]
