@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { GuiSession } from '../../src/subtitle_translator/static/session.mjs';
+import { GuiSession } from '../../src/subtitle_translator/server/static/session.mjs';
 
 class Socket {
  static all = [];

@@ -1,0 +1,245 @@
+"""Configuration management using pydantic-settings."""
+
+import threading
+from datetime import timedelta
+from typing import Any
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from subtitle_translator.backends.gemini import GEMINI_DEFAULT_MODEL
+from subtitle_translator.core.settings import CoreSettings
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # Server Configuration
+    host: str = "0.0.0.0"
+    port: int = 8765
+    debug: bool = False
+    ui_enabled: bool = False
+
+    # OpenRouter Configuration
+    openrouter_api_key: str = Field("", repr=False)
+    openrouter_api_base: str = "https://openrouter.ai/api/v1"
+    openrouter_default_model: str = "amazon/nova-2-lite-v1:free"
+    openrouter_temperature: float = 0.3
+    openrouter_max_tokens: int = 8000
+
+    # Back ends, tried in this order; a back end with no key or sign-in is skipped.
+    backend_order: str = "openrouter,gemini"
+    openrouter_deny_data_collection: bool = False
+
+    # Gemini: comma-separated keys, and optionally the Google Cloud project of each, so keys
+    # from one project share its limits.
+    gemini_api_keys: str = Field("", repr=False)
+    gemini_key_projects: str = ""
+    gemini_model: str = GEMINI_DEFAULT_MODEL
+    gemini_batch_size: int = 300
+    gemini_reasoning: str = "disabled"
+    gemini_price_input: float = 0.0
+    gemini_price_output: float = 0.0
+
+    # Per-back-end data folders (sign-ins of installed harness back ends).
+    backends_data_dir: str = "/app/data/backends"
+
+    # Translation Configuration
+    batch_size: int = 100
+    parallel_batches_per_job: int = 4  # Number of batches to process in parallel per job
+    max_retries: int = 3
+    retry_delay: float = 1.0
+    request_timeout: float = 120.0
+
+    # Job Queue Configuration
+    job_queue_max_concurrent: int = (
+        15  # Max concurrent translation jobs (increased for battle royale)
+    )
+    job_queue_max_jobs: int = 500  # Max jobs in memory (increased for high-throughput testing)
+    job_queue_ttl_hours: int = 1  # TTL for completed/failed jobs
+
+    # Encryption
+    encryption_enabled: bool = True
+    encryption_strict: bool = False  # When True, reject plaintext API keys
+    encryption_key: str = Field("", repr=False)  # 64-char hex AES-256 key, overrides key file
+    encryption_key_file: str = "/app/data/encryption.key"
+
+    # Persistence
+    db_path: str = "/app/data/jobs.db"
+    job_retention_hours: int = 24
+
+    # Admin API key for protecting config endpoints (optional)
+    admin_api_key: str = Field("", repr=False)
+
+    # App identification for OpenRouter analytics
+    app_name: str = "ai-subtitle-translator"
+    app_url: str | None = "https://lavx.hu"
+
+    # RTL (Right-to-Left) language codes
+    rtl_languages: list[str] = [
+        "ar",  # Arabic
+        "he",  # Hebrew
+        "fa",  # Persian/Farsi
+        "ur",  # Urdu
+        "yi",  # Yiddish
+        "ps",  # Pashto
+        "sd",  # Sindhi
+        "ku",  # Kurdish (Sorani)
+    ]
+
+    def get_openrouter_headers(self, api_key_override: str | None = None) -> dict[str, str]:
+        """
+        Get headers for OpenRouter API requests.
+
+        Args:
+            api_key_override: Optional API key to use instead of the configured one
+
+        Returns:
+            Headers dictionary for OpenRouter API requests
+        """
+        api_key = api_key_override or self.openrouter_api_key
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "X-Title": self.app_name,
+        }
+        if self.app_url:
+            headers["HTTP-Referer"] = self.app_url
+        return headers
+
+    @property
+    def openrouter_headers(self) -> dict[str, str]:
+        """Get headers for OpenRouter API requests (legacy property)."""
+        return self.get_openrouter_headers()
+
+    def is_rtl_language(self, language_code: str) -> bool:
+        """Check if a language code represents an RTL language."""
+        # Handle full language names or codes
+        code = language_code.lower().split("-")[0].split("_")[0]
+        return code in self.rtl_languages
+
+    @property
+    def job_queue_ttl(self) -> timedelta:
+        """Get job TTL as timedelta."""
+        return timedelta(hours=self.job_queue_ttl_hours)
+
+    def core(self) -> CoreSettings:
+        """The env-free subset the translation core reads."""
+        return CoreSettings(**{name: getattr(self, name) for name in CoreSettings.model_fields})
+
+
+# Global settings instance with lock for thread safety
+_settings: Settings | None = None
+_settings_lock = threading.Lock()
+_runtime_overrides: dict[str, Any] = {}
+_overridden_settings: Settings | None = None
+
+
+def get_settings() -> Settings:
+    """
+    Get settings instance with runtime overrides applied.
+
+    This function returns a settings instance that combines:
+    1. Environment variables / .env file values (base)
+    2. Runtime overrides set via update_runtime_config
+
+    Returns:
+        Settings instance with runtime overrides applied
+    """
+    global _settings, _overridden_settings
+    with _settings_lock:
+        if _settings is None:
+            _settings = Settings()
+
+        if _runtime_overrides:
+            if _overridden_settings is None:
+                settings_dict = _settings.model_dump()
+                settings_dict.update(_runtime_overrides)
+                _overridden_settings = Settings(**settings_dict)
+            return _overridden_settings
+
+        return _settings
+
+
+def update_runtime_config(key: str, value: Any) -> None:
+    """
+    Update configuration at runtime without restarting.
+
+    This allows dynamic configuration changes through the API.
+    The changes are stored in memory and will be lost on restart.
+
+    Args:
+        key: Configuration key to update (must be a valid Settings field)
+        value: New value for the configuration
+
+    Raises:
+        ValueError: If key is not a valid Settings field
+    """
+    global _runtime_overrides, _overridden_settings
+
+    # Only allow safe-to-modify keys at runtime. URL-type settings,
+    # file paths, and security-sensitive fields are immutable after startup.
+    RUNTIME_MUTABLE_KEYS = {
+        "openrouter_api_key",
+        "openrouter_default_model",
+        "openrouter_temperature",
+        "openrouter_max_tokens",
+        "batch_size",
+        "parallel_batches_per_job",
+        "max_retries",
+        "retry_delay",
+        "request_timeout",
+        "job_queue_max_concurrent",
+        "job_queue_max_jobs",
+        "job_queue_ttl_hours",
+    }
+    if key not in RUNTIME_MUTABLE_KEYS:
+        raise ValueError(
+            f"Configuration key '{key}' cannot be modified at runtime. "
+            f"Mutable keys: {sorted(RUNTIME_MUTABLE_KEYS)}"
+        )
+
+    with _settings_lock:
+        _runtime_overrides[key] = value
+        _overridden_settings = None
+
+
+def get_runtime_overrides() -> dict[str, Any]:
+    """
+    Get current runtime configuration overrides.
+
+    Returns:
+        Dictionary of runtime overrides (keys are masked for sensitive values)
+    """
+    with _settings_lock:
+        result = {}
+        for key, value in _runtime_overrides.items():
+            if "key" in key.lower() or "secret" in key.lower() or "password" in key.lower():
+                result[key] = "***" if value else None
+            else:
+                result[key] = value
+        return result
+
+
+def clear_runtime_overrides() -> None:
+    """Clear all runtime configuration overrides."""
+    global _runtime_overrides, _overridden_settings
+    with _settings_lock:
+        _runtime_overrides = {}
+        _overridden_settings = None
+
+
+def reset_settings() -> None:
+    """Reset settings instance to force reload from environment."""
+    global _settings, _runtime_overrides, _overridden_settings
+    with _settings_lock:
+        _settings = None
+        _runtime_overrides = {}
+        _overridden_settings = None

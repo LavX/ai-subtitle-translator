@@ -8,7 +8,7 @@ import asyncio
 import os
 from pathlib import Path
 
-from subtitle_translator.providers.base import (
+from subtitle_translator.core.provider import (
     TranslationProvider,
     TranslationProviderError,
     TranslationResult,
@@ -90,10 +90,10 @@ def main():
         ENCRYPTION_KEY=FIXTURE_KEY,
         DB_PATH=str(args.data_dir / "jobs.db"),
     )
-    import subtitle_translator.core.translator as translator_module
-    import subtitle_translator.ui_api as ui_api
-    from subtitle_translator.config import get_settings
-    from subtitle_translator.main import create_app
+    import subtitle_translator.server.runtime as translator_module
+    import subtitle_translator.server.ui_api as ui_api
+    from subtitle_translator.server.config import get_settings
+    from subtitle_translator.server.main import create_app
 
     async def fixture_catalog():
         return [
@@ -110,9 +110,8 @@ def main():
     else:
         ui_api._fetch_model_catalog = fixture_catalog
         provider = FixtureProvider()
-    translator_module._translator_instance = translator_module.SubtitleTranslator(
-        provider=provider, settings=get_settings()
-    )
+    settings = get_settings()
+    translator_module._runtime = translator_module.single_provider_runtime(provider, settings)
     import uvicorn
 
     uvicorn.run(create_app(), host=args.host, port=args.port, log_level="error")

@@ -39,6 +39,15 @@ The installer detects containers named `bazarr` or `bazarr-ui-test`, configures 
 
 On a shared custom Docker network, use `http://ai-subtitle-translator:8765`. Across separate bridge networks, use the Docker host's IP and published port. `localhost` works only when Bazarr+ shares the host network or runs directly on that host. See the [Bazarr+ Setup Guide](docs/BAZARR-SETUP.md).
 
+### As a library
+
+```bash
+pip install lavx-ai-subtitle-translator            # the core and the built-in back ends
+pip install "lavx-ai-subtitle-translator[server]"  # plus the HTTP service and GUI
+```
+
+The core never reads environment variables: build a `CoreSettings` and pass it in.
+
 ### Docker
 
 ```bash
@@ -62,16 +71,41 @@ Service runs at `http://localhost:8765`. Interactive docs at `/docs`. The named 
 git clone https://github.com/LavX/ai-subtitle-translator.git
 cd ai-subtitle-translator
 python -m venv venv && source venv/bin/activate
-pip install -e .
+pip install -e ".[server]"
 export OPENROUTER_API_KEY=sk-or-...
 export OPENROUTER_DEFAULT_MODEL=openai/gpt-5.6-luna:smartfast
 mkdir -p data
 export DB_PATH="$PWD/data/jobs.db"
 export ENCRYPTION_KEY_FILE="$PWD/data/encryption.key"
-uvicorn subtitle_translator.main:app --host 0.0.0.0 --port 8765
+ai-subtitle-translator serve --host 0.0.0.0 --port 8765
 ```
 
 The source-build examples select Luna with local `:smartfast` routing. See [model recommendations](#subtitle-translation-leaderboard) for quality, cost and compatibility notes.
+
+### Upgrading from 2.1.x
+
+The package is now published as `lavx-ai-subtitle-translator`, and `requirements.txt` is gone: the
+dependencies live in `pyproject.toml`, and the HTTP server is the `server` extra. For a manual
+install, remove the old distribution first, because both own the same `subtitle_translator` files:
+
+```bash
+pip uninstall ai-subtitle-translator
+pip install ".[server]"      # from a checkout; or: pip install "lavx-ai-subtitle-translator[server]"
+```
+
+The `ai-subtitle-translator` command, the `uvicorn subtitle_translator.main:app` entry point and the
+HTTP API are unchanged, so Docker users only need to pull the new image.
+
+Data-collection handling is stricter than in 2.1.x. A request whose `config` pins `backend` to
+Gemini or an OpenAI-compatible connection and also sets `provider.dataCollection: "deny"` is now
+refused with a validation error, and a request that sets deny without a pin no longer fails over to
+those back ends, because they cannot promise that no data is collected. `provider.only` and
+`provider.ignore` on those pins are ignored and logged.
+
+Admins who set `OPENROUTER_DENY_DATA_COLLECTION=true` and also keep a Gemini or OpenAI-compatible
+back end in `BACKEND_ORDER` lose that fallback: the setting now limits failover to OpenRouter
+connections, the same as a per-request deny. Remove the setting to keep the fallback, or accept
+that those back ends cannot promise that no data is collected.
 
 ## Optional web UI
 
@@ -379,9 +413,11 @@ SmartFast accepts `config.provider.sort: "smartfast"` or a trailing `:smartfast`
 
 Per-request `config.serviceTier` accepts `default` (standard capacity), `flex`, or `priority`. It is forwarded as OpenRouter's top-level `service_tier`. Setting `default` prevents route shortcuts from admitting Flex and priority tiers, while retaining their price or throughput sorting. Outside SmartFast, omitting it preserves OpenRouter's routing-based tier selection. SmartFast uses standard endpoints when it is omitted, unless an explicit `only` restriction selects another tier. The GUI explicitly selects standard capacity for new submissions; existing API clients retain their current behavior.
 
+When a library caller gives a job a cost budget, ordinary OpenRouter routing (not only SmartFast) sends the catalog prices the budget reserved, and a zero per-request fee, as `provider.max_price`, so no endpoint or service tier above them can serve the request and spend what the budget never held. A lower cap the request already carries stays; a model whose prices the catalog does not list is sent no cap and is held by reported cost only.
+
 ## Configuration
 
-The table lists application defaults. For manual runs, most settings load from environment variables or a `.env` file in the working directory. `LOG_LEVEL` and `CORS_ALLOWED_ORIGINS` read the process environment directly: export them for manual runs. Docker Compose only forwards the variables explicitly listed in `docker-compose.yml`; add other settings to its `environment` section. Its default model is `google/gemini-2.5-flash-preview-09-2025`, which differs from the application default below. Set a model ID available to your OpenRouter account explicitly.
+The table lists application defaults. For manual runs, most settings load from environment variables or a `.env` file in the working directory. `LOG_LEVEL` and `CORS_ALLOWED_ORIGINS` read the process environment directly: export them for manual runs. Docker Compose only forwards the variables explicitly listed in `docker-compose.yml`. That covers the ones in `.env.example` except `JOB_QUEUE_MAX_CONCURRENT`, `JOB_QUEUE_MAX_JOBS` and `JOB_QUEUE_TTL_HOURS`, which Compose does not pass on: add them to the `environment` section to change the job queue limits. Add the `<TYPE>_<FIELD>` variables of an installed extension back end to that section as well. The Compose default model is `google/gemini-2.5-flash-lite`, which differs from the application default below. Set a model ID available to your OpenRouter account explicitly.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -389,6 +425,22 @@ The table lists application defaults. For manual runs, most settings load from e
 | `OPENROUTER_DEFAULT_MODEL` | `amazon/nova-2-lite-v1:free` | Default translation model |
 | `OPENROUTER_TEMPERATURE` | `0.3` | Sampling temperature |
 | `OPENROUTER_MAX_TOKENS` | `8000` | Room the reply gets for the translation itself, sent as `max_tokens`. Reasoning is paid for out of the same allowance, so a reasoning request raises what is sent: a declared reasoning budget is added on top, and an effort level (or a model that always reasons) multiplies it, because effort buys a share of the total. The result is held under the output ceiling the catalog publishes for the model's top provider, and a model that accepts no budget parameter is sent none. `0` or any non-positive value sends no budget, which lets OpenRouter reserve the model's full output ceiling against your balance: a free account rarely has the credit for that |
+| `BACKEND_ORDER` | `openrouter,gemini` | Back ends to try, in order. A back end with no key or sign-in is skipped; add `openai_compatible` or the type id of an installed back-end package to use it |
+| `OPENROUTER_DENY_DATA_COLLECTION` | `false` | Send `provider.data_collection: deny`, so OpenRouter uses only providers that do not collect user data. It also limits failover: only OpenRouter connections are tried, so a Gemini or OpenAI-compatible fallback in `BACKEND_ORDER` is never used. A request that pins one of those back ends is refused with a validation error, and so is every request when the server has no OpenRouter connection. A request can state its own `dataCollection` (`allow`) to override it |
+| `GEMINI_API_KEYS` | *(empty)* | Comma-separated Google Gemini API keys |
+| `GEMINI_KEY_PROJECTS` | *(empty)* | The Google Cloud project of each key, in the same order, so keys from one project share its limits |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Gemini model |
+| `GEMINI_BATCH_SIZE` | `300` | Max subtitle lines per Gemini batch |
+| `GEMINI_REASONING` | `disabled` | Gemini reasoning mode |
+| `GEMINI_PRICE_INPUT` | `0` | USD per million input tokens; `0` reports usage with no cost and holds nothing |
+| `GEMINI_PRICE_OUTPUT` | `0` | USD per million output tokens |
+| `OPENAI_COMPATIBLE_PRESET` | *(empty)* | `openai`, `lmstudio`, `ollama` or `custom` |
+| `OPENAI_COMPATIBLE_BASE_URL` | *(preset)* | Server address, for example `http://192.168.1.10:1234/v1` |
+| `OPENAI_COMPATIBLE_MODEL` | *(empty)* | Model name the server serves |
+| `OPENAI_COMPATIBLE_API_KEY` | *(empty)* | Only if the server asks for one |
+| `OPENAI_COMPATIBLE_PRICE_INPUT`, `OPENAI_COMPATIBLE_PRICE_OUTPUT` | `0` | USD per million input and output tokens; required for the OpenAI preset |
+| `OPENAI_COMPATIBLE_TEMPERATURE`, `OPENAI_COMPATIBLE_BATCH_SIZE`, `OPENAI_COMPATIBLE_PARALLEL_BATCHES`, `OPENAI_COMPATIBLE_MAX_TOKENS` | *(back-end defaults)* | Request tuning for the OpenAI-compatible back end |
+| `BACKENDS_DATA_DIR` | `/app/data/backends` | Folder for per-back-end data, such as the sign-ins of installed back-end packages |
 | `BATCH_SIZE` | `100` | Max subtitle lines per batch (auto-adjusted per model) |
 | `PARALLEL_BATCHES_PER_JOB` | `4` | Concurrent batches per translation job |
 | `JOB_QUEUE_MAX_CONCURRENT` | `15` | Concurrent translation job workers at startup |
@@ -400,14 +452,40 @@ The table lists application defaults. For manual runs, most settings load from e
 | `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed CORS origins |
 | `ADMIN_API_KEY` | *(empty)* | Required as `X-Admin-Key` header for PUT /config when set |
 | `UI_ENABLED` | `false` | Serve the optional web UI at `/ui/` |
-| `HOST` | `0.0.0.0` | Bind address when launched with `python -m subtitle_translator.main` |
-| `PORT` | `8765` | Port when launched with `python -m subtitle_translator.main` |
+| `HOST` | `0.0.0.0` | Bind address when launched with `ai-subtitle-translator serve` or `python -m subtitle_translator.main` |
+| `PORT` | `8765` | Port when launched with `ai-subtitle-translator serve` or `python -m subtitle_translator.main` |
 | `ENCRYPTION_ENABLED` | `true` | Enable AES-256-GCM API key encryption |
 | `ENCRYPTION_STRICT` | `false` | When true, reject plaintext API keys (require enc: prefix) |
 | `ENCRYPTION_KEY` | *(auto-generated)* | 64-char hex AES-256 key. Overrides key file when set |
 | `ENCRYPTION_KEY_FILE` | `/app/data/encryption.key` | Path to persistent encryption key file |
 | `DB_PATH` | `/app/data/jobs.db` | SQLite database path for job persistence |
 | `JOB_RETENTION_HOURS` | `24` | Hours to keep completed/failed jobs before cleanup |
+
+Inside a container `localhost` is the container itself, so an OpenAI-compatible server on the
+host takes the host's LAN address or `host.docker.internal`.
+
+Requests that carry their own OpenRouter key (the Bazarr+ 2.7 integration and the web GUI) run only
+on that key. Other requests use the back ends in `BACKEND_ORDER`; when one is rate limited, out of
+quota, rejects its key or cannot be reached, the next one continues where it stopped. Put `backend`
+in a request's `config` to use one back end only.
+
+What a request's options do on each kind of connection:
+
+| Option | OpenRouter | Gemini / OpenAI-compatible, pinned with `backend` | Gemini / OpenAI-compatible, reached by failover |
+|--------|-----------|----------------------------------------------------|-------------------------------------------------|
+| `requestTimeout` | applied | applied to the call and the batch | applied |
+| `model`, `temperature` (config first, then the top-level fields) | applied | applied | ignored: the connection keeps its own, because a model name means nothing to another back end |
+| `parallelBatches` | applied | applied by OpenAI-compatible; Gemini always runs one batch at a time | ignored |
+| `provider` routing (`only`, `ignore`, `order`, `sort`, `smartFast`, `allowFallbacks`), `reasoning`, `useThinkingVariant`, `serviceTier` | applied | ignored, with a warning in the log | ignored |
+| `provider.dataCollection: "deny"` | applied | the request is refused with a validation error | never reached: only OpenRouter connections are tried |
+| `provider.dataCollection: "allow"` | applied | ignored | ignored |
+
+A request that brings its own OpenRouter key runs on that key alone, with every option applied.
+`provider.dataCollection: "deny"` is different from the other routing options because Gemini and
+OpenAI-compatible back ends cannot promise that no data is collected: a request pinned to one is
+refused with a validation error, and an unpinned request that says deny only ever tries OpenRouter
+connections, and is refused when there is none. `OPENROUTER_DENY_DATA_COLLECTION` does the same for
+every request that does not state its own `dataCollection`.
 
 `OPENROUTER_MAX_TOKENS` and `BATCH_SIZE` have to fit each other. A batch that cannot
 answer inside the budget comes back cut short, and the adaptive sizer then halves the
@@ -516,29 +594,13 @@ This starts a temporary local service using the real API and job worker with syn
 
 ```
 src/subtitle_translator/
-  main.py                 # FastAPI application
-  config.py               # Settings from environment variables
-  crypto.py               # AES-256-GCM encryption and key management
-  cli.py                  # CLI commands (key regeneration)
-  web.py                  # Optional static UI routes
-  gui.py                  # App-owned browser commands and live job updates
-  ui_api.py               # OpenRouter key authentication and GUI job ownership
-  static/                 # Browser workspace and ZIP download helper
-  api/
-    routes.py             # REST API endpoints
-    models.py             # Pydantic request/response models
-  core/
-    translator.py         # Translation orchestration
-    srt_parser.py         # SRT file parsing and composing
-    batch_processor.py    # Parallel batch processing with adaptive retry
-    batch_sizing.py       # Per-model batch size resolution
-  providers/
-    base.py               # Abstract translation provider interface
-    openrouter.py         # OpenRouter API implementation
-  queue/
-    job_manager.py        # Async job queue with progress tracking
-    job_store.py          # SQLite persistence layer
-    worker.py             # Background job worker
+  main.py, cli.py         # shims for the documented entry points
+  _vendor/srt.py          # vendored srt 3.5.3 (MIT)
+  core/                   # importable without the server: models, settings, errors,
+                          # batch processing, the back-end interface, the engine
+  backends/               # built-in back ends: OpenRouter, the OpenAI-compatible client, Gemini
+  server/                 # the standalone service: FastAPI app, config, crypto, CLI,
+    api/  queue/  static/ # job queue, browser GUI
 ```
 
 ## License

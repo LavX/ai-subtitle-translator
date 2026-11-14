@@ -2,7 +2,7 @@
 
 import logging
 
-from subtitle_translator.config import get_settings
+from subtitle_translator.core.settings import CoreSettings
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,11 @@ OUTPUT_TOKENS_PER_LINE_ESTIMATE = 100
 class BatchSizeResolver:
     """Determines optimal batch size per model through learned cache, metadata, and heuristics."""
 
-    def __init__(self) -> None:
+    def __init__(self, settings: CoreSettings | None = None) -> None:
         self._learned_sizes: dict[str, int] = {}
         self._ceilings: dict[str, int] = {}
         self._success_counts: dict[str, int] = {}
-        self._settings = get_settings()
+        self._settings = settings or CoreSettings()
 
     def _budget_cap(self, output_ceiling: int | None = None) -> int | None:
         """How many cues the configured output budget can answer for, if it is set.
@@ -136,13 +136,3 @@ class BatchSizeResolver:
         self._learned_sizes.clear()
         self._ceilings.clear()
         self._success_counts.clear()
-
-
-_resolver_instance: BatchSizeResolver | None = None
-
-
-def get_batch_size_resolver() -> BatchSizeResolver:
-    global _resolver_instance
-    if _resolver_instance is None:
-        _resolver_instance = BatchSizeResolver()
-    return _resolver_instance

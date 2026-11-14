@@ -32,6 +32,9 @@ jobs:
       - name: Run ruff lint
         run: ruff check src/ tests/
 
+      - name: Check package boundaries
+        run: lint-imports
+
   web-ui:
     runs-on: ubuntu-latest
     steps:
@@ -41,6 +44,55 @@ jobs:
           node-version: "24"
       - name: Check browser modules and archive helpers
         run: |
-          node --check src/subtitle_translator/static/app.js
-          node --check src/subtitle_translator/static/session.mjs
+          node --check src/subtitle_translator/server/static/app.js
+          node --check src/subtitle_translator/server/static/session.mjs
+          node --check src/subtitle_translator/server/static/backends.mjs
           node --test tests/ui/*.test.mjs
+
+  core-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install the core without the server extra
+        run: |
+          pip install --upgrade pip
+          pip install . pytest pytest-asyncio
+          if python -c "import fastapi" 2>/dev/null; then echo "fastapi leaked into the core install"; exit 1; fi
+      - name: Core, back-end and tooling tests without the server
+        run: pytest tests/core tests/backends tests/tooling -q -o addopts=""
+
+  wheel-availability:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+        platform:
+          - "manylinux2014_x86_64 manylinux_2_17_x86_64 manylinux_2_28_x86_64"
+          - "manylinux2014_aarch64 manylinux_2_17_aarch64 manylinux_2_28_aarch64"
+          - "musllinux_1_1_x86_64 musllinux_1_2_x86_64"
+          - "musllinux_1_1_aarch64 musllinux_1_2_aarch64"
+          - "win_amd64"
+          - "macosx_11_0_arm64"
+          - "macosx_10_12_x86_64 macosx_10_13_x86_64"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Every core dependency installs from a wheel
+        run: |
+          pip install --upgrade pip build
+          python -m build --wheel --outdir dist/
+          ABI="cp$(echo '${{ matrix.python }}' | tr -d .)"
+          PLATFORMS=""
+          for tag in ${{ matrix.platform }}; do PLATFORMS="$PLATFORMS --platform $tag"; done
+          pip download --only-binary=:all: --no-cache-dir \
+            --python-version ${{ matrix.python }} --implementation cp \
+            --abi "$ABI" --abi abi3 --abi none $PLATFORMS \
+            -d /tmp/wheels dist/*.whl
+          ls /tmp/wheels
+          if ls /tmp/wheels | grep -v '\.whl$'; then echo "a source distribution slipped in"; exit 1; fi

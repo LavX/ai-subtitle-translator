@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ai-subtitle-translator"
-version = "2.1.1"
-description = "LLM-powered subtitle translation microservice by LavX"
+name = "lavx-ai-subtitle-translator"
+version = "2.2.0.dev0"
+description = "LLM subtitle translation: an importable core with pluggable back ends, and an optional standalone service, by LavX"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
@@ -19,35 +19,49 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Framework :: FastAPI",
     "Topic :: Multimedia :: Video",
     "Topic :: Text Processing :: Linguistic",
 ]
-keywords = ["subtitle", "translation", "openrouter", "llm", "fastapi", "srt", "ai", "bazarr"]
+keywords = ["subtitle", "translation", "openrouter", "gemini", "llm", "srt", "ai", "bazarr"]
 
 dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.11.2,<2.13",
+    "openrouter==1.1.133",
+    "tzdata>=2026.4",
+]
+
+[project.entry-points."subtitle_translator.backends"]
+openai_compatible = "subtitle_translator.backends.openai_compatible:OpenAICompatibleBackendType"
+gemini = "subtitle_translator.backends.gemini:GeminiBackendType"
+openrouter = "subtitle_translator.backends.openrouter_backend:OpenRouterBackendType"
+
+[project.optional-dependencies]
+server = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
-    "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
-    "httpx>=0.25.0",
-    "openrouter==1.1.133",
-    "srt>=3.5.0",
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.6",
     "cryptography>=41.0.0",
 ]
-
-[project.optional-dependencies]
 dev = [
+    "lavx-ai-subtitle-translator[server]",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
-    "httpx>=0.25.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.7.0",
+    "import-linter>=2.15",
+    "build>=1.6.1",
 ]
+
+[project.scripts]
+ai-subtitle-translator = "subtitle_translator.server.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/LavX/ai-subtitle-translator"
@@ -60,8 +74,10 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 subtitle_translator = [
-    "static/index.html", "static/app.css", "static/app.js", "static/archive.mjs", "static/session.mjs",
-    "static/outfit.woff2", "static/outfit-OFL.txt",
+    "server/static/index.html", "server/static/app.css", "server/static/app.js",
+    "server/static/archive.mjs", "server/static/session.mjs", "server/static/backends.mjs",
+    "server/static/outfit.woff2", "server/static/outfit-OFL.txt",
+    "_vendor/LICENSE.srt",
 ]
 
 [tool.black]
@@ -74,6 +90,7 @@ target-version = "py311"
 exclude = [
     "tests/battle_royale_50_lines.py",
     "tests/elimination_battle_royale.py",
+    "src/subtitle_translator/_vendor/srt.py",
 ]
 
 [tool.ruff.lint]
@@ -94,3 +111,22 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+
+[tool.importlinter]
+root_package = "subtitle_translator"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Package direction: server on top, then backends, then core"
+type = "layers"
+layers = [
+    "subtitle_translator.server",
+    "subtitle_translator.backends",
+    "subtitle_translator.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "The core and the back ends never load server libraries"
+type = "forbidden"
+source_modules = ["subtitle_translator.core", "subtitle_translator.backends"]
+forbidden_modules = ["fastapi", "starlette", "pydantic_settings", "dotenv", "cryptography", "uvicorn", "multipart", "python_multipart"]
