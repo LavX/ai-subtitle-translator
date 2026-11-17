@@ -141,6 +141,11 @@ class KeyRing:
         soonest: tuple[float, KeyState] | None = None
         for index, key in enumerate(self._keys):
             if self._rejected(key, now):
+                # A rejected key comes back when its mark runs out, which may be before another
+                # key's block does.
+                until = self._invalid[key][1]
+                if soonest is None or until < soonest[0]:
+                    soonest = (until, KeyState.COOLING)
                 continue
             block = self._block(self._groups[index], scope, now)
             if block is None:

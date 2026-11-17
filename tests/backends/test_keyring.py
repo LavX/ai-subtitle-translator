@@ -132,3 +132,12 @@ def test_new_key_material_starts_with_a_clean_ring():
     new = Connection("g", "gemini", secrets={"api_keys": ["fixed"]})
     # The engine opens one back end, and so one ring, per connection fingerprint.
     assert old.fingerprint() != new.fingerprint()
+
+
+def test_wait_counts_when_a_rejected_key_comes_back():
+    clock = Clock()
+    ring = KeyRing(["a", "b"], clock=clock, invalid_seconds=60)
+    ring.mark_invalid("a")
+    ring.mark_exhausted("b", clock.now + 3600)
+    state, seconds = ring.wait()
+    assert state is KeyState.COOLING and seconds == 60

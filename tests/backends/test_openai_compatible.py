@@ -383,3 +383,15 @@ async def test_a_model_list_that_is_not_json_lists_nothing():
     settings = {"preset": "ollama", "base_url": "http://localhost:11434/v1"}
     backend = OpenAICompatibleBackendType(transport=httpx.MockTransport(listing))
     assert await backend.options("model", settings, {}, BackendContext()) == []
+
+
+@pytest.mark.asyncio
+async def test_a_403_rate_limit_carries_the_retry_after_the_reply_names():
+    def answer(request):
+        body = {"error": {"message": "Rate limit reached", "code": "rate_limit_exceeded"}}
+        return httpx.Response(403, json=body, headers={"retry-after": "3600"})
+
+    backend = opened(answer, base_url="http://host/v1", secrets={"api_key": "k"})
+    with pytest.raises(RateLimitError) as caught:
+        await backend.provider.translate_batch(BATCH, config_override=backend.config)
+    assert caught.value.retry_after == pytest.approx(3600, abs=5)

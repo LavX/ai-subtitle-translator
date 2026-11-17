@@ -25,11 +25,16 @@ class Server:
 
     def __init__(self):
         self.seen = []
+        self.ports = []
         self.script = []
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
+            # Keep-alive, so a pooled socket would survive if a client were left open.
+            protocol_version = "HTTP/1.1"
+
             def do_POST(self):
+                owner.ports.append(self.client_address[1])
                 self.rfile.read(int(self.headers.get("content-length") or 0))
                 owner.seen.append(self.headers.get("authorization"))
                 status, headers, body = owner.script.pop(0) if owner.script else (200, {}, OK)
@@ -114,6 +119,8 @@ async def test_a_real_http_client_is_reopened_on_every_new_event_loop(server):
         result = await call(plugin, server.url)
         assert result["status"] == "complete" and result["lines"][0]["text"] == "Szia"
     assert server.seen == ["Bearer sk-local"] * 3
+    # Each call opened its own connection: no pooled socket was carried over to a new loop.
+    assert len(set(server.ports)) == 3
 
 
 @pytest.mark.asyncio

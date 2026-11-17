@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from subtitle_translator.backends.chat_completions import retry_after_of
 from subtitle_translator.backends.openai_compat import OpenAICompatProvider
 from subtitle_translator.core.backends import (
     BackendContext,
@@ -199,6 +200,7 @@ class OpenAICompatibleServerProvider(OpenAICompatProvider):
             return RateLimitError(
                 f"{self.error_label} says the rate limit was reached",
                 provider=self._name,
+                retry_after=retry_after_of(response),
             )
         if code in (403, 429) and _insufficient_quota(response):
             return QuotaExhaustedError(
