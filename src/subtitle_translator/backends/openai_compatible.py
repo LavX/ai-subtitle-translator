@@ -31,6 +31,7 @@ from subtitle_translator.core.errors import (
     AuthenticationError,
     InvalidConfigError,
     QuotaExhaustedError,
+    RateLimitError,
     TranslationProviderError,
 )
 from subtitle_translator.core.models import TranslationConfig
@@ -110,16 +111,24 @@ def _base_url(value: Any) -> tuple[str, str | None]:
     return text, None
 
 
-def _insufficient_quota(response: httpx.Response) -> bool:
+def _error_object(response: httpx.Response) -> dict[str, Any]:
     try:
         body = response.json()
     except ValueError:
-        return False
+        return {}
     error = body.get("error") if isinstance(body, dict) else None
-    return isinstance(error, dict) and "insufficient_quota" in (
-        str(error.get("code")),
-        str(error.get("type")),
-    )
+    return error if isinstance(error, dict) else {}
+
+
+def _insufficient_quota(response: httpx.Response) -> bool:
+    error = _error_object(response)
+    return "insufficient_quota" in (str(error.get("code")), str(error.get("type")))
+
+
+def _rate_limited(response: httpx.Response) -> bool:
+    error = _error_object(response)
+    text = " ".join(str(error.get(key) or "") for key in ("code", "type", "message")).lower()
+    return "rate_limit" in text or "rate limit" in text
 
 
 class OpenAICompatibleServerProvider(OpenAICompatProvider):
@@ -180,15 +189,22 @@ class OpenAICompatibleServerProvider(OpenAICompatProvider):
 
     def classify(self, response: httpx.Response, model: str) -> TranslationProviderError | None:
         code = response.status_code
-        if code == 403:
+        # A 403 can also mean a limit, which passes; a refusal of the key is a rejection, and a
+        # rejected key is not tried again for a while.
+        if code == 403 and not _insufficient_quota(response) and not _rate_limited(response):
             return AuthenticationError(
                 f"{self.error_label} refused the request (403)", provider=self._name
             )
-        if code == 429 and _insufficient_quota(response):
+        if code == 403 and _rate_limited(response) and not _insufficient_quota(response):
+            return RateLimitError(
+                f"{self.error_label} says the rate limit was reached",
+                provider=self._name,
+            )
+        if code in (403, 429) and _insufficient_quota(response):
             return QuotaExhaustedError(
                 f"{self.error_label} says the account has no quota left",
                 provider=self._name,
-                status_code=429,
+                status_code=code,
             )
         return None
 

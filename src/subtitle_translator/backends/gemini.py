@@ -196,9 +196,23 @@ class GeminiProvider(OpenAICompatProvider):
             parsed.reason in ("API_KEY_INVALID", "API_KEY_SERVICE_BLOCKED")
             or "api key not valid" in message.lower()
         )
-        if code in (401, 403) or key_rejected:
+        # A 403 can also mean a limit, which passes; only a refusal of the key itself is a
+        # rejection, and a rejected key is not tried again for a while.
+        limited_403 = (
+            code == 403
+            and not key_rejected
+            and parsed is not None
+            and (
+                parsed.status == "RESOURCE_EXHAUSTED"
+                or parsed.reason in ("RATE_LIMIT_EXCEEDED", "QUOTA_EXCEEDED")
+                or bool(parsed.quota_ids)
+                or "quota" in message.lower()
+                or "rate limit" in message.lower()
+            )
+        )
+        if (code in (401, 403) or key_rejected) and not limited_403:
             return AuthenticationError(f"Gemini rejected the key: {message}", provider="gemini")
-        if code == 429:
+        if code == 429 or limited_403:
             daily = parsed is not None and any(
                 "perday" in q.lower() or "daily" in q.lower() for q in parsed.quota_ids
             )
@@ -208,7 +222,7 @@ class GeminiProvider(OpenAICompatProvider):
                     f"Gemini's daily quota for {model} is used up until midnight Pacific",
                     provider="gemini",
                     retry_after=next_pacific_midnight(now) - now,
-                    status_code=429,
+                    status_code=code,
                 )
             delay = parsed.retry_delay if parsed and parsed.retry_delay is not None else 60.0
             return RateLimitError(

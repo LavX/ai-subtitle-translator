@@ -104,3 +104,31 @@ def test_a_later_short_rate_limit_does_not_shorten_a_quota_block():
     # ... and a success from before the second mark cannot lift it either.
     ring.mark_success("a", "m", since=0)
     assert ring.wait("m") == (KeyState.EXHAUSTED, 3600)
+
+
+def test_a_rejected_key_is_tried_again_after_a_bounded_time():
+    clock = Clock()
+    ring = KeyRing(["a"], clock=clock, invalid_seconds=60)
+    ring.mark_invalid("a", "rejected")
+    assert ring.acquire() is None and ring.all_invalid()
+    assert ring.health()[0].state is KeyState.INVALID
+    clock.now += 61
+    assert not ring.all_invalid() and ring.acquire() == "a"
+    assert ring.health()[0].state is KeyState.OK
+
+
+def test_the_default_rejection_does_not_last_for_the_worker_s_life():
+    clock = Clock()
+    ring = KeyRing(["a", "b"], clock=clock)
+    ring.mark_invalid("a")
+    clock.now += 24 * 3600
+    assert ring.acquire() == "a" and not ring.all_invalid()
+
+
+def test_new_key_material_starts_with_a_clean_ring():
+    from subtitle_translator.core.backends import Connection
+
+    old = Connection("g", "gemini", secrets={"api_keys": ["old"]})
+    new = Connection("g", "gemini", secrets={"api_keys": ["fixed"]})
+    # The engine opens one back end, and so one ring, per connection fingerprint.
+    assert old.fingerprint() != new.fingerprint()

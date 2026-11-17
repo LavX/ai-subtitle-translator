@@ -17,6 +17,7 @@ from subtitle_translator.backends.gemini import (
     reasoning_effort,
     resolve_model,
 )
+from subtitle_translator.backends.keyring import KeyState
 from subtitle_translator.core.backends import BackendContext, Connection
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.errors import (
@@ -367,3 +368,30 @@ async def test_a_gemini_model_list_that_is_not_an_object_lists_nothing(body):
         "model", {}, {"api_keys": ["k"]}, BackendContext()
     )
     assert choices == []
+
+
+@pytest.mark.asyncio
+async def test_a_403_that_means_a_limit_cools_the_key_instead_of_rejecting_it():
+    body = {"error": {"code": 403, "message": "Quota exceeded for this project", "status": "RESOURCE_EXHAUSTED"}}
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers["authorization"])
+        return httpx.Response(403, json=body)
+
+    p = gemini(handler, keys=["a"])
+    with pytest.raises(RateLimitError):
+        await p.translate_batch(BATCH)
+    assert p.keys.health("gemini-2.5-flash")[0].state is KeyState.COOLING
+    assert not p.keys.all_invalid()
+
+
+@pytest.mark.asyncio
+async def test_a_plain_403_is_still_a_rejected_key():
+    def handler(request):
+        return httpx.Response(403, json={"error": {"code": 403, "message": "denied", "status": "PERMISSION_DENIED"}})
+
+    p = gemini(handler, keys=["a"])
+    with pytest.raises(AuthenticationError):
+        await p.translate_batch(BATCH)
+    assert p.keys.all_invalid()

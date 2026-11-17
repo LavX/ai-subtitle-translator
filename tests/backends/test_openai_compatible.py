@@ -183,6 +183,8 @@ async def test_a_stopped_server_is_dependency_unavailable_and_names_no_key():
     [
         (401, {"error": {"message": "bad key"}}, {}, AuthenticationError),
         (403, {"error": {"message": "forbidden"}}, {}, AuthenticationError),
+        (403, {"error": {"message": "Rate limit reached", "code": "rate_limit_exceeded"}}, {}, RateLimitError),
+        (403, {"error": {"message": "no quota", "type": "insufficient_quota"}}, {}, QuotaExhaustedError),
         (429, {"error": {"message": "slow down"}}, {"retry-after": "7"}, RateLimitError),
         (429, {"error": {"message": "You exceeded your current quota", "type": "insufficient_quota", "code": "insufficient_quota"}}, {}, QuotaExhaustedError),
     ],

@@ -10,6 +10,12 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+# How long a rejected key stays out. A rejection is not proof for the worker's life: the person
+# may fix the cause (enable the API, add billing) without changing the key, so the key is tried
+# again after this. New key material never waits for it, because a changed connection opens a
+# new ring.
+INVALID_SECONDS = 900.0
+
 
 class KeyState(StrEnum):
     OK = "ok"
@@ -34,6 +40,7 @@ class KeyRing:
         groups: Sequence[str | None] = (),
         *,
         clock: Callable[[], float] = time.time,
+        invalid_seconds: float = INVALID_SECONDS,
     ) -> None:
         self._keys: list[str] = []
         self._groups: list[str] = []
@@ -48,12 +55,23 @@ class KeyRing:
         # A block remembers the tick it was set at, so a reply can be told apart from a block
         # that came after its request was sent.
         self._blocks: dict[tuple[str, str], tuple[float, KeyState, str, int]] = {}
-        self._invalid: dict[str, str] = {}
+        self._invalid: dict[str, tuple[str, float]] = {}
+        self._invalid_seconds = invalid_seconds
         self._position = 0
         self._tick = 0
 
     def __len__(self) -> int:
         return len(self._keys)
+
+    def _rejected(self, key: str, now: float) -> bool:
+        """Whether the key is out for having been rejected; a mark that has run out is dropped."""
+        mark = self._invalid.get(key)
+        if mark is None:
+            return False
+        if mark[1] <= now:
+            del self._invalid[key]
+            return False
+        return True
 
     def _group(self, key: str) -> str:
         return self._groups[self._keys.index(key)]
@@ -86,7 +104,7 @@ class KeyRing:
         for offset in range(len(self._keys)):
             index = (self._position + offset) % len(self._keys)
             key = self._keys[index]
-            if key in self._invalid or self._block(self._groups[index], scope, now):
+            if self._rejected(key, now) or self._block(self._groups[index], scope, now):
                 continue
             self._position = (index + 1) % len(self._keys)
             return key
@@ -105,7 +123,7 @@ class KeyRing:
         self._set_block(key, scope, until, KeyState.EXHAUSTED, reason)
 
     def mark_invalid(self, key: str, reason: str = "rejected") -> None:
-        self._invalid[key] = reason
+        self._invalid[key] = (reason, self._clock() + self._invalid_seconds)
 
     def mark_success(self, key: str, scope: str = "", *, since: int) -> None:
         """A request that got through proves the block it saw is over. A block set after that
@@ -115,13 +133,14 @@ class KeyRing:
             del self._blocks[(self._group(key), scope)]
 
     def all_invalid(self) -> bool:
-        return bool(self._keys) and all(key in self._invalid for key in self._keys)
+        now = self._clock()
+        return bool(self._keys) and all(self._rejected(key, now) for key in self._keys)
 
     def wait(self, scope: str = "") -> tuple[KeyState, float] | None:
         now = self._clock()
         soonest: tuple[float, KeyState] | None = None
         for index, key in enumerate(self._keys):
-            if key in self._invalid:
+            if self._rejected(key, now):
                 continue
             block = self._block(self._groups[index], scope, now)
             if block is None:
@@ -134,11 +153,10 @@ class KeyRing:
         now = self._clock()
         report = []
         for index, key in enumerate(self._keys):
-            if key in self._invalid:
+            if self._rejected(key, now):
+                reason, until = self._invalid[key]
                 report.append(
-                    KeyHealth(
-                        index + 1, self._groups[index], KeyState.INVALID, None, self._invalid[key]
-                    )
+                    KeyHealth(index + 1, self._groups[index], KeyState.INVALID, until, reason)
                 )
                 continue
             block = self._block(self._groups[index], scope, now)
