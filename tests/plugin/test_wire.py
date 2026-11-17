@@ -51,6 +51,7 @@ def test_auto_source_and_checkpoints():
         ({"lines": "nope"}, "lines"),
         ({"target": "hu"}, "target"),
         ({"checkpoints": [{"lines": 3}]}, "checkpoints[0]"),
+        ({"checkpoints": 7}, "checkpoints"),
         ({"config": {"connection": {"type": "gemini"}}}, "config.connection.id"),
         ({"budget": -1}, "budget"),
         ({"lines": [{"position": 0, "text": "x" * 2001}]}, "lines[0].text"),

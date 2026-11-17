@@ -127,7 +127,10 @@ def read_job(request: Any) -> tuple[TranslationJob, Connection, CoreSettings]:
     request = _mapping(request, "request")
     lines = read_lines(request.get("lines"))
     checkpoints = []
-    for index, item in enumerate(request.get("checkpoints") or []):
+    held = request.get("checkpoints") or []
+    if not isinstance(held, list):
+        raise WireError("checkpoints", "must be a list")
+    for index, item in enumerate(held):
         try:
             checkpoints.append(Checkpoint.from_dict(item))
         except ValueError as error:

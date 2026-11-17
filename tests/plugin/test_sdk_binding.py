@@ -108,12 +108,66 @@ async def test_a_translation_reports_holds_and_usage_through_the_sdk_context():
 
 
 @pytest.mark.asyncio
-async def test_a_call_leaves_no_opened_back_end_behind():
+async def test_a_call_closes_its_clients_and_keeps_the_back_end_for_the_next_call():
     provider = ScriptedProvider()
     plugin = scripted_plugin(provider)
+    backend = plugin._contract.registry.get("scripted")
+
+    def one_call_on_its_own_loop():
+        ctx, _ = fake_context()
+        return asyncio.run(plugin.translate(request(5), ctx))
+
+    await asyncio.to_thread(one_call_on_its_own_loop)
+    assert provider.closed and len(plugin._contract._engines) == 1
+    provider.closed = False
+    await asyncio.to_thread(one_call_on_its_own_loop)
+    # The second call, on another event loop, reused what the first opened.
+    assert backend.opened == ["c1"] and provider.closed
+
+
+@pytest.mark.asyncio
+async def test_a_failing_close_does_not_replace_a_finished_result():
+    class BrokenClose(ScriptedProvider):
+        async def close(self):
+            raise RuntimeError("socket gone")
+
+    plugin = scripted_plugin(BrokenClose())
     ctx, _ = fake_context()
-    await plugin.translate(request(5), ctx)
-    assert plugin._contract._engines == {} and provider.closed
+    result = await plugin.translate(request(5), ctx)
+    assert result["status"] == "complete"
+
+
+def refusing_context(error):
+    ctx, calls = fake_context()
+
+    async def reserve(amount, model):
+        calls.append(("reserve", amount))
+        raise error
+
+    ctx.reserve = reserve
+    return ctx, calls
+
+
+@pytest.mark.asyncio
+async def test_a_hold_the_host_refuses_ends_the_attempt_as_a_budget_stop():
+    provider = ScriptedProvider(price=0.02)
+    ctx, calls = refusing_context(
+        PluginError("cancelled", "the cost budget does not cover this call (month_spent)")
+    )
+    with pytest.raises(PluginError) as caught:
+        await scripted_plugin(provider).translate(request(), ctx)
+    assert caught.value.code == "cancelled" and caught.value.reason == "budget_exhausted"
+    assert provider.batches == []
+    # A refused hold is final: the remaining batches do not ask again.
+    assert len([c for c in calls if c[0] == "reserve"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_hold_that_fails_for_another_reason_keeps_its_own_kind():
+    ctx, _ = refusing_context(PluginError("dependency_unavailable", "the host is busy"))
+    with pytest.raises(PluginError) as caught:
+        await scripted_plugin(ScriptedProvider(price=0.02)).translate(request(), ctx)
+    assert caught.value.code == "dependency_unavailable"
 
 
 @pytest.mark.asyncio

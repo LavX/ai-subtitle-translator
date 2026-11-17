@@ -3,12 +3,21 @@
 import asyncio
 import importlib.metadata
 import json
+import threading
+from collections import OrderedDict
 from collections.abc import Callable, Iterable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Any, Protocol
 
+import httpx
+
 from subtitle_translator import __version__
-from subtitle_translator.core.backends import BackendContext, BackendRegistry
+from subtitle_translator.core.backends import (
+    BackendContext,
+    BackendRegistry,
+    Connection,
+    FieldType,
+)
 from subtitle_translator.core.engine import EngineError, EngineEvents, TranslationEngine
 from subtitle_translator.core.errors import (
     DependencyUnavailableError,
@@ -36,6 +45,8 @@ KIND_API = "bazarr.translator.v1"
 SETTINGS_VERSION = 1
 # Used when the host names no heartbeat interval; the SDK binding passes the host's value.
 HEARTBEAT_SECONDS = 10.0
+# How many engine-settings snapshots a worker keeps state for.
+MAX_ENGINES = 8
 SECRET_FIELDS_V1 = {"openrouter": {"api_key"}, "gemini": {"api_keys"}, "openai_compatible": {"api_key"}}
 
 
@@ -86,6 +97,31 @@ def _settings_fields(field_errors: dict[str, str] | None) -> dict[str, str]:
     }
 
 
+def key_list(value: str) -> list[str]:
+    """The keys of a key-list secret as the host delivers it. The wire carries a secret as one
+    text value, so the host sends a key list as a JSON list in text; one key per line is read
+    too. Blank entries are dropped."""
+    text = value.strip()
+    if text.startswith("["):
+        try:
+            decoded = json.loads(text)
+        except ValueError:
+            decoded = None
+        if isinstance(decoded, list):
+            return [item.strip() for item in decoded if isinstance(item, str) and item.strip()]
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def decode_secrets(backend, connection: Connection) -> Connection:
+    """The connection with its key-list secrets as lists, whatever form they arrived in."""
+    lists = {spec.key for spec in backend.fields() if spec.type == FieldType.KEY_LIST}
+    secrets = {
+        key: key_list(value) if key in lists and isinstance(value, str) else value
+        for key, value in connection.secrets.items()
+    }
+    return replace(connection, secrets=secrets)
+
+
 def secret_fields(contract: "TranslatorContract") -> dict[str, set[str]]:
     result = {}
     for type_id in contract.registry.types():
@@ -103,7 +139,10 @@ class TranslatorContract:
         self.scope = scope
         self._entry_points = entry_points
         self._registry: BackendRegistry | None = None
-        self._engines: dict[str, TranslationEngine] = {}
+        # One engine per distinct engine-settings snapshot, kept for the worker's life: it holds
+        # no event loop, so its key health and learned batch sizes serve every call.
+        self._engines: OrderedDict[str, TranslationEngine] = OrderedDict()
+        self._engines_lock = threading.Lock()
 
     @property
     def registry(self) -> BackendRegistry:
@@ -201,6 +240,7 @@ class TranslatorContract:
                 "invalid_config", f"No live choices for {field}", field_errors={field: "unknown"}
             )
         backend = self._backend(connection.backend_type)
+        connection = decode_secrets(backend, connection)
         try:
             choices = await backend.options(
                 field[len(prefix) :], connection.settings, connection.secrets, context or BackendContext()
@@ -208,6 +248,11 @@ class TranslatorContract:
         except TranslationProviderError as error:
             raise ContractError(
                 str(error_kind(error)), error.message, retry_after=error.retry_after
+            ) from None
+        except (httpx.HTTPError, OSError) as error:
+            # A back end that lets a transport failure through, such as an unreachable server.
+            raise ContractError(
+                "dependency_unavailable", f"The server could not be reached: {type(error).__name__}"
             ) from None
         # A live choice fills nothing else, so the preset values are not part of the answer.
         return [{k: v for k, v in asdict(choice).items() if k != "fills"} for choice in choices]
@@ -229,6 +274,7 @@ class TranslatorContract:
                 "invalid_config", error.message, field_errors={error.field: error.message}
             ) from None
         backend = self._backend(connection.backend_type)
+        connection = decode_secrets(backend, connection)
         context = context or BackendContext()
         if backend.uses_sign_in:
             status = await backend.sign_in_status(connection, context)
@@ -267,22 +313,28 @@ class TranslatorContract:
             "cost": meter.cost,
         }
 
-    async def release(self) -> None:
-        """Close and forget every opened back end. A host that runs each call on its own event
-        loop calls this after each, because an opened back end's HTTP client belongs to the loop
-        that first used it."""
-        engines, self._engines = list(self._engines.values()), {}
+    async def close_clients(self) -> None:
+        """Close the HTTP clients every opened back end holds, keeping the back ends. A host that
+        runs each call on an event loop of its own calls this after each call, because a client
+        belongs to the loop that first used it; key health, rotation and learned batch sizes
+        stay, and a provider opens a new client on its next use."""
+        with self._engines_lock:
+            engines = list(self._engines.values())
         for engine in engines:
-            await engine.aclose()
+            await engine.close_clients()
 
     def _engine(self, base, context) -> TranslationEngine:
         key = json.dumps(base.model_dump(), sort_keys=True)
-        engine = self._engines.get(key)
-        if engine is None:
-            engine = self._engines[key] = TranslationEngine(
-                self.registry, base, lambda type_id: context
-            )
-        return engine
+        with self._engines_lock:
+            engine = self._engines.get(key)
+            if engine is None:
+                engine = self._engines[key] = TranslationEngine(
+                    self.registry, base, lambda type_id: context
+                )
+            self._engines.move_to_end(key)
+            while len(self._engines) > MAX_ENGINES:
+                self._engines.popitem(last=False)
+            return engine
 
     async def translate(
         self,
@@ -299,7 +351,7 @@ class TranslatorContract:
             raise ContractError(
                 "invalid_config", error.message, field_errors={error.field: error.message}
             ) from None
-        self._backend(connection.backend_type)
+        connection = decode_secrets(self._backend(connection.backend_type), connection)
         if cancelled is not None and cancelled.is_set():
             raise ContractError("cancelled", "Bazarr+ cancelled this job before it started")
         engine = self._engine(base, context or BackendContext())
@@ -343,7 +395,7 @@ class TranslatorContract:
             raise ContractError(
                 shaped["code"],
                 shaped["message"],
-                shaped["field_errors"],
+                _settings_fields(shaped["field_errors"]),
                 shaped["retry_after"],
                 shaped["reason"],
             ) from None

@@ -146,13 +146,6 @@ forbidden_modules = ["subtitle_translator.plugin"]
 [[tool.importlinter.contracts]]
 name = "Only the SDK binding imports the SDK"
 type = "forbidden"
-source_modules = [
-    "subtitle_translator.core",
-    "subtitle_translator.backends",
-    "subtitle_translator.server",
-    "subtitle_translator.plugin.contract",
-    "subtitle_translator.plugin.wire",
-    "subtitle_translator.plugin.scope",
-    "subtitle_translator.plugin.manifest",
-]
+source_modules = ["subtitle_translator"]
 forbidden_modules = ["bazarr_plugin_sdk"]
+ignore_imports = ["subtitle_translator.plugin.sdk_binding -> bazarr_plugin_sdk"]

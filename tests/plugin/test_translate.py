@@ -186,3 +186,18 @@ async def test_a_job_cancelled_before_it_starts_sends_nothing():
     with pytest.raises(ContractError) as caught:
         await contract(provider).translate(request(), Sink(), cancelled=cancel)
     assert caught.value.code == "cancelled" and provider.batches == []
+
+
+@pytest.mark.asyncio
+async def test_a_connection_the_engine_cannot_open_names_its_field_like_test_does():
+    contract = TranslatorContract(PluginScope.builtin())
+    gemini = request()
+    gemini["config"]["connection"] = {
+        "id": "g", "type": "gemini", "enabled": True,
+        "settings": {"price_input_per_million": -1},
+    }
+    gemini["secrets"] = {"api_keys": '["k"]'}
+    with pytest.raises(ContractError) as caught:
+        await contract.translate(gemini, Sink())
+    assert caught.value.code == "invalid_config"
+    assert set(caught.value.field_errors) == {"connection.settings.price_input_per_million"}

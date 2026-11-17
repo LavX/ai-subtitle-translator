@@ -116,3 +116,50 @@ async def test_a_paid_test_is_held_and_reported_like_a_translation():
     refused = await contract_with(ScriptedBackend({"c1": spent})).test(scripted, {}, sink=Holds(), budget=0.0)
     assert refused["ok"] is False and refused["code"] == "cancelled" and refused["reason"] == "budget_exhausted"
     assert spent.batches == []
+
+
+@pytest.mark.asyncio
+async def test_a_key_list_arrives_as_json_text_and_is_read_as_a_list():
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers["authorization"])
+        return httpx.Response(200, json={"data": [{"id": "models/gemini-2.5-flash"}]})
+
+    contract = contract_with(GeminiBackendType(transport=httpx.MockTransport(handler)))
+    await contract.options("connection.settings.model", CONFIG, {"api_keys": '["first","second"]'})
+    assert seen == ["Bearer first"]
+
+
+def test_key_list_text_forms():
+    from subtitle_translator.plugin.contract import key_list
+
+    assert key_list('["a", " b ", "", 3]') == ["a", "b"]
+    assert key_list("a\nb\r\n\n c ") == ["a", "b", "c"]
+    assert key_list("single-key") == ["single-key"]
+    assert key_list("123456") == ["123456"]  # a number is a key, not a JSON value
+    assert key_list("[not json") == ["[not json"]
+
+
+@pytest.mark.asyncio
+async def test_a_translate_request_decodes_its_key_list_for_the_engine():
+    from subtitle_translator.core.backends import Connection
+    from subtitle_translator.plugin.contract import decode_secrets
+
+    backend = GeminiBackendType()
+    connection = Connection("g", "gemini", secrets={"api_keys": '["k1","k2"]', "other": "x"})
+    decoded = decode_secrets(backend, connection)
+    assert decoded.secrets == {"api_keys": ["k1", "k2"], "other": "x"}
+    already = Connection("g", "gemini", secrets={"api_keys": ["k1"]})
+    assert decode_secrets(backend, already).secrets == {"api_keys": ["k1"]}
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_server_while_listing_options_is_dependency_unavailable():
+    def handler(request):
+        raise httpx.ConnectError("refused", request=request)
+
+    contract = contract_with(GeminiBackendType(transport=httpx.MockTransport(handler)))
+    with pytest.raises(ContractError) as caught:
+        await contract.options("connection.settings.model", CONFIG, {"api_keys": ["k"]})
+    assert caught.value.code == "dependency_unavailable"

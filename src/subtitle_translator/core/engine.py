@@ -307,6 +307,14 @@ class TranslationEngine:
             return
         await provider.close()
 
+    async def close_clients(self) -> None:
+        """Close what every opened back end holds open on the running event loop (its HTTP
+        client), and keep the back ends themselves: their key health, rotation, learned batch
+        sizes and routing state live on, and a provider opens a new client when it is used
+        again. For a host that runs each call on an event loop of its own."""
+        for entry in [*self._opened.values(), *self._retired]:
+            await entry.opened.provider.close()
+
     async def aclose(self) -> None:
         for entry in [*self._opened.values(), *self._retired]:
             await entry.opened.provider.close()
