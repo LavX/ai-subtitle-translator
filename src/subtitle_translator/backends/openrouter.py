@@ -487,7 +487,9 @@ class OpenRouterProvider(ChatCompletionsProvider):
         return snapshot
 
     async def close(self) -> None:
-        """Close the HTTP client."""
+        """Close the HTTP client. The catalog lock is replaced too, because a lock remembers the
+        event loop it was contended on and this provider may be used again on another."""
+        self._model_params_lock = asyncio.Lock()
         if self._client is not None and not self._client.is_closed:
             await self._client.aclose()
             self._client = None

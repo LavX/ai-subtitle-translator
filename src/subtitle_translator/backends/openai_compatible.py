@@ -275,7 +275,7 @@ class OpenAICompatibleBackendType(BackendType):
                 help="0 sends no budget.",
             ),
             SettingField(
-                "price_input",
+                "price_input_per_million",
                 FieldType.NUMBER,
                 "Input price (USD per 1M tokens)",
                 default=0.0,
@@ -284,7 +284,7 @@ class OpenAICompatibleBackendType(BackendType):
                 help="0 for a free or local server. A set price makes the budget hold each request's worst case.",
             ),
             SettingField(
-                "price_output",
+                "price_output_per_million",
                 FieldType.NUMBER,
                 "Output price (USD per 1M tokens)",
                 default=0.0,
@@ -323,7 +323,7 @@ class OpenAICompatibleBackendType(BackendType):
                 errors[key] = f"{label} is a whole number from {low} to {high}"
             else:
                 patch[key] = value
-        for key, label in (("price_input", "Input price"), ("price_output", "Output price")):
+        for key, label in (("price_input_per_million", "Input price"), ("price_output_per_million", "Output price")):
             value = settings.get(key, 0.0)
             try:
                 price = float(value)
@@ -332,8 +332,8 @@ class OpenAICompatibleBackendType(BackendType):
                 patch[key] = price
             except (TypeError, ValueError):
                 errors[key] = f"{label} is a number from 0 to 100000"
-        if preset.id == "openai" and not (patch.get("price_input") or patch.get("price_output")):
-            errors["price_input"] = "The OpenAI preset needs its prices so the budget can hold each call"
+        if preset.id == "openai" and not (patch.get("price_input_per_million") or patch.get("price_output_per_million")):
+            errors["price_input_per_million"] = "The OpenAI preset needs its prices so the budget can hold each call"
         return Validation(patch=patch, errors=errors)
 
     def _client(self, base: CoreSettings, base_url: str) -> httpx.AsyncClient | None:
@@ -354,8 +354,8 @@ class OpenAICompatibleBackendType(BackendType):
             preset=PRESETS[settings["preset"]],
             model=settings.get("model", ""),
             max_output_tokens=settings.get("max_tokens", DEFAULT_MAX_TOKENS),
-            price_input=float(settings.get("price_input", 0.0)),
-            price_output=float(settings.get("price_output", 0.0)),
+            price_input=float(settings.get("price_input_per_million", 0.0)),
+            price_output=float(settings.get("price_output_per_million", 0.0)),
             settings=base,
             client=self._client(base, settings["base_url"]),
             clock=self._clock,

@@ -221,9 +221,9 @@ def test_the_gemini_connection_carries_its_prices():
         settings(gemini_api_keys="k", gemini_price_input=1.5, gemini_price_output=3.0), registry, environ={}
     )
     gemini = next(c for c in priced if c.id == "gemini")
-    assert (gemini.settings["price_input"], gemini.settings["price_output"]) == (1.5, 3.0)
+    assert (gemini.settings["price_input_per_million"], gemini.settings["price_output_per_million"]) == (1.5, 3.0)
     default = next(c for c in build_connections(settings(gemini_api_keys="k"), registry, environ={}) if c.id == "gemini")
-    assert (default.settings["price_input"], default.settings["price_output"]) == (0.0, 0.0)
+    assert (default.settings["price_input_per_million"], default.settings["price_output_per_million"]) == (0.0, 0.0)
 
 
 def test_a_keyless_request_with_routing_leaves_the_servers_data_retention_option_alone():
@@ -365,7 +365,7 @@ def test_a_blank_value_from_compose_counts_as_not_set(tmp_path, monkeypatch):
     registry = BackendRegistry.discover(BackendScope.builtin())
     connection = build_connections(settings(backend_order="openai_compatible"), registry)[0]
     assert connection.enabled and connection.secrets == {}
-    assert connection.settings["batch_size"] == 100 and connection.settings["price_input"] == 0.0
+    assert connection.settings["batch_size"] == 100 and connection.settings["price_input_per_million"] == 0.0
 
 
 def test_no_dotenv_file_is_fine(tmp_path, monkeypatch):

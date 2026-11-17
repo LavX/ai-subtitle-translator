@@ -1,5 +1,6 @@
 """OpenRouter as a back-end type: connection settings, validation, live model choices, tests."""
 
+import json
 import logging
 from collections.abc import Callable, Mapping
 from typing import Any
@@ -71,11 +72,29 @@ def _reasoning(value: Any) -> ReasoningConfig | None:
     return ReasoningConfig(effort="none" if value == "disabled" else str(value))
 
 
+def _policy(value: Any) -> dict[str, Any] | None:
+    """The SmartFast policy as an object. The standalone service hands over an object; Bazarr+
+    has no object field type, so the manifest declares text and the policy arrives as JSON text.
+    Anything else is an error, never an ignored value."""
+    if value is None or value == "" or value == {}:
+        return None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            raise ValueError(
+                'The SmartFast policy is not valid JSON, for example {"maxPromptPrice": 0.05}'
+            ) from None
+    if not isinstance(value, dict):
+        raise ValueError('The SmartFast policy is a JSON object, for example {"maxPromptPrice": 0.05}')
+    return value
+
+
 def translation_config(
     settings: Mapping[str, Any], secrets: Mapping[str, Any]
 ) -> TranslationConfig:
     routing = settings.get("routing") or None
-    policy = settings.get("smart_fast")
+    policy = _policy(settings.get("smart_fast"))
     provider_fields = {
         "order": settings.get("provider_order") or None,
         "allowFallbacks": settings.get("allow_fallbacks", True),
@@ -83,7 +102,7 @@ def translation_config(
         # An empty list is the unset value of a list field, not "no provider allowed".
         "only": settings.get("only") or None,
         "ignore": settings.get("ignore") or None,
-        "smartFast": SmartFastPolicy(**policy) if isinstance(policy, dict) else None,
+        "smartFast": SmartFastPolicy(**policy) if policy else None,
         # A request's explicit choice ("allow" or "deny") wins; the toggle can only deny.
         "dataCollection": settings.get("data_collection")
         or ("deny" if settings.get("deny_data_collection") else None),
@@ -188,6 +207,7 @@ class OpenRouterBackendType(BackendType):
                 FieldType.TEXT,
                 "SmartFast policy",
                 group="SmartFast",
+                help='A JSON object, for example {"maxPromptPrice": 0.05}. Empty keeps the defaults.',
                 show_when=("routing", "smartfast"),
             ),
             SettingField(

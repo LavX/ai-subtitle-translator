@@ -75,6 +75,31 @@ def test_a_smartfast_policy_is_checked_without_the_key():
     assert backend.validate(fine, {}).errors == {"api_key": "API key is required"}
 
 
+def test_a_smartfast_policy_entered_as_json_text_is_applied():
+    # Bazarr+ has no object field, so the manifest's text field delivers the policy as text.
+    config = translation_config(
+        {"model": "x/y", "routing": "smartfast", "smart_fast": '{"maxPromptPrice": 0.05}'},
+        {"api_key": "k"},
+    )
+    assert config.provider.smart_fast.maxPromptPrice == 0.05
+    unset = translation_config({"model": "x/y", "routing": "smartfast", "smart_fast": ""}, {})
+    assert unset.provider.smart_fast is None
+
+
+@pytest.mark.parametrize("text", ["not json", "[1, 2]", "0.05", '{"warp": 9}', '{"maxPromptPrice": -1}'])
+def test_a_smartfast_policy_that_cannot_be_read_is_refused_not_ignored(text):
+    backend = OpenRouterBackendType()
+    settings = {"routing": "smartfast", "smart_fast": text}
+    assert set(backend.validate(settings, {"api_key": "k"}).errors) == {"smart_fast"}
+    with pytest.raises(InvalidConfigError) as caught:
+        backend.open(
+            Connection("or", "openrouter", settings={"model": "x/y", **settings}, secrets={"api_key": "k"}),
+            CoreSettings(),
+            BackendContext(),
+        )
+    assert set(caught.value.field_errors) == {"smart_fast"}
+
+
 def test_open_refuses_a_policy_it_cannot_read():
     with pytest.raises(InvalidConfigError) as caught:
         OpenRouterBackendType().open(

@@ -54,3 +54,17 @@ def test_the_engine_bounds_are_the_ones_a_request_is_held_to():
 def test_the_checked_in_copy_matches_the_code():
     generated = settings_block(TranslatorContract(PluginScope.builtin()))
     assert json.loads(CHECKED_IN.read_text()) == json.loads(json.dumps(generated))
+
+
+def test_the_price_fields_carry_the_names_the_host_uses():
+    block = settings_block(TranslatorContract(PluginScope.builtin()))
+    for type_id in ("gemini", "openai_compatible"):
+        keys = {f["key"] for f in block["backend_types"][type_id]["connection"]}
+        assert {"price_input_per_million", "price_output_per_million"} <= keys
+        assert not keys & {"price_input", "price_output"}
+
+
+def test_the_smartfast_policy_is_declared_as_text_and_read_as_text():
+    block = settings_block(TranslatorContract(PluginScope.builtin()))
+    fields = {f["key"]: f for f in block["backend_types"]["openrouter"]["connection"]}
+    assert fields["smart_fast"]["type"] == "text" and "maxPromptPrice" in fields["smart_fast"]["help"]

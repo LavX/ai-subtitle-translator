@@ -288,7 +288,7 @@ class GeminiBackendType(BackendType):
                 maximum=500,
             ),
             SettingField(
-                "price_input",
+                "price_input_per_million",
                 FieldType.NUMBER,
                 "Input price (USD per 1M tokens)",
                 default=0.0,
@@ -297,7 +297,7 @@ class GeminiBackendType(BackendType):
                 help="0 for the free tier. A set price makes the budget hold each request's worst case.",
             ),
             SettingField(
-                "price_output",
+                "price_output_per_million",
                 FieldType.NUMBER,
                 "Output price (USD per 1M tokens)",
                 default=0.0,
@@ -329,7 +329,7 @@ class GeminiBackendType(BackendType):
             errors["batch_size"] = "Lines per request is a whole number from 10 to 500"
         else:
             patch["batch_size"] = size
-        for key, label in (("price_input", "Input price"), ("price_output", "Output price")):
+        for key, label in (("price_input_per_million", "Input price"), ("price_output_per_million", "Output price")):
             value = settings.get(key, 0.0)
             try:
                 price = float(value)
@@ -365,7 +365,7 @@ class GeminiBackendType(BackendType):
             # The request's own timeout bounds the HTTP call and the batch alike.
             base = base.model_copy(update={"request_timeout": timeout})
         prices: dict[str, float] = {}
-        for key, label in (("price_input", "Input price"), ("price_output", "Output price")):
+        for key, label in (("price_input_per_million", "Input price"), ("price_output_per_million", "Output price")):
             value = settings.get(key, 0.0)
             try:
                 price = float(value)
@@ -384,8 +384,8 @@ class GeminiBackendType(BackendType):
             key_projects=_labels(settings),
             model=model,
             reasoning=str(settings.get("reasoning") or "disabled"),
-            price_input=prices["price_input"],
-            price_output=prices["price_output"],
+            price_input=prices["price_input_per_million"],
+            price_output=prices["price_output_per_million"],
             settings=base,
             client=self._client(base),
             clock=self._clock,

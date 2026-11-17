@@ -272,7 +272,7 @@ async def test_a_priced_gemini_call_settles_at_the_computed_cost():
         return httpx.Response(200, json=body)
 
     opened = GeminiBackendType(transport=httpx.MockTransport(handler)).open(
-        Connection("g", "gemini", settings={"model": "gemini-2.5-flash", "price_input": 1.0, "price_output": 2.0}, secrets={"api_keys": ["k"]}),
+        Connection("g", "gemini", settings={"model": "gemini-2.5-flash", "price_input_per_million": 1.0, "price_output_per_million": 2.0}, secrets={"api_keys": ["k"]}),
         CoreSettings(request_timeout=5.0),
         BackendContext(),
     )
