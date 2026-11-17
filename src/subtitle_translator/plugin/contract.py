@@ -234,8 +234,10 @@ class TranslatorContract:
             raise ContractError(
                 "invalid_config", error.message, field_errors={error.field: error.message}
             ) from None
+        # The host names the field by its bare key; the prefixed form is accepted too.
         prefix = "connection.settings."
-        if not field.startswith(prefix):
+        key = field[len(prefix) :] if field.startswith(prefix) else field
+        if not key or "." in key:
             raise ContractError(
                 "invalid_config", f"No live choices for {field}", field_errors={field: "unknown"}
             )
@@ -243,7 +245,7 @@ class TranslatorContract:
         connection = decode_secrets(backend, connection)
         try:
             choices = await backend.options(
-                field[len(prefix) :], connection.settings, connection.secrets, context or BackendContext()
+                key, connection.settings, connection.secrets, context or BackendContext()
             )
         except TranslationProviderError as error:
             raise ContractError(

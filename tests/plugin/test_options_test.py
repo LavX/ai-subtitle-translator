@@ -1,6 +1,8 @@
 # tests/plugin/test_options_test.py
 """options and test receive secrets, use one connection, and report sign-in state without credentials."""
 
+import json
+
 import httpx
 import pytest
 
@@ -163,3 +165,36 @@ async def test_an_unreachable_server_while_listing_options_is_dependency_unavail
     with pytest.raises(ContractError) as caught:
         await contract.options("connection.settings.model", CONFIG, {"api_keys": ["k"]})
     assert caught.value.code == "dependency_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_options_take_the_bare_field_key_the_host_sends():
+    def handler(request):
+        return httpx.Response(200, json={"data": [{"id": "models/gemini-2.5-flash"}]})
+
+    contract = contract_with(GeminiBackendType(transport=httpx.MockTransport(handler)))
+    bare = await contract.options("model", CONFIG, {"api_keys": ["k"]})
+    prefixed = await contract.options("connection.settings.model", CONFIG, {"api_keys": ["k"]})
+    assert bare == prefixed and bare[0]["value"] == "gemini-2.5-flash"
+    with pytest.raises(ContractError) as caught:
+        await contract.options("", CONFIG, {"api_keys": ["k"]})
+    assert caught.value.code == "invalid_config"
+
+
+@pytest.mark.asyncio
+async def test_a_translation_sends_the_first_key_of_a_json_text_key_list():
+    from tests.plugin.test_translate import Sink, request
+
+    seen = []
+
+    def handler(req):
+        seen.append(req.headers["authorization"])
+        content = json.dumps({"translations": [{"index": "0", "content": "Szia"}]})
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}}], "usage": {"total_tokens": 5}})
+
+    contract = contract_with(GeminiBackendType(transport=httpx.MockTransport(handler)))
+    job = request(1)
+    job["config"]["connection"] = {"id": "g", "type": "gemini", "enabled": True, "settings": {}}
+    job["secrets"] = {"api_keys": '["first-key","second-key"]'}
+    result = await contract.translate(job, Sink())
+    assert result["status"] == "complete" and seen == ["Bearer first-key"]
