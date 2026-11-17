@@ -2,22 +2,27 @@
 
 import importlib.metadata
 from collections.abc import Callable, Iterable
-from typing import Any
+from dataclasses import asdict
+from typing import Any, Protocol
 
 from subtitle_translator import __version__
-from subtitle_translator.core.backends import BackendRegistry
+from subtitle_translator.core.backends import BackendContext, BackendRegistry
 from subtitle_translator.core.errors import (
     DependencyUnavailableError,
     InvalidConfigError,
     TranslationProviderError,
+    error_kind,
 )
 from subtitle_translator.core.models import MAX_LINE_CHARS
+from subtitle_translator.core.usage import UsageMeter
 from subtitle_translator.plugin.scope import PluginScope
 from subtitle_translator.plugin.wire import (
     MAX_LINES,
     WireError,
+    read_budget,
     read_connection,
     read_engine_settings,
+    write_usage,
 )
 
 KIND_API = "bazarr.translator.v1"
@@ -40,6 +45,36 @@ class ContractError(Exception):
         self.field_errors = dict(field_errors or {})
         self.retry_after = retry_after
         self.reason = reason
+
+
+class Sink(Protocol):
+    def progress(self, done: int, total: int, message: str) -> None: ...
+    def heartbeat(self) -> None: ...
+    async def reserve(self, amount: float, model: str) -> str | None: ...
+    async def usage(self, report: dict) -> None: ...
+    async def checkpoint(self, data: dict) -> None: ...
+
+
+def _meter_sinks(sink: "Sink | None"):
+    """The usage and reservation callbacks of a meter that reports to Bazarr+ through the sink."""
+    if sink is None:
+        return None, None
+
+    async def usage(report) -> None:
+        await sink.usage(write_usage(report))
+
+    async def reserve(amount: float, model: str) -> str | None:
+        return await sink.reserve(amount, model)
+
+    return usage, reserve
+
+
+def _settings_fields(field_errors: dict[str, str] | None) -> dict[str, str]:
+    """A back end names its own settings; Bazarr+ addresses them as connection.settings.<key>."""
+    return {
+        key if key.startswith("connection.") else f"connection.settings.{key}": message
+        for key, message in (field_errors or {}).items()
+    }
 
 
 def secret_fields(contract: "TranslatorContract") -> dict[str, set[str]]:
@@ -140,3 +175,84 @@ class TranslatorContract:
                 ) from None
             migrated.append({**connection, "settings": new_settings})
         return {"settings": dict(settings), "connections": migrated}
+
+    async def options(
+        self, field: str, config: dict, secrets: dict, context: BackendContext | None = None
+    ) -> list[dict]:
+        try:
+            connection = read_connection(config, secrets)
+        except WireError as error:
+            raise ContractError(
+                "invalid_config", error.message, field_errors={error.field: error.message}
+            ) from None
+        prefix = "connection.settings."
+        if not field.startswith(prefix):
+            raise ContractError(
+                "invalid_config", f"No live choices for {field}", field_errors={field: "unknown"}
+            )
+        backend = self._backend(connection.backend_type)
+        try:
+            choices = await backend.options(
+                field[len(prefix) :], connection.settings, connection.secrets, context or BackendContext()
+            )
+        except TranslationProviderError as error:
+            raise ContractError(
+                str(error_kind(error)), error.message, retry_after=error.retry_after
+            ) from None
+        # A live choice fills nothing else, so the preset values are not part of the answer.
+        return [{k: v for k, v in asdict(choice).items() if k != "fills"} for choice in choices]
+
+    async def test(
+        self,
+        config: dict,
+        secrets: dict,
+        context: BackendContext | None = None,
+        sink: "Sink | None" = None,
+        budget: float | None = None,
+    ) -> dict:
+        try:
+            connection = read_connection(config, secrets)
+            base = read_engine_settings(config)
+            budget = read_budget(budget)
+        except WireError as error:
+            raise ContractError(
+                "invalid_config", error.message, field_errors={error.field: error.message}
+            ) from None
+        backend = self._backend(connection.backend_type)
+        context = context or BackendContext()
+        if backend.uses_sign_in:
+            status = await backend.sign_in_status(connection, context)
+            if status is not None and not status.signed_in:
+                return {
+                    "ok": False,
+                    "code": "auth_required",
+                    "reason": None,
+                    "message": status.detail or "Signed out",
+                    "model": None,
+                    "signed_in": False,
+                    "tokens": 0,
+                    "cost": 0.0,
+                }
+        # A paid test is held and reported like a translation call.
+        meter = UsageMeter(budget, *_meter_sinks(sink))
+        try:
+            outcome = await backend.test(connection, base, context, meter)
+        except TranslationProviderError as error:
+            # The back end refused the connection before any call, so there is no result to
+            # report; like settings it cannot read, this names the fields at fault.
+            raise ContractError(
+                str(error_kind(error)),
+                error.message,
+                field_errors=_settings_fields(getattr(error, "field_errors", None)),
+                retry_after=error.retry_after,
+            ) from None
+        return {
+            "ok": outcome.ok,
+            "code": str(outcome.kind) if outcome.kind else None,
+            "reason": outcome.reason,
+            "message": outcome.message,
+            "model": outcome.model,
+            "signed_in": True if backend.uses_sign_in else None,
+            "tokens": meter.tokens,
+            "cost": meter.cost,
+        }
