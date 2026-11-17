@@ -1,12 +1,15 @@
 """The bazarr.translator.v1 operations on plain dictionaries. No SDK import here."""
 
+import asyncio
 import importlib.metadata
+import json
 from collections.abc import Callable, Iterable
 from dataclasses import asdict
 from typing import Any, Protocol
 
 from subtitle_translator import __version__
 from subtitle_translator.core.backends import BackendContext, BackendRegistry
+from subtitle_translator.core.engine import EngineError, EngineEvents, TranslationEngine
 from subtitle_translator.core.errors import (
     DependencyUnavailableError,
     InvalidConfigError,
@@ -22,11 +25,17 @@ from subtitle_translator.plugin.wire import (
     read_budget,
     read_connection,
     read_engine_settings,
+    read_job,
+    write_checkpoint,
+    write_error,
+    write_outcome,
     write_usage,
 )
 
 KIND_API = "bazarr.translator.v1"
 SETTINGS_VERSION = 1
+# Used when the host names no heartbeat interval; the SDK binding passes the host's value.
+HEARTBEAT_SECONDS = 10.0
 SECRET_FIELDS_V1 = {"openrouter": {"api_key"}, "gemini": {"api_keys"}, "openai_compatible": {"api_key"}}
 
 
@@ -94,6 +103,7 @@ class TranslatorContract:
         self.scope = scope
         self._entry_points = entry_points
         self._registry: BackendRegistry | None = None
+        self._engines: dict[str, TranslationEngine] = {}
 
     @property
     def registry(self) -> BackendRegistry:
@@ -256,3 +266,79 @@ class TranslatorContract:
             "tokens": meter.tokens,
             "cost": meter.cost,
         }
+
+    def _engine(self, base, context) -> TranslationEngine:
+        key = json.dumps(base.model_dump(), sort_keys=True)
+        engine = self._engines.get(key)
+        if engine is None:
+            engine = self._engines[key] = TranslationEngine(
+                self.registry, base, lambda type_id: context
+            )
+        return engine
+
+    async def translate(
+        self,
+        request: dict,
+        sink: Sink,
+        *,
+        heartbeat_interval: float = HEARTBEAT_SECONDS,
+        context: BackendContext | None = None,
+        cancelled: asyncio.Event | None = None,
+    ) -> dict:
+        try:
+            job, connection, base = read_job(request)
+        except WireError as error:
+            raise ContractError(
+                "invalid_config", error.message, field_errors={error.field: error.message}
+            ) from None
+        self._backend(connection.backend_type)
+        if cancelled is not None and cancelled.is_set():
+            raise ContractError("cancelled", "Bazarr+ cancelled this job before it started")
+        engine = self._engine(base, context or BackendContext())
+
+        async def beat() -> None:
+            while True:
+                sink.heartbeat()
+                await asyncio.sleep(heartbeat_interval)
+
+        usage, reserve = _meter_sinks(sink)
+
+        async def checkpoint(data) -> None:
+            await sink.checkpoint(write_checkpoint(data))
+
+        events = EngineEvents(
+            on_progress=lambda p: sink.progress(p.done_lines, p.total_lines, p.message),
+            on_usage=usage,
+            on_checkpoint=checkpoint,
+            on_reserve=reserve,
+        )
+        # The attempt runs as its own task, so either way Bazarr+ cancels a job, by cancelling
+        # this coroutine or by setting the SDK's cancel event, it stops at once and reports
+        # nothing more.
+        heartbeat = asyncio.create_task(beat())
+        stop = asyncio.create_task(cancelled.wait()) if cancelled is not None else None
+        work = asyncio.create_task(engine.attempt(job, connection, events))
+        try:
+            await asyncio.wait({work, stop} - {None}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for task in (work, stop, heartbeat):
+                if task is not None and not task.done():
+                    task.cancel()
+            await asyncio.gather(
+                *(t for t in (work, stop, heartbeat) if t is not None), return_exceptions=True
+            )
+        if work.cancelled():
+            raise ContractError("cancelled", "Bazarr+ cancelled this job")
+        error = work.exception()
+        if isinstance(error, EngineError):
+            shaped = write_error(error)
+            raise ContractError(
+                shaped["code"],
+                shaped["message"],
+                shaped["field_errors"],
+                shaped["retry_after"],
+                shaped["reason"],
+            ) from None
+        if error is not None:
+            raise error
+        return write_outcome(work.result())
