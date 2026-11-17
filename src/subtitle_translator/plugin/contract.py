@@ -267,6 +267,14 @@ class TranslatorContract:
             "cost": meter.cost,
         }
 
+    async def release(self) -> None:
+        """Close and forget every opened back end. A host that runs each call on its own event
+        loop calls this after each, because an opened back end's HTTP client belongs to the loop
+        that first used it."""
+        engines, self._engines = list(self._engines.values()), {}
+        for engine in engines:
+            await engine.aclose()
+
     def _engine(self, base, context) -> TranslationEngine:
         key = json.dumps(base.model_dump(), sort_keys=True)
         engine = self._engines.get(key)

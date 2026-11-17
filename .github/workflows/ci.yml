@@ -25,6 +25,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e ".[dev]"
+          # The host carries its own copy of the SDK at run time; the binding's tests need one.
+          pip install "git+https://github.com/LavX/bazarr-plugin-sdk@v0.1.0"
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
