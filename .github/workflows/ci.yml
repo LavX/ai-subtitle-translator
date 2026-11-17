@@ -35,6 +35,9 @@ jobs:
       - name: Check package boundaries
         run: lint-imports
 
+      - name: Check the plugin manifest settings are current
+        run: python -m subtitle_translator.plugin.manifest --scope builtin | diff - catalog/ai_translator.settings.json
+
   web-ui:
     runs-on: ubuntu-latest
     steps:
