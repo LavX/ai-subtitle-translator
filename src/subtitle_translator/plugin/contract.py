@@ -8,10 +8,10 @@ from subtitle_translator import __version__
 from subtitle_translator.core.backends import BackendRegistry
 from subtitle_translator.core.models import MAX_LINE_CHARS
 from subtitle_translator.plugin.scope import PluginScope
+from subtitle_translator.plugin.wire import MAX_LINES
 
 KIND_API = "bazarr.translator.v1"
 SETTINGS_VERSION = 1
-MAX_LINES = 10_000
 
 
 class TranslatorContract:
