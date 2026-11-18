@@ -204,7 +204,7 @@ async def test_a_connection_the_engine_cannot_open_names_its_field_like_test_doe
 
 
 @pytest.mark.asyncio
-async def test_every_call_opens_back_ends_with_its_own_folders():
+async def test_a_back_end_opened_for_a_call_gets_that_call_s_folders():
     from pathlib import Path
 
     from subtitle_translator.core.backends import BackendContext
@@ -218,7 +218,7 @@ async def test_every_call_opens_back_ends_with_its_own_folders():
             self.contexts.append(context)
             return super().open(connection, base, context)
 
-    backend = Recording({"c1": ScriptedProvider()})
+    backend = Recording({"c1": ScriptedProvider(), "c2": ScriptedProvider()})
     result = TranslatorContract(PluginScope.builtin())
     result._registry = BackendRegistry(
         [RegisteredBackend("scripted", backend, "lavx-ai-subtitle-translator", "0", None)]
@@ -226,9 +226,9 @@ async def test_every_call_opens_back_ends_with_its_own_folders():
     first = BackendContext(temp_dir=Path("/tmp/job-1"), artifacts_dir=Path("/tmp/art-1"))
     second = BackendContext(temp_dir=Path("/tmp/job-2"), artifacts_dir=Path("/tmp/art-2"))
     await result.translate(request(), Sink(), context=first)
-    await result.translate(request(), Sink(), context=second)
-    # A later call never reuses an opened back end that holds an earlier call's folders.
+    other = request()
+    other["config"]["connection"]["id"] = "c2"
+    await result.translate(other, Sink(), context=second)
     assert backend.contexts == [first, second]
-    # Calls with the same folders share the opened back end and its state.
-    await result.translate(request(), Sink(), context=second)
-    assert backend.contexts == [first, second]
+    # One engine serves both calls: no folder is part of what is cached.
+    assert len(result._engines) == 1

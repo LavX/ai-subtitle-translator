@@ -88,7 +88,9 @@ def request(url):
     }
 
 
-def context():
+def context(job=0):
+    from pathlib import Path
+
     async def stored(*args, **kwargs):
         return None
 
@@ -101,15 +103,19 @@ def context():
         cancelled=asyncio.Event(),
         heartbeat_interval=0.05,
         budget=None,
-        data_dir=None,
-        temp_dir=None,
-        artifacts_dir=None,
+        data_dir=Path("/tmp/plugin-data"),
+        temp_dir=Path(f"/tmp/job-{job}"),
+        artifacts_dir=Path(f"/tmp/art-{job}"),
     )
 
 
+_jobs = iter(range(1, 1000))
+
+
 def call(plugin, url):
-    """One translate call on an event loop of its own, as the SDK runs it."""
-    return asyncio.to_thread(lambda: asyncio.run(plugin.translate(request(url), context())))
+    """One translate call on an event loop of its own, as the SDK runs it, with folders of its own."""
+    job = next(_jobs)
+    return asyncio.to_thread(lambda: asyncio.run(plugin.translate(request(url), context(job))))
 
 
 @pytest.mark.asyncio

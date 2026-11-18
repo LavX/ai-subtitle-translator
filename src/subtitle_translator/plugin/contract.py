@@ -325,20 +325,13 @@ class TranslatorContract:
         for engine in engines:
             await engine.close_clients()
 
-    def _engine(self, base, context) -> TranslationEngine:
-        # The folders are part of the key: an engine hands its context to every back end it opens,
-        # so one engine never carries a folder of an earlier call into a later one. Calls with the
-        # same folders share an engine, and with it key health and learned batch sizes.
-        key = json.dumps(
-            [base.model_dump(), [str(p) for p in (context.data_dir, context.artifacts_dir, context.temp_dir)]],
-            sort_keys=True,
-        )
+    def _engine(self, base) -> TranslationEngine:
+        key = json.dumps(base.model_dump(), sort_keys=True)
         with self._engines_lock:
             engine = self._engines.get(key)
             if engine is None:
-                engine = self._engines[key] = TranslationEngine(
-                    self.registry, base, lambda type_id: context
-                )
+                # No folder is stored here: each call hands its own to the attempt.
+                engine = self._engines[key] = TranslationEngine(self.registry, base)
             self._engines.move_to_end(key)
             while len(self._engines) > MAX_ENGINES:
                 self._engines.popitem(last=False)
@@ -362,7 +355,8 @@ class TranslatorContract:
         connection = decode_secrets(self._backend(connection.backend_type), connection)
         if cancelled is not None and cancelled.is_set():
             raise ContractError("cancelled", "Bazarr+ cancelled this job before it started")
-        engine = self._engine(base, context or BackendContext())
+        context = context or BackendContext()
+        engine = self._engine(base)
 
         async def beat() -> None:
             while True:
@@ -385,7 +379,7 @@ class TranslatorContract:
         # nothing more.
         heartbeat = asyncio.create_task(beat())
         stop = asyncio.create_task(cancelled.wait()) if cancelled is not None else None
-        work = asyncio.create_task(engine.attempt(job, connection, events))
+        work = asyncio.create_task(engine.attempt(job, connection, events, context))
         try:
             await asyncio.wait({work, stop} - {None}, return_when=asyncio.FIRST_COMPLETED)
         finally:

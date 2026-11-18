@@ -248,15 +248,17 @@ class TranslationEngine:
     def registry(self) -> BackendRegistry:
         return self._registry
 
-    def _open(self, connection: Connection) -> _Opened:
+    def _open(self, connection: Connection, context: BackendContext | None = None) -> _Opened:
         # Two connections never share an opened back end, even with equal settings: each keeps
         # its own key health and learned sizes. A saved change opens a new one.
         key = f"{connection.id}:{connection.fingerprint()}"
         entry = self._opened.get(key)
         if entry is None:
             backend = self._registry.get(connection.backend_type)
+            # A back end opened now gets the folders of the call that needs it, not a fixed set
+            # kept from an earlier one.
             opened = backend.open(
-                connection, self._base, self._context_for(connection.backend_type)
+                connection, self._base, context or self._context_for(connection.backend_type)
             )
             entry = _Opened(opened, BatchSizeResolver(opened.settings))
             self._opened[key] = entry
@@ -322,10 +324,14 @@ class TranslationEngine:
         self._retired.clear()
 
     async def attempt(
-        self, job: TranslationJob, connection: Connection, events: EngineEvents | None = None
+        self,
+        job: TranslationJob,
+        connection: Connection,
+        events: EngineEvents | None = None,
+        context: BackendContext | None = None,
     ) -> TranslationOutcome:
         try:
-            entry = self._open(connection)
+            entry = self._open(connection, context)
         except TranslationProviderError as error:
             raise EngineError(
                 error_kind(error),
