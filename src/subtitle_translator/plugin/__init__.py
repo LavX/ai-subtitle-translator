@@ -1,4 +1,4 @@
-"""The Bazarr+ translator-kind entry. Needs the [plugin] extra for the SDK binding."""
+"""The Bazarr+ translator-kind entry. The SDK binding needs bazarr_plugin_sdk, which the host provides on the worker path."""
 
 
 def __getattr__(name: str):
