@@ -326,7 +326,13 @@ class TranslatorContract:
             await engine.close_clients()
 
     def _engine(self, base, context) -> TranslationEngine:
-        key = json.dumps(base.model_dump(), sort_keys=True)
+        # The folders are part of the key: an engine hands its context to every back end it opens,
+        # so one engine never carries a folder of an earlier call into a later one. Calls with the
+        # same folders share an engine, and with it key health and learned batch sizes.
+        key = json.dumps(
+            [base.model_dump(), [str(p) for p in (context.data_dir, context.artifacts_dir, context.temp_dir)]],
+            sort_keys=True,
+        )
         with self._engines_lock:
             engine = self._engines.get(key)
             if engine is None:
