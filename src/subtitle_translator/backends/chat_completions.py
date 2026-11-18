@@ -71,6 +71,11 @@ def _retry_after_seconds(value: str | None) -> float | None:
     return seconds if math.isfinite(seconds) and seconds >= 0 else None
 
 
+def retry_after_of(response: httpx.Response) -> float | None:
+    """The wait a reply names in its Retry-After header, as the shared parser reads it."""
+    return _retry_after_seconds(response.headers.get("retry-after"))
+
+
 class ChatCompletionsProvider(TranslationProvider):
     """A back end whose replies are OpenAI-style chat completions.
 
@@ -190,7 +195,7 @@ class ChatCompletionsProvider(TranslationProvider):
                 )
             error.tokens_used = total_tokens or 0
             error.cost = cost or 0.0
-            error.retry_after = _retry_after_seconds(response.headers.get("retry-after"))
+            error.retry_after = retry_after_of(response)
             raise error
 
         # The server may commit HTTP 200 before an upstream error arrives.

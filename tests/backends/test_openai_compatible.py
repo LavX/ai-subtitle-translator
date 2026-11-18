@@ -77,7 +77,7 @@ def test_each_preset_fills_its_address_and_the_address_stays_editable():
         ({"base_url": "http://host/v1"}, "model"),
         ({"preset": "vllm", "base_url": "http://host/v1", "model": "m"}, "preset"),
         ({"base_url": "http://host/v1", "model": "m", "parallel_batches": 0}, "parallel_batches"),
-        ({"base_url": "http://host/v1", "model": "m", "price_input": -1}, "price_input"),
+        ({"base_url": "http://host/v1", "model": "m", "price_input_per_million": -1}, "price_input_per_million"),
     ],
 )
 def test_validate_names_the_field_at_fault(settings, field):
@@ -94,7 +94,7 @@ def test_the_openai_preset_needs_a_price():
     _seen, handler = recorder()
     with pytest.raises(InvalidConfigError) as caught:
         opened(handler, preset="openai", model="gpt-5.6-mini", secrets={"api_key": "k"})
-    assert "price_input" in caught.value.field_errors
+    assert "price_input_per_million" in caught.value.field_errors
 
 
 @pytest.mark.asyncio
@@ -115,7 +115,7 @@ async def test_a_keyless_lm_studio_request():
 async def test_the_openai_preset_sends_a_bearer_key_and_max_completion_tokens():
     seen, handler = recorder()
     backend = opened(handler, preset="openai", model="gpt-5.6-mini", secrets={"api_key": "sk-live-secret"},
-                     price_input=1.0, price_output=2.0)
+                     price_input_per_million=1.0, price_output_per_million=2.0)
     result = await backend.provider.translate_batch(BATCH, config_override=backend.config)
     body = json.loads(seen[0].content)
     assert seen[0].headers["authorization"] == "Bearer sk-live-secret" and "sk-live" not in str(seen[0].url)
@@ -142,7 +142,7 @@ async def test_a_refused_temperature_is_dropped_and_remembered_for_that_model():
 
     seen, handler = recorder(answer)
     backend = opened(handler, preset="openai", model="o-reasoner", secrets={"api_key": "k"},
-                     price_input=1.0, price_output=2.0)
+                     price_input_per_million=1.0, price_output_per_million=2.0)
     await backend.provider.translate_batch(BATCH, config_override=backend.config)
     await backend.provider.translate_batch(BATCH, config_override=backend.config)
     sent = ["temperature" in json.loads(r.content) for r in seen]
@@ -183,6 +183,8 @@ async def test_a_stopped_server_is_dependency_unavailable_and_names_no_key():
     [
         (401, {"error": {"message": "bad key"}}, {}, AuthenticationError),
         (403, {"error": {"message": "forbidden"}}, {}, AuthenticationError),
+        (403, {"error": {"message": "Rate limit reached", "code": "rate_limit_exceeded"}}, {}, RateLimitError),
+        (403, {"error": {"message": "no quota", "type": "insufficient_quota"}}, {}, QuotaExhaustedError),
         (429, {"error": {"message": "slow down"}}, {"retry-after": "7"}, RateLimitError),
         (429, {"error": {"message": "You exceeded your current quota", "type": "insufficient_quota", "code": "insufficient_quota"}}, {}, QuotaExhaustedError),
     ],
@@ -192,7 +194,7 @@ async def test_http_failures_land_on_the_shared_kinds(status, body, headers, exp
         return httpx.Response(status, json=body, headers=headers)
 
     for secrets in ({}, {"api_key": "k"}):
-        backend = opened(answer, preset="openai", secrets=secrets, price_input=1.0, price_output=2.0)
+        backend = opened(answer, preset="openai", secrets=secrets, price_input_per_million=1.0, price_output_per_million=2.0)
         with pytest.raises(expected):
             await backend.provider.translate_batch(BATCH, config_override=backend.config)
 
@@ -231,7 +233,7 @@ async def test_a_total_only_usage_uses_the_higher_price():
     }
     seen, handler = recorder(lambda request: httpx.Response(200, json=body))
     backend = opened(handler, preset="openai", model="gpt-5.6-mini", secrets={"api_key": "k"},
-                     price_input=1.0, price_output=2.0)
+                     price_input_per_million=1.0, price_output_per_million=2.0)
     result = await backend.provider.translate_batch(BATCH, config_override=backend.config)
     assert result.cost == pytest.approx(0.00002)
 
@@ -246,7 +248,7 @@ async def test_a_priced_request_is_held_before_it_is_sent():
         return httpx.Response(200, json=OK)
 
     backend = opened(handler, preset="openai", model="gpt-5.6-mini", secrets={"api_key": "k"},
-                     price_input=1.0, price_output=2.0)
+                     price_input_per_million=1.0, price_output_per_million=2.0)
     config = backend.config.for_operation()
     config._usage_meter = meter
     result = await backend.provider.translate_batch(BATCH, config_override=config)
@@ -260,7 +262,7 @@ async def test_a_priced_call_settles_at_the_computed_cost():
     meter = UsageMeter(budget=1.0)
     _seen, handler = recorder()
     backend = opened(handler, preset="openai", model="gpt-5.6-mini", secrets={"api_key": "k"},
-                     price_input=1.0, price_output=2.0)
+                     price_input_per_million=1.0, price_output_per_million=2.0)
     processor = BatchProcessor(backend.provider, backend.settings, meter=meter)
     result = await processor.process_all_batches(
         BATCH.lines, "en", "hu", batch_size=10, model="gpt-5.6-mini"
@@ -279,7 +281,7 @@ async def test_no_prices_hold_nothing():
 @pytest.mark.asyncio
 async def test_an_unknown_output_bound_refuses_only_with_a_budget():
     _seen, handler = recorder()
-    backend = opened(handler, base_url="http://host/v1", max_tokens=0, price_output=1.0)
+    backend = opened(handler, base_url="http://host/v1", max_tokens=0, price_output_per_million=1.0)
     config = backend.config.for_operation()
     config._usage_meter = UsageMeter(budget=1.0)
     with pytest.raises(InvalidConfigError) as caught:
@@ -313,7 +315,7 @@ async def _one_call_budget(handler_kwargs):
 
 @pytest.mark.asyncio
 async def test_a_refused_field_gives_its_hold_back_before_the_retry():
-    kwargs = {"preset": "openai", "model": "gpt-5.6-mini", "secrets": {"api_key": "k"}, "price_input": 1.0, "price_output": 2.0}
+    kwargs = {"preset": "openai", "model": "gpt-5.6-mini", "secrets": {"api_key": "k"}, "price_input_per_million": 1.0, "price_output_per_million": 2.0}
     meter = UsageMeter(budget=await _one_call_budget(kwargs))
     seen, handler = recorder(_temperature_refusal)
     backend = opened(handler, **kwargs)
@@ -352,7 +354,7 @@ async def test_a_classified_failure_charges_the_usage_it_reported(status, body):
         return httpx.Response(status, json={**body, "usage": {"total_tokens": 100}})
 
     backend = opened(handler, preset="openai", model="gpt-5.6-mini", secrets={"api_key": "sk"},
-                     price_input=1.0, price_output=2.0)
+                     price_input_per_million=1.0, price_output_per_million=2.0)
     meter = UsageMeter(budget=1.0)
     result = await BatchProcessor(backend.provider, CoreSettings(max_retries=0), meter=meter).process_all_batches(
         BATCH.lines, "en", "hu", batch_size=10, model="gpt-5.6-mini"
@@ -381,3 +383,15 @@ async def test_a_model_list_that_is_not_json_lists_nothing():
     settings = {"preset": "ollama", "base_url": "http://localhost:11434/v1"}
     backend = OpenAICompatibleBackendType(transport=httpx.MockTransport(listing))
     assert await backend.options("model", settings, {}, BackendContext()) == []
+
+
+@pytest.mark.asyncio
+async def test_a_403_rate_limit_carries_the_retry_after_the_reply_names():
+    def answer(request):
+        body = {"error": {"message": "Rate limit reached", "code": "rate_limit_exceeded"}}
+        return httpx.Response(403, json=body, headers={"retry-after": "3600"})
+
+    backend = opened(answer, base_url="http://host/v1", secrets={"api_key": "k"})
+    with pytest.raises(RateLimitError) as caught:
+        await backend.provider.translate_batch(BATCH, config_override=backend.config)
+    assert caught.value.retry_after == pytest.approx(3600, abs=5)

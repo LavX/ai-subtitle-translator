@@ -4,6 +4,7 @@ standalone service calls translate()."""
 
 import asyncio
 import logging
+import threading
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Sequence
@@ -213,11 +214,17 @@ class EngineError(Exception):
         self.failovers = list(failovers)
 
 
+def _folders(context: BackendContext) -> tuple[str, ...]:
+    return tuple(str(p) for p in (context.data_dir, context.artifacts_dir, context.temp_dir))
+
+
 @dataclass(eq=False)
 class _Opened:
     opened: OpenedBackend
     resolver: BatchSizeResolver
     users: int = 0  # attempts running on it now
+    # The folders it was opened with, kept only to see whether a later call brings others.
+    folders: tuple[str, ...] = ()
 
 
 class TranslationEngine:
@@ -236,6 +243,7 @@ class TranslationEngine:
         self._context_for = context_for or (lambda type_id: BackendContext())
         self._opened: OrderedDict[str, _Opened] = OrderedDict()
         self._retired: list[_Opened] = []
+        self._lock = threading.RLock()
         # connection id -> (fingerprint, when it may be tried again, whether the provider named
         # that wait, the tick it was set at). A wait the provider named is honoured; one of the
         # defaults is a guess. The tick lets an attempt that finishes late clear only a cooldown
@@ -248,24 +256,34 @@ class TranslationEngine:
     def registry(self) -> BackendRegistry:
         return self._registry
 
-    def _open(self, connection: Connection) -> _Opened:
+    def _open(self, connection: Connection, context: BackendContext | None = None) -> _Opened:
         # Two connections never share an opened back end, even with equal settings: each keeps
         # its own key health and learned sizes. A saved change opens a new one.
         key = f"{connection.id}:{connection.fingerprint()}"
-        entry = self._opened.get(key)
-        if entry is None:
-            backend = self._registry.get(connection.backend_type)
-            opened = backend.open(
-                connection, self._base, self._context_for(connection.backend_type)
-            )
-            entry = _Opened(opened, BatchSizeResolver(opened.settings))
-            self._opened[key] = entry
-            while len(self._opened) > MAX_OPENED:
-                _, oldest = self._opened.popitem(last=False)
-                self._retired.append(oldest)
-        else:
-            self._opened.move_to_end(key)
-        return entry
+        with self._lock:
+            entry = self._opened.get(key)
+            if entry is None:
+                folders = context or self._context_for(connection.backend_type)
+                backend = self._registry.get(connection.backend_type)
+                opened = backend.open(connection, self._base, folders)
+                entry = _Opened(opened, BatchSizeResolver(opened.settings), 0, _folders(folders))
+                self._opened[key] = entry
+                while len(self._opened) > MAX_OPENED:
+                    _, oldest = self._opened.popitem(last=False)
+                    self._retired.append(oldest)
+            else:
+                self._opened.move_to_end(key)
+                if context is not None and not entry.users and _folders(context) != entry.folders:
+                    # The call brings other folders than the ones this back end was opened with:
+                    # open it again with them. The earlier provider is retired and closed once
+                    # nothing uses it; the key health and what the back end learned move to the
+                    # new one, and the batch sizes stay with the entry.
+                    backend = self._registry.get(connection.backend_type)
+                    fresh = backend.open(connection, self._base, context)
+                    fresh.provider.adopt_state(entry.opened.provider)
+                    self._retired.append(_Opened(entry.opened, entry.resolver))
+                    entry.opened, entry.folders = fresh, _folders(context)
+            return entry
 
     def provider_for(self, connection: Connection):
         """The provider serving a connection (the standalone GUI reads its key health)."""
@@ -307,6 +325,14 @@ class TranslationEngine:
             return
         await provider.close()
 
+    async def close_clients(self) -> None:
+        """Close what every opened back end holds open on the running event loop (its HTTP
+        client), and keep the back ends themselves: their key health, rotation, learned batch
+        sizes and routing state live on, and a provider opens a new client when it is used
+        again. For a host that runs each call on an event loop of its own."""
+        for entry in [*self._opened.values(), *self._retired]:
+            await entry.opened.provider.close()
+
     async def aclose(self) -> None:
         for entry in [*self._opened.values(), *self._retired]:
             await entry.opened.provider.close()
@@ -314,10 +340,14 @@ class TranslationEngine:
         self._retired.clear()
 
     async def attempt(
-        self, job: TranslationJob, connection: Connection, events: EngineEvents | None = None
+        self,
+        job: TranslationJob,
+        connection: Connection,
+        events: EngineEvents | None = None,
+        context: BackendContext | None = None,
     ) -> TranslationOutcome:
         try:
-            entry = self._open(connection)
+            entry = self._open(connection, context)
         except TranslationProviderError as error:
             raise EngineError(
                 error_kind(error),

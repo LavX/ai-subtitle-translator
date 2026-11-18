@@ -17,6 +17,7 @@ from subtitle_translator.backends.gemini import (
     reasoning_effort,
     resolve_model,
 )
+from subtitle_translator.backends.keyring import KeyState
 from subtitle_translator.core.backends import BackendContext, Connection
 from subtitle_translator.core.batch_processor import BatchProcessor
 from subtitle_translator.core.errors import (
@@ -272,7 +273,7 @@ async def test_a_priced_gemini_call_settles_at_the_computed_cost():
         return httpx.Response(200, json=body)
 
     opened = GeminiBackendType(transport=httpx.MockTransport(handler)).open(
-        Connection("g", "gemini", settings={"model": "gemini-2.5-flash", "price_input": 1.0, "price_output": 2.0}, secrets={"api_keys": ["k"]}),
+        Connection("g", "gemini", settings={"model": "gemini-2.5-flash", "price_input_per_million": 1.0, "price_output_per_million": 2.0}, secrets={"api_keys": ["k"]}),
         CoreSettings(request_timeout=5.0),
         BackendContext(),
     )
@@ -367,3 +368,53 @@ async def test_a_gemini_model_list_that_is_not_an_object_lists_nothing(body):
         "model", {}, {"api_keys": ["k"]}, BackendContext()
     )
     assert choices == []
+
+
+@pytest.mark.asyncio
+async def test_a_403_that_means_a_limit_cools_the_key_instead_of_rejecting_it():
+    body = {"error": {"code": 403, "message": "Quota exceeded for this project", "status": "RESOURCE_EXHAUSTED"}}
+    seen = []
+
+    def handler(request):
+        seen.append(request.headers["authorization"])
+        return httpx.Response(403, json=body)
+
+    p = gemini(handler, keys=["a"])
+    with pytest.raises(RateLimitError):
+        await p.translate_batch(BATCH)
+    assert p.keys.health("gemini-2.5-flash")[0].state is KeyState.COOLING
+    assert not p.keys.all_invalid()
+
+
+@pytest.mark.asyncio
+async def test_a_plain_403_is_still_a_rejected_key():
+    def handler(request):
+        return httpx.Response(403, json={"error": {"code": 403, "message": "denied", "status": "PERMISSION_DENIED"}})
+
+    p = gemini(handler, keys=["a"])
+    with pytest.raises(AuthenticationError):
+        await p.translate_batch(BATCH)
+    assert p.keys.all_invalid()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "headers,body_delay,expected",
+    [
+        ({"retry-after": "3600"}, None, 3600),
+        ({"retry-after": "3600"}, "90s", 90),  # Google's own hint wins
+        ({}, None, 60),
+    ],
+)
+async def test_a_403_limit_waits_as_long_as_the_reply_says(headers, body_delay, expected):
+    error = {"code": 403, "message": "Rate limit exceeded", "status": "RESOURCE_EXHAUSTED"}
+    if body_delay:
+        error["details"] = [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": body_delay}]
+
+    def handler(request):
+        return httpx.Response(403, json={"error": error}, headers=headers)
+
+    p = gemini(handler, keys=["a"])
+    with pytest.raises(RateLimitError) as caught:
+        await p.translate_batch(BATCH)
+    assert caught.value.retry_after == pytest.approx(expected, abs=5)

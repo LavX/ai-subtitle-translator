@@ -438,7 +438,7 @@ The table lists application defaults. For manual runs, most settings load from e
 | `OPENAI_COMPATIBLE_BASE_URL` | *(preset)* | Server address, for example `http://192.168.1.10:1234/v1` |
 | `OPENAI_COMPATIBLE_MODEL` | *(empty)* | Model name the server serves |
 | `OPENAI_COMPATIBLE_API_KEY` | *(empty)* | Only if the server asks for one |
-| `OPENAI_COMPATIBLE_PRICE_INPUT`, `OPENAI_COMPATIBLE_PRICE_OUTPUT` | `0` | USD per million input and output tokens; required for the OpenAI preset |
+| `OPENAI_COMPATIBLE_PRICE_INPUT`, `OPENAI_COMPATIBLE_PRICE_OUTPUT` | `0` | USD per million input and output tokens; required for the OpenAI preset. `OPENAI_COMPATIBLE_PRICE_INPUT_PER_MILLION` and `..._OUTPUT_PER_MILLION` are the same settings under the names Bazarr+ uses, and win when both are set |
 | `OPENAI_COMPATIBLE_TEMPERATURE`, `OPENAI_COMPATIBLE_BATCH_SIZE`, `OPENAI_COMPATIBLE_PARALLEL_BATCHES`, `OPENAI_COMPATIBLE_MAX_TOKENS` | *(back-end defaults)* | Request tuning for the OpenAI-compatible back end |
 | `BACKENDS_DATA_DIR` | `/app/data/backends` | Folder for per-back-end data, such as the sign-ins of installed back-end packages |
 | `BATCH_SIZE` | `100` | Max subtitle lines per batch (auto-adjusted per model) |

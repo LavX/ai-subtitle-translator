@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from subtitle_translator.backends.chat_completions import retry_after_of
 from subtitle_translator.backends.openai_compat import OpenAICompatProvider
 from subtitle_translator.core.backends import (
     BackendContext,
@@ -196,9 +197,23 @@ class GeminiProvider(OpenAICompatProvider):
             parsed.reason in ("API_KEY_INVALID", "API_KEY_SERVICE_BLOCKED")
             or "api key not valid" in message.lower()
         )
-        if code in (401, 403) or key_rejected:
+        # A 403 can also mean a limit, which passes; only a refusal of the key itself is a
+        # rejection, and a rejected key is not tried again for a while.
+        limited_403 = (
+            code == 403
+            and not key_rejected
+            and parsed is not None
+            and (
+                parsed.status == "RESOURCE_EXHAUSTED"
+                or parsed.reason in ("RATE_LIMIT_EXCEEDED", "QUOTA_EXCEEDED")
+                or bool(parsed.quota_ids)
+                or "quota" in message.lower()
+                or "rate limit" in message.lower()
+            )
+        )
+        if (code in (401, 403) or key_rejected) and not limited_403:
             return AuthenticationError(f"Gemini rejected the key: {message}", provider="gemini")
-        if code == 429:
+        if code == 429 or limited_403:
             daily = parsed is not None and any(
                 "perday" in q.lower() or "daily" in q.lower() for q in parsed.quota_ids
             )
@@ -208,9 +223,14 @@ class GeminiProvider(OpenAICompatProvider):
                     f"Gemini's daily quota for {model} is used up until midnight Pacific",
                     provider="gemini",
                     retry_after=next_pacific_midnight(now) - now,
-                    status_code=429,
+                    status_code=code,
                 )
-            delay = parsed.retry_delay if parsed and parsed.retry_delay is not None else 60.0
+            # Google's own hint first, then the header, then a minute.
+            delay = parsed.retry_delay if parsed and parsed.retry_delay is not None else None
+            if delay is None:
+                delay = retry_after_of(response)
+            if delay is None:
+                delay = 60.0
             return RateLimitError(
                 f"Gemini rate limit: {message}", provider="gemini", retry_after=delay
             )
@@ -288,7 +308,7 @@ class GeminiBackendType(BackendType):
                 maximum=500,
             ),
             SettingField(
-                "price_input",
+                "price_input_per_million",
                 FieldType.NUMBER,
                 "Input price (USD per 1M tokens)",
                 default=0.0,
@@ -297,7 +317,7 @@ class GeminiBackendType(BackendType):
                 help="0 for the free tier. A set price makes the budget hold each request's worst case.",
             ),
             SettingField(
-                "price_output",
+                "price_output_per_million",
                 FieldType.NUMBER,
                 "Output price (USD per 1M tokens)",
                 default=0.0,
@@ -329,7 +349,7 @@ class GeminiBackendType(BackendType):
             errors["batch_size"] = "Lines per request is a whole number from 10 to 500"
         else:
             patch["batch_size"] = size
-        for key, label in (("price_input", "Input price"), ("price_output", "Output price")):
+        for key, label in (("price_input_per_million", "Input price"), ("price_output_per_million", "Output price")):
             value = settings.get(key, 0.0)
             try:
                 price = float(value)
@@ -365,7 +385,7 @@ class GeminiBackendType(BackendType):
             # The request's own timeout bounds the HTTP call and the batch alike.
             base = base.model_copy(update={"request_timeout": timeout})
         prices: dict[str, float] = {}
-        for key, label in (("price_input", "Input price"), ("price_output", "Output price")):
+        for key, label in (("price_input_per_million", "Input price"), ("price_output_per_million", "Output price")):
             value = settings.get(key, 0.0)
             try:
                 price = float(value)
@@ -384,8 +404,8 @@ class GeminiBackendType(BackendType):
             key_projects=_labels(settings),
             model=model,
             reasoning=str(settings.get("reasoning") or "disabled"),
-            price_input=prices["price_input"],
-            price_output=prices["price_output"],
+            price_input=prices["price_input_per_million"],
+            price_output=prices["price_output_per_million"],
             settings=base,
             client=self._client(base),
             clock=self._clock,

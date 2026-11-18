@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from subtitle_translator.backends.chat_completions import retry_after_of
 from subtitle_translator.backends.openai_compat import OpenAICompatProvider
 from subtitle_translator.core.backends import (
     BackendContext,
@@ -31,6 +32,7 @@ from subtitle_translator.core.errors import (
     AuthenticationError,
     InvalidConfigError,
     QuotaExhaustedError,
+    RateLimitError,
     TranslationProviderError,
 )
 from subtitle_translator.core.models import TranslationConfig
@@ -110,16 +112,24 @@ def _base_url(value: Any) -> tuple[str, str | None]:
     return text, None
 
 
-def _insufficient_quota(response: httpx.Response) -> bool:
+def _error_object(response: httpx.Response) -> dict[str, Any]:
     try:
         body = response.json()
     except ValueError:
-        return False
+        return {}
     error = body.get("error") if isinstance(body, dict) else None
-    return isinstance(error, dict) and "insufficient_quota" in (
-        str(error.get("code")),
-        str(error.get("type")),
-    )
+    return error if isinstance(error, dict) else {}
+
+
+def _insufficient_quota(response: httpx.Response) -> bool:
+    error = _error_object(response)
+    return "insufficient_quota" in (str(error.get("code")), str(error.get("type")))
+
+
+def _rate_limited(response: httpx.Response) -> bool:
+    error = _error_object(response)
+    text = " ".join(str(error.get(key) or "") for key in ("code", "type", "message")).lower()
+    return "rate_limit" in text or "rate limit" in text
 
 
 class OpenAICompatibleServerProvider(OpenAICompatProvider):
@@ -159,6 +169,11 @@ class OpenAICompatibleServerProvider(OpenAICompatProvider):
         self.max_output_tokens = max_output_tokens
         self._rejected: dict[str, set[str]] = {}
 
+    def adopt_state(self, earlier) -> None:
+        super().adopt_state(earlier)
+        if isinstance(earlier, OpenAICompatibleServerProvider):
+            self._rejected = earlier._rejected
+
     def _extra_payload(self, model: str, config) -> dict[str, Any]:
         extra: dict[str, Any] = {}
         if self.preset.response_format is not None:
@@ -180,15 +195,23 @@ class OpenAICompatibleServerProvider(OpenAICompatProvider):
 
     def classify(self, response: httpx.Response, model: str) -> TranslationProviderError | None:
         code = response.status_code
-        if code == 403:
+        # A 403 can also mean a limit, which passes; a refusal of the key is a rejection, and a
+        # rejected key is not tried again for a while.
+        if code == 403 and not _insufficient_quota(response) and not _rate_limited(response):
             return AuthenticationError(
                 f"{self.error_label} refused the request (403)", provider=self._name
             )
-        if code == 429 and _insufficient_quota(response):
+        if code == 403 and _rate_limited(response) and not _insufficient_quota(response):
+            return RateLimitError(
+                f"{self.error_label} says the rate limit was reached",
+                provider=self._name,
+                retry_after=retry_after_of(response),
+            )
+        if code in (403, 429) and _insufficient_quota(response):
             return QuotaExhaustedError(
                 f"{self.error_label} says the account has no quota left",
                 provider=self._name,
-                status_code=429,
+                status_code=code,
             )
         return None
 
@@ -275,7 +298,7 @@ class OpenAICompatibleBackendType(BackendType):
                 help="0 sends no budget.",
             ),
             SettingField(
-                "price_input",
+                "price_input_per_million",
                 FieldType.NUMBER,
                 "Input price (USD per 1M tokens)",
                 default=0.0,
@@ -284,7 +307,7 @@ class OpenAICompatibleBackendType(BackendType):
                 help="0 for a free or local server. A set price makes the budget hold each request's worst case.",
             ),
             SettingField(
-                "price_output",
+                "price_output_per_million",
                 FieldType.NUMBER,
                 "Output price (USD per 1M tokens)",
                 default=0.0,
@@ -323,7 +346,7 @@ class OpenAICompatibleBackendType(BackendType):
                 errors[key] = f"{label} is a whole number from {low} to {high}"
             else:
                 patch[key] = value
-        for key, label in (("price_input", "Input price"), ("price_output", "Output price")):
+        for key, label in (("price_input_per_million", "Input price"), ("price_output_per_million", "Output price")):
             value = settings.get(key, 0.0)
             try:
                 price = float(value)
@@ -332,8 +355,8 @@ class OpenAICompatibleBackendType(BackendType):
                 patch[key] = price
             except (TypeError, ValueError):
                 errors[key] = f"{label} is a number from 0 to 100000"
-        if preset.id == "openai" and not (patch.get("price_input") or patch.get("price_output")):
-            errors["price_input"] = "The OpenAI preset needs its prices so the budget can hold each call"
+        if preset.id == "openai" and not (patch.get("price_input_per_million") or patch.get("price_output_per_million")):
+            errors["price_input_per_million"] = "The OpenAI preset needs its prices so the budget can hold each call"
         return Validation(patch=patch, errors=errors)
 
     def _client(self, base: CoreSettings, base_url: str) -> httpx.AsyncClient | None:
@@ -354,8 +377,8 @@ class OpenAICompatibleBackendType(BackendType):
             preset=PRESETS[settings["preset"]],
             model=settings.get("model", ""),
             max_output_tokens=settings.get("max_tokens", DEFAULT_MAX_TOKENS),
-            price_input=float(settings.get("price_input", 0.0)),
-            price_output=float(settings.get("price_output", 0.0)),
+            price_input=float(settings.get("price_input_per_million", 0.0)),
+            price_output=float(settings.get("price_output_per_million", 0.0)),
             settings=base,
             client=self._client(base, settings["base_url"]),
             clock=self._clock,

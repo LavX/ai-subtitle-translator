@@ -1,0 +1,696 @@
+{
+  "settings_version": 1,
+  "endpoints": [
+    "generativelanguage.googleapis.com",
+    "openrouter.ai"
+  ],
+  "engine": [
+    {
+      "key": "request_timeout",
+      "type": "integer",
+      "label": "Seconds to wait for one request",
+      "default": 120,
+      "required": false,
+      "secret": false,
+      "destination": false,
+      "help": null,
+      "help_url": null,
+      "choices": [],
+      "min": 30,
+      "max": 900,
+      "group": null,
+      "show_when": null
+    },
+    {
+      "key": "max_retries",
+      "type": "integer",
+      "label": "Retries of one batch",
+      "default": 3,
+      "required": false,
+      "secret": false,
+      "destination": false,
+      "help": null,
+      "help_url": null,
+      "choices": [],
+      "min": 0,
+      "max": 6,
+      "group": null,
+      "show_when": null
+    }
+  ],
+  "backend_types": {
+    "gemini": {
+      "name": "Google Gemini",
+      "sign_in": false,
+      "login": null,
+      "connection": [
+        {
+          "key": "api_keys",
+          "type": "key_list",
+          "label": "API keys",
+          "default": null,
+          "required": true,
+          "secret": true,
+          "destination": false,
+          "help": "Several keys rotate when one is limited. Keys from one Google Cloud project share its limits.",
+          "help_url": "https://aistudio.google.com/apikey",
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "key_projects",
+          "type": "list",
+          "label": "Project of each key",
+          "default": null,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "Optional. Give keys from the same project the same name, in the order of the keys.",
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "model",
+          "type": "live_choice",
+          "label": "Model",
+          "default": "gemini-3.6-flash",
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "reasoning",
+          "type": "choice",
+          "label": "Thinking",
+          "default": "disabled",
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "Gemini 3 and 2.5 Pro always think; Disabled uses their lowest level.",
+          "help_url": null,
+          "choices": [
+            {
+              "value": "disabled",
+              "label": "Disabled"
+            },
+            {
+              "value": "low",
+              "label": "Low"
+            },
+            {
+              "value": "medium",
+              "label": "Medium"
+            },
+            {
+              "value": "high",
+              "label": "High"
+            }
+          ],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "temperature",
+          "type": "number",
+          "label": "Temperature",
+          "default": 0.3,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 2,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "batch_size",
+          "type": "integer",
+          "label": "Lines per request",
+          "default": 300,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": 10,
+          "max": 500,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "price_input_per_million",
+          "type": "number",
+          "label": "Input price (USD per 1M tokens)",
+          "default": 0.0,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "0 for the free tier. A set price makes the budget hold each request's worst case.",
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 100000,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "price_output_per_million",
+          "type": "number",
+          "label": "Output price (USD per 1M tokens)",
+          "default": 0.0,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 100000,
+          "group": null,
+          "show_when": null
+        }
+      ]
+    },
+    "openai_compatible": {
+      "name": "OpenAI-compatible server",
+      "sign_in": false,
+      "login": null,
+      "connection": [
+        {
+          "key": "preset",
+          "type": "choice",
+          "label": "Server",
+          "default": "custom",
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "Fills in the address and the request details that server expects.",
+          "help_url": null,
+          "choices": [
+            {
+              "value": "openai",
+              "label": "OpenAI",
+              "fills": {
+                "base_url": "https://api.openai.com/v1",
+                "parallel_batches": 4
+              }
+            },
+            {
+              "value": "lmstudio",
+              "label": "LM Studio",
+              "fills": {
+                "base_url": "http://localhost:1234/v1",
+                "parallel_batches": 1
+              }
+            },
+            {
+              "value": "ollama",
+              "label": "Ollama",
+              "fills": {
+                "base_url": "http://localhost:11434/v1",
+                "parallel_batches": 1
+              }
+            },
+            {
+              "value": "custom",
+              "label": "Custom",
+              "fills": {
+                "base_url": "",
+                "parallel_batches": 1
+              }
+            }
+          ],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "base_url",
+          "type": "text",
+          "label": "Server address",
+          "default": null,
+          "required": true,
+          "secret": false,
+          "destination": true,
+          "help": "Inside a container, localhost is the container itself: for a server on your machine use its LAN address or host.docker.internal.",
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "api_key",
+          "type": "secret",
+          "label": "API key",
+          "default": null,
+          "required": false,
+          "secret": true,
+          "destination": false,
+          "help": "Only if the server asks for one. LM Studio and Ollama need none.",
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "model",
+          "type": "live_choice",
+          "label": "Model",
+          "default": null,
+          "required": true,
+          "secret": false,
+          "destination": false,
+          "help": "Pick one the server has loaded, or type its id.",
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "temperature",
+          "type": "number",
+          "label": "Temperature",
+          "default": 0.3,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 2,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "batch_size",
+          "type": "integer",
+          "label": "Lines per request",
+          "default": 100,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "Local models often have a small context window: lower this if replies come back cut short.",
+          "help_url": null,
+          "choices": [],
+          "min": 10,
+          "max": 500,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "parallel_batches",
+          "type": "integer",
+          "label": "Requests in parallel",
+          "default": 1,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "A local server usually answers one request at a time.",
+          "help_url": null,
+          "choices": [],
+          "min": 1,
+          "max": 10,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "max_tokens",
+          "type": "integer",
+          "label": "Output budget per request",
+          "default": 8000,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "0 sends no budget.",
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 200000,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "price_input_per_million",
+          "type": "number",
+          "label": "Input price (USD per 1M tokens)",
+          "default": 0.0,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "0 for a free or local server. A set price makes the budget hold each request's worst case.",
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 100000,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "price_output_per_million",
+          "type": "number",
+          "label": "Output price (USD per 1M tokens)",
+          "default": 0.0,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 100000,
+          "group": null,
+          "show_when": null
+        }
+      ]
+    },
+    "openrouter": {
+      "name": "OpenRouter",
+      "sign_in": false,
+      "login": null,
+      "connection": [
+        {
+          "key": "api_key",
+          "type": "secret",
+          "label": "API key",
+          "default": null,
+          "required": true,
+          "secret": true,
+          "destination": false,
+          "help": null,
+          "help_url": "https://openrouter.ai/keys",
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "model",
+          "type": "live_choice",
+          "label": "Model",
+          "default": "google/gemini-2.5-flash-lite",
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "temperature",
+          "type": "number",
+          "label": "Temperature",
+          "default": 0.3,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 2,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "reasoning",
+          "type": "choice",
+          "label": "Reasoning",
+          "default": "disabled",
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [
+            {
+              "value": "disabled",
+              "label": "disabled"
+            },
+            {
+              "value": "minimal",
+              "label": "minimal"
+            },
+            {
+              "value": "low",
+              "label": "low"
+            },
+            {
+              "value": "medium",
+              "label": "medium"
+            },
+            {
+              "value": "high",
+              "label": "high"
+            },
+            {
+              "value": "xhigh",
+              "label": "xhigh"
+            }
+          ],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "routing",
+          "type": "choice",
+          "label": "Provider routing",
+          "default": "throughput",
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [
+            {
+              "value": "default",
+              "label": "default"
+            },
+            {
+              "value": "throughput",
+              "label": "throughput"
+            },
+            {
+              "value": "price",
+              "label": "price"
+            },
+            {
+              "value": "latency",
+              "label": "latency"
+            },
+            {
+              "value": "nitro",
+              "label": "nitro"
+            },
+            {
+              "value": "floor",
+              "label": "floor"
+            },
+            {
+              "value": "smartfast",
+              "label": "smartfast"
+            }
+          ],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "smart_fast",
+          "type": "text",
+          "label": "SmartFast policy",
+          "default": null,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "A JSON object, for example {\"maxPromptPrice\": 0.05}. Empty keeps the defaults.",
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": "SmartFast",
+          "show_when": {
+            "field": "routing",
+            "equals": "smartfast"
+          }
+        },
+        {
+          "key": "provider_order",
+          "type": "orderable_list",
+          "label": "Provider order",
+          "default": null,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": "Providers",
+          "show_when": null
+        },
+        {
+          "key": "only",
+          "type": "list",
+          "label": "Only these providers",
+          "default": null,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": "Providers",
+          "show_when": null
+        },
+        {
+          "key": "ignore",
+          "type": "list",
+          "label": "Never these providers",
+          "default": null,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": "Providers",
+          "show_when": null
+        },
+        {
+          "key": "allow_fallbacks",
+          "type": "toggle",
+          "label": "Allow fallback providers",
+          "default": true,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": "Providers",
+          "show_when": null
+        },
+        {
+          "key": "deny_data_collection",
+          "type": "toggle",
+          "label": "Avoid providers that store or train on your data",
+          "default": false,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "Many free models retain data, so this can leave no provider for them.",
+          "help_url": null,
+          "choices": [],
+          "min": null,
+          "max": null,
+          "group": "Providers",
+          "show_when": null
+        },
+        {
+          "key": "service_tier",
+          "type": "choice",
+          "label": "Service tier",
+          "default": null,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [
+            {
+              "value": "default",
+              "label": "default"
+            },
+            {
+              "value": "flex",
+              "label": "flex"
+            },
+            {
+              "value": "priority",
+              "label": "priority"
+            }
+          ],
+          "min": null,
+          "max": null,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "parallel_batches",
+          "type": "integer",
+          "label": "Requests in parallel",
+          "default": 4,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": null,
+          "help_url": null,
+          "choices": [],
+          "min": 1,
+          "max": 10,
+          "group": null,
+          "show_when": null
+        },
+        {
+          "key": "max_tokens",
+          "type": "integer",
+          "label": "Output budget per request",
+          "default": 8000,
+          "required": false,
+          "secret": false,
+          "destination": false,
+          "help": "0 sends no budget.",
+          "help_url": null,
+          "choices": [],
+          "min": 0,
+          "max": 200000,
+          "group": null,
+          "show_when": null
+        }
+      ]
+    }
+  }
+}

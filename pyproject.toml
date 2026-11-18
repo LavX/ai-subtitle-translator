@@ -130,3 +130,22 @@ name = "The core and the back ends never load server libraries"
 type = "forbidden"
 source_modules = ["subtitle_translator.core", "subtitle_translator.backends"]
 forbidden_modules = ["fastapi", "starlette", "pydantic_settings", "dotenv", "cryptography", "uvicorn", "multipart", "python_multipart"]
+
+[[tool.importlinter.contracts]]
+name = "The plugin never imports the server"
+type = "forbidden"
+source_modules = ["subtitle_translator.plugin"]
+forbidden_modules = ["subtitle_translator.server"]
+
+[[tool.importlinter.contracts]]
+name = "The core and the back ends never import the plugin"
+type = "forbidden"
+source_modules = ["subtitle_translator.core", "subtitle_translator.backends"]
+forbidden_modules = ["subtitle_translator.plugin"]
+
+[[tool.importlinter.contracts]]
+name = "Only the SDK binding imports the SDK"
+type = "forbidden"
+source_modules = ["subtitle_translator"]
+forbidden_modules = ["bazarr_plugin_sdk"]
+ignore_imports = ["subtitle_translator.plugin.sdk_binding -> bazarr_plugin_sdk"]

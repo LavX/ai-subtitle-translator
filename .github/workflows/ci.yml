@@ -25,6 +25,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e ".[dev]"
+          # The host carries its own copy of the SDK at run time; the binding's tests need one.
+          pip install "git+https://github.com/LavX/bazarr-plugin-sdk@v0.1.0"
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
@@ -34,6 +36,9 @@ jobs:
 
       - name: Check package boundaries
         run: lint-imports
+
+      - name: Check the plugin manifest settings are current
+        run: python -m subtitle_translator.plugin.manifest --scope builtin | diff - catalog/ai_translator.settings.json
 
   web-ui:
     runs-on: ubuntu-latest
