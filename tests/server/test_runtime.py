@@ -368,6 +368,37 @@ def test_a_blank_value_from_compose_counts_as_not_set(tmp_path, monkeypatch):
     assert connection.settings["batch_size"] == 100 and connection.settings["price_input_per_million"] == 0.0
 
 
+def _price_connection(tmp_path, monkeypatch, env):
+    for name in ("PRICE_INPUT", "PRICE_OUTPUT", "PRICE_INPUT_PER_MILLION", "PRICE_OUTPUT_PER_MILLION"):
+        monkeypatch.delenv(f"OPENAI_COMPATIBLE_{name}", raising=False)
+    for name, value in {"PRESET": "openai", "MODEL": "gpt-5.6-mini", "API_KEY": "sk-x", **env}.items():
+        monkeypatch.setenv(f"OPENAI_COMPATIBLE_{name}", value)
+    monkeypatch.chdir(tmp_path)
+    registry = BackendRegistry.discover(BackendScope.builtin())
+    return build_connections(settings(backend_order="openai_compatible"), registry)[0]
+
+
+def test_the_earlier_price_variables_still_set_the_prices(tmp_path, monkeypatch):
+    connection = _price_connection(tmp_path, monkeypatch, {"PRICE_INPUT": "1.5", "PRICE_OUTPUT": "6"})
+    assert connection.enabled
+    assert (connection.settings["price_input_per_million"], connection.settings["price_output_per_million"]) == (1.5, 6.0)
+
+
+def test_the_new_price_variable_wins_when_both_are_set(tmp_path, monkeypatch):
+    connection = _price_connection(
+        tmp_path, monkeypatch, {"PRICE_INPUT": "1.5", "PRICE_INPUT_PER_MILLION": "2.5", "PRICE_OUTPUT": "6"}
+    )
+    assert connection.settings["price_input_per_million"] == 2.5
+    assert connection.settings["price_output_per_million"] == 6.0
+
+
+def test_a_blank_new_variable_falls_back_to_the_earlier_one(tmp_path, monkeypatch):
+    connection = _price_connection(
+        tmp_path, monkeypatch, {"PRICE_INPUT_PER_MILLION": "", "PRICE_INPUT": "1.5", "PRICE_OUTPUT": "6"}
+    )
+    assert connection.settings["price_input_per_million"] == 1.5
+
+
 def test_no_dotenv_file_is_fine(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     for name in ("PRESET", "BASE_URL", "MODEL"):

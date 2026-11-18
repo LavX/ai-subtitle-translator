@@ -395,3 +395,26 @@ async def test_a_plain_403_is_still_a_rejected_key():
     with pytest.raises(AuthenticationError):
         await p.translate_batch(BATCH)
     assert p.keys.all_invalid()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "headers,body_delay,expected",
+    [
+        ({"retry-after": "3600"}, None, 3600),
+        ({"retry-after": "3600"}, "90s", 90),  # Google's own hint wins
+        ({}, None, 60),
+    ],
+)
+async def test_a_403_limit_waits_as_long_as_the_reply_says(headers, body_delay, expected):
+    error = {"code": 403, "message": "Rate limit exceeded", "status": "RESOURCE_EXHAUSTED"}
+    if body_delay:
+        error["details"] = [{"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": body_delay}]
+
+    def handler(request):
+        return httpx.Response(403, json={"error": error}, headers=headers)
+
+    p = gemini(handler, keys=["a"])
+    with pytest.raises(RateLimitError) as caught:
+        await p.translate_batch(BATCH)
+    assert caught.value.retry_after == pytest.approx(expected, abs=5)

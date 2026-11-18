@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from subtitle_translator.backends.chat_completions import retry_after_of
 from subtitle_translator.backends.openai_compat import OpenAICompatProvider
 from subtitle_translator.core.backends import (
     BackendContext,
@@ -224,7 +225,12 @@ class GeminiProvider(OpenAICompatProvider):
                     retry_after=next_pacific_midnight(now) - now,
                     status_code=code,
                 )
-            delay = parsed.retry_delay if parsed and parsed.retry_delay is not None else 60.0
+            # Google's own hint first, then the header, then a minute.
+            delay = parsed.retry_delay if parsed and parsed.retry_delay is not None else None
+            if delay is None:
+                delay = retry_after_of(response)
+            if delay is None:
+                delay = 60.0
             return RateLimitError(
                 f"Gemini rate limit: {message}", provider="gemini", retry_after=delay
             )

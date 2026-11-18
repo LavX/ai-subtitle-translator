@@ -21,8 +21,27 @@ logger = logging.getLogger(__name__)
 _LISTS = {FieldType.LIST, FieldType.KEY_LIST, FieldType.ORDERABLE_LIST}
 
 
+# Settings renamed to the names Bazarr+ uses keep their earlier environment variable, so a
+# standalone deployment that sets it keeps its prices. The new name wins when both are set.
+ENV_ALIASES = {
+    "price_input_per_million": "price_input",
+    "price_output_per_million": "price_output",
+}
+
+
 def env_name(type_id: str, key: str) -> str:
     return f"{type_id}_{key}".upper().replace("-", "_")
+
+
+def _raw(name: str, key: str, environ: Mapping[str, str]) -> str | None:
+    """The value of a setting's variable, or of its earlier spelling when the new one is empty."""
+    for candidate in (key, ENV_ALIASES.get(key)):
+        if candidate is None:
+            continue
+        raw = environ.get(env_name(name, candidate))
+        if raw is not None and raw.strip():
+            return raw
+    return None
 
 
 def _split(value: str) -> list[str]:
@@ -68,8 +87,8 @@ def _upper(source: Mapping[str, str]) -> dict[str, str]:
 def _configured(name: str, backend, environ: Mapping[str, str]) -> Connection:
     values, secrets = {}, {}
     for spec in backend.fields():
-        raw = environ.get(env_name(name, spec.key))
-        if raw is None or not raw.strip():
+        raw = _raw(name, spec.key, environ)
+        if raw is None:
             # Docker Compose hands a variable the .env file lacks through as an empty string.
             continue
         try:
