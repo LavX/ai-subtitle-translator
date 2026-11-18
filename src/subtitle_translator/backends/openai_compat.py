@@ -63,6 +63,9 @@ class OpenAICompatProvider(ChatCompletionsProvider):
         self.price_output = price_output
         self.prices_requests = price_input > 0 or price_output > 0
 
+    def adopt_state(self, earlier) -> None:
+        if isinstance(earlier, OpenAICompatProvider) and len(earlier.keys) == len(self.keys):
+            self.keys = earlier.keys
     @property
     def provider_name(self) -> str:
         return self._name

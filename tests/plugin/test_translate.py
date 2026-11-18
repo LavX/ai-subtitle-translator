@@ -204,21 +204,29 @@ async def test_a_connection_the_engine_cannot_open_names_its_field_like_test_doe
 
 
 @pytest.mark.asyncio
-async def test_a_back_end_opened_for_a_call_gets_that_call_s_folders():
+async def test_a_back_end_is_reopened_with_a_later_call_s_folders_and_keeps_its_state():
     from pathlib import Path
 
     from subtitle_translator.core.backends import BackendContext
 
+    class Adopting(ScriptedProvider):
+        adopted = None
+
+        def adopt_state(self, earlier):
+            self.adopted = earlier
+
     class Recording(ScriptedBackend):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.contexts = []
+            self.contexts, self.made = [], []
 
         def open(self, connection, base, context):
             self.contexts.append(context)
+            self.made.append(Adopting())
+            self.providers["c1"] = self.made[-1]
             return super().open(connection, base, context)
 
-    backend = Recording({"c1": ScriptedProvider(), "c2": ScriptedProvider()})
+    backend = Recording({})
     result = TranslatorContract(PluginScope.builtin())
     result._registry = BackendRegistry(
         [RegisteredBackend("scripted", backend, "lavx-ai-subtitle-translator", "0", None)]
@@ -226,9 +234,26 @@ async def test_a_back_end_opened_for_a_call_gets_that_call_s_folders():
     first = BackendContext(temp_dir=Path("/tmp/job-1"), artifacts_dir=Path("/tmp/art-1"))
     second = BackendContext(temp_dir=Path("/tmp/job-2"), artifacts_dir=Path("/tmp/art-2"))
     await result.translate(request(), Sink(), context=first)
-    other = request()
-    other["config"]["connection"]["id"] = "c2"
-    await result.translate(other, Sink(), context=second)
+    await result.translate(request(), Sink(), context=second)
+    # The same connection, called with other folders: opened again with them, state handed over.
     assert backend.contexts == [first, second]
-    # One engine serves both calls: no folder is part of what is cached.
+    old, new = backend.made
+    assert new.adopted is old and old.closed
     assert len(result._engines) == 1
+    # The same folders again reuse what is open.
+    await result.translate(request(), Sink(), context=second)
+    assert backend.contexts == [first, second]
+
+
+@pytest.mark.asyncio
+async def test_an_adopting_provider_keeps_its_keys_and_learned_fields():
+    from subtitle_translator.backends.openai_compat import OpenAICompatProvider
+
+    old = OpenAICompatProvider("http://h/v1", ["a", "b"], default_model="m")
+    old.keys.mark_rate_limited("a", 3600, "m")
+    new = OpenAICompatProvider("http://h/v1", ["a", "b"], default_model="m")
+    new.adopt_state(old)
+    assert new.keys is old.keys
+    different = OpenAICompatProvider("http://h/v1", ["a"], default_model="m")
+    different.adopt_state(old)
+    assert different.keys is not old.keys

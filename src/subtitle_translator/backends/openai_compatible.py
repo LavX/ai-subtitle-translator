@@ -169,6 +169,11 @@ class OpenAICompatibleServerProvider(OpenAICompatProvider):
         self.max_output_tokens = max_output_tokens
         self._rejected: dict[str, set[str]] = {}
 
+    def adopt_state(self, earlier) -> None:
+        super().adopt_state(earlier)
+        if isinstance(earlier, OpenAICompatibleServerProvider):
+            self._rejected = earlier._rejected
+
     def _extra_payload(self, model: str, config) -> dict[str, Any]:
         extra: dict[str, Any] = {}
         if self.preset.response_format is not None:

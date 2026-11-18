@@ -102,8 +102,17 @@ class TranslationProvider(ABC):
 
     @abstractmethod
     async def close(self) -> None:
-        """Clean up resources (close HTTP connections, etc.)."""
+        """Clean up resources (close HTTP connections, etc.).
+
+        A provider must work again after close(): it opens a new client when it is used again,
+        because a host that runs each call on its own event loop closes the clients after
+        every call and keeps the provider."""
         pass
+
+    def adopt_state(self, earlier: "TranslationProvider") -> None:  # noqa: B027
+        """Take over what an earlier provider of the same connection learned (key health,
+        rejected request fields, catalogs), when the engine replaces it with a new one. Nothing
+        loop-bound or path-bound is taken. The default takes nothing."""
 
     @abstractmethod
     async def get_available_models(self) -> list[dict]:

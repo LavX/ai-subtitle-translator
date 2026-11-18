@@ -486,6 +486,17 @@ class OpenRouterProvider(ChatCompletionsProvider):
         snapshot._client = client
         return snapshot
 
+    def adopt_state(self, earlier) -> None:
+        if not isinstance(earlier, OpenRouterProvider):
+            return
+        self._smartfast_router = earlier._smartfast_router
+        self._model_params_cache = earlier._model_params_cache
+        self._model_reasoning_cache = earlier._model_reasoning_cache
+        self._model_max_output_cache = earlier._model_max_output_cache
+        self._model_price_cache = earlier._model_price_cache
+        self._model_params_fetched = earlier._model_params_fetched
+        self._model_params_retry_at = earlier._model_params_retry_at
+
     async def close(self) -> None:
         """Close the HTTP client. The catalog lock is replaced too, because a lock remembers the
         event loop it was contended on and this provider may be used again on another."""
