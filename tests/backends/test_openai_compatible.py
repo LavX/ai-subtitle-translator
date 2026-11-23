@@ -258,6 +258,16 @@ async def test_a_priced_request_is_held_before_it_is_sent():
 
 
 @pytest.mark.asyncio
+async def test_split_usage_preserves_whole_microdollar_charge():
+    _seen, handler = recorder()
+    backend = opened(handler, preset="openai", model="gpt-5.6-mini", secrets={"api_key": "k"},
+                     price_input_per_million=2.0, price_output_per_million=5.0)
+    result = await backend.provider.translate_batch(BATCH, config_override=backend.config)
+    # The host ceilings fractional microdollars, so the wire amount must stay at exactly 60 micros.
+    assert result.cost == 0.00006
+
+
+@pytest.mark.asyncio
 async def test_a_priced_call_settles_at_the_computed_cost():
     meter = UsageMeter(budget=1.0)
     _seen, handler = recorder()

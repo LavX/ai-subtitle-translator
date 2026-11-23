@@ -5,6 +5,7 @@ are both built on it; neither one's request details reach the other."""
 import logging
 import time
 from collections.abc import Callable, Sequence
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Optional
 
 import httpx
@@ -171,16 +172,19 @@ class OpenAICompatProvider(ChatCompletionsProvider):
     def _priced_cost(
         self, prompt: int | None, completion: int | None, total: int | None
     ) -> float | None:
-        """The call's cost from the configured prices, never from the server's own figure."""
+        """Price the call in decimal before sending the amount to a host that rounds up."""
         if (
             isinstance(prompt, int)
             and not isinstance(prompt, bool)
             and isinstance(completion, int)
             and not isinstance(completion, bool)
         ):
-            return prompt * self.price_input / 1e6 + completion * self.price_output / 1e6
+            prompt_cost = prompt * Decimal(str(self.price_input))
+            completion_cost = completion * Decimal(str(self.price_output))
+            return float((prompt_cost + completion_cost) / 1_000_000)
         if isinstance(total, int) and not isinstance(total, bool) and total > 0:
-            return total * max(self.price_input, self.price_output) / 1e6
+            rate = Decimal(str(max(self.price_input, self.price_output)))
+            return float(total * rate / 1_000_000)
         return None
 
     def _attach_usage(self, error: TranslationProviderError, response: httpx.Response) -> None:
@@ -193,8 +197,11 @@ class OpenAICompatProvider(ChatCompletionsProvider):
         self._price_error(error)
 
     def _price_error(self, error: TranslationProviderError) -> None:
-        if self.prices_requests and error.tokens_used:
-            error.cost = float(error.tokens_used) * max(self.price_input, self.price_output) / 1e6
+        if not self.prices_requests:
+            return
+        cost = self._priced_cost(None, None, error.tokens_used)
+        if cost is not None:
+            error.cost = cost
             # The reported tokens put a charge on the call, so its hold is settled with it.
             error.billing_unknown = False
 
